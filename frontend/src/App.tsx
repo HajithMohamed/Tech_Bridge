@@ -15,6 +15,7 @@ import MyApplicationsPage from './pages/MyApplicationsPage';
 import MyResourceRequestsPage from './pages/MyResourceRequestsPage';
 import PublicProviderProfilePage from './pages/PublicProviderProfilePage';
 import ImpactDashboardPage from './pages/ImpactDashboardPage';
+import LandingPage from './pages/LandingPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -57,8 +58,8 @@ function App() {
       <Route path="/impact" element={<ProtectedRoute><ImpactDashboardPage /></ProtectedRoute>} />
 
       {/* Redirects */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
