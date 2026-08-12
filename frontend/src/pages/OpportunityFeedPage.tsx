@@ -4,13 +4,13 @@ import AppHeader from '../components/AppHeader';
 import { getOpportunities, getScholarships, getMatchedOpportunities } from '../api/opportunityApi';
 import { useAuth } from '../hooks/useAuth';
 import type { Opportunity, MatchedOpportunity, OpportunityType, WorkMode } from '../types';
-import { Search, Filter, Briefcase, GraduationCap, BookOpen, Code, Wrench, Lightbulb, Target, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, Filter, Briefcase, GraduationCap, BookOpen, Code, Wrench, Lightbulb, Target, ArrowRight, Sparkles, Users } from 'lucide-react';
 
 const typeLabels: Record<OpportunityType, string> = {
-  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance', workshop: 'Workshop',
+  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance', workshop: 'Workshop', mentorship: 'Mentorship',
 };
 const typeIcons: Record<OpportunityType, typeof Briefcase> = {
-  job: Briefcase, internship: GraduationCap, scholarship: BookOpen, course: Lightbulb, freelance: Code, workshop: Wrench,
+  job: Briefcase, internship: GraduationCap, scholarship: BookOpen, course: Lightbulb, freelance: Code, workshop: Wrench, mentorship: Users,
 };
 const coverageLabels: Record<string, string> = {
   full: 'Full coverage', partial: 'Partial coverage', tuition_only: 'Tuition only', equipment_only: 'Equipment only', stipend: 'Stipend',
@@ -43,7 +43,7 @@ const OpportunityFeedPage = () => {
   const isStudent = user?.role === 'student';
 
   const [opportunities, setOpportunities] = useState<(Opportunity | MatchedOpportunity)[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'scholarships' | 'matched'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'earn' | 'learn' | 'experience' | 'financial' | 'matched'>('all');
   const [type, setType] = useState<OpportunityType | ''>('');
   const [skill, setSkill] = useState('');
   const [workMode, setWorkMode] = useState<WorkMode | ''>('');
@@ -58,15 +58,35 @@ const OpportunityFeedPage = () => {
         if (activeTab === 'matched' && isStudent) {
           const result = await getMatchedOpportunities();
           setOpportunities(result.opportunities);
-        } else if (activeTab === 'scholarships' && !skill.trim() && !workMode) {
+        } else if (activeTab === 'financial' && !skill.trim() && !workMode) {
           setOpportunities(await getScholarships());
         } else {
+          let typeQuery = type ? type : undefined;
+          
+          if (!type) {
+            if (activeTab === 'financial') typeQuery = 'scholarship';
+            // We can't query multiple types simultaneously with the current `type` filter. 
+            // The backend /api/opportunities?type=job etc. supports only one.
+            // But wait, if activeTab is earn/learn/experience we can fetch all and filter in frontend,
+            // OR update backend to support multiple types? 
+            // For now, let's fetch all and filter in frontend if no specific `type` is chosen!
+          }
+
           const filters = {
-            ...(activeTab === 'scholarships' ? { type: 'scholarship' as OpportunityType } : type ? { type } : {}),
+            ...(typeQuery ? { type: typeQuery } : {}),
             ...(skill.trim() ? { skill: skill.trim() } : {}),
             ...(workMode ? { workMode } : {}),
           };
-          setOpportunities(await getOpportunities(filters));
+          
+          let results = await getOpportunities(filters);
+          
+          if (!typeQuery) {
+            if (activeTab === 'earn') results = results.filter(o => ['job', 'freelance'].includes(o.type));
+            if (activeTab === 'learn') results = results.filter(o => ['course', 'workshop', 'mentorship'].includes(o.type));
+            if (activeTab === 'experience') results = results.filter(o => o.type === 'internship');
+          }
+          
+          setOpportunities(results);
         }
       } catch {
         setError('We could not load opportunities right now. Please try again.');
@@ -77,9 +97,9 @@ const OpportunityFeedPage = () => {
     void load();
   }, [activeTab, type, skill, workMode, isStudent]);
 
-  const switchTab = (tab: 'all' | 'scholarships' | 'matched') => {
+  const switchTab = (tab: 'all' | 'earn' | 'learn' | 'experience' | 'financial' | 'matched') => {
     setActiveTab(tab);
-    if (tab === 'scholarships') setType('');
+    setType('');
   };
 
   return (
@@ -96,12 +116,21 @@ const OpportunityFeedPage = () => {
         </section>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-gray-200 mb-6">
+        <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
           <button onClick={() => switchTab('all')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'all' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
             All opportunities
           </button>
-          <button onClick={() => switchTab('scholarships')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'scholarships' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-            Scholarships
+          <button onClick={() => switchTab('earn')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'earn' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            EARN <span className="text-xs font-normal opacity-70 ml-1">(Jobs)</span>
+          </button>
+          <button onClick={() => switchTab('experience')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'experience' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            EXPERIENCE <span className="text-xs font-normal opacity-70 ml-1">(Internships)</span>
+          </button>
+          <button onClick={() => switchTab('learn')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'learn' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            LEARN <span className="text-xs font-normal opacity-70 ml-1">(Mentorships, Courses)</span>
+          </button>
+          <button onClick={() => switchTab('financial')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'financial' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            FINANCIAL <span className="text-xs font-normal opacity-70 ml-1">(Scholarships)</span>
           </button>
           {isStudent && (
             <button onClick={() => switchTab('matched')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${activeTab === 'matched' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
@@ -109,6 +138,11 @@ const OpportunityFeedPage = () => {
               Matched for you
             </button>
           )}
+          
+          <div className="flex-1"></div>
+          <Link to="/resources" className="px-4 py-3 text-sm font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-2">
+            ACCESS <span className="text-xs font-normal opacity-80">(Resources)</span> <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
         {/* Filters (hidden in matched tab) */}
@@ -117,8 +151,8 @@ const OpportunityFeedPage = () => {
             <div className="relative">
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <select
-                value={activeTab === 'scholarships' ? 'scholarship' : type}
-                disabled={activeTab === 'scholarships'}
+                value={activeTab === 'financial' ? 'scholarship' : type}
+                disabled={activeTab === 'financial'}
                 onChange={(e) => setType(e.target.value as OpportunityType | '')}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 text-sm text-gray-700 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:opacity-60 appearance-none cursor-pointer"
               >

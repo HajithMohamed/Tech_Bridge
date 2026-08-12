@@ -12,6 +12,8 @@ import ProviderProfilePage from './pages/ProviderProfilePage';
 import ResourceHubPage from './pages/ResourceHubPage';
 import ResourceListingPage from './pages/ResourceListingPage';
 import MyApplicationsPage from './pages/MyApplicationsPage';
+import MyResourceRequestsPage from './pages/MyResourceRequestsPage';
+import PublicProviderProfilePage from './pages/PublicProviderProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -49,6 +51,8 @@ function App() {
       <Route path="/resources" element={<ProtectedRoute><ResourceHubPage /></ProtectedRoute>} />
       <Route path="/resources/list" element={<ProtectedRoute><ResourceListingPage /></ProtectedRoute>} />
       <Route path="/my-applications" element={<ProtectedRoute allowedRoles={['student']}><MyApplicationsPage /></ProtectedRoute>} />
+      <Route path="/my-resource-requests" element={<ProtectedRoute allowedRoles={['student']}><MyResourceRequestsPage /></ProtectedRoute>} />
+      <Route path="/providers/:id" element={<ProtectedRoute><PublicProviderProfilePage /></ProtectedRoute>} />
 
       {/* Redirects */}
       <Route path="/" element={<Navigate to="/login" replace />} />

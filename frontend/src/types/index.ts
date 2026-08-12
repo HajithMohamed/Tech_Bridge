@@ -241,12 +241,23 @@ export interface ProviderDashboard {
     totalOpportunities: number;
     scholarships: number;
     applicationsReceived: number;
+    resourceRequestsReceived: number;
+    pendingRequests: number;
+    acceptedRequests: number;
     activeListings: number;
     resourceCount: number;
     expiringSoon: number;
     views: number;
   };
   recentOpportunities: Array<Pick<Opportunity, '_id' | 'title' | 'type' | 'status' | 'applicationDeadline' | 'createdAt' | 'views'>>;
+  recentActivity: Array<{
+    id: string;
+    kind: 'opportunity' | 'application' | 'resource_request';
+    title: string;
+    detail: string;
+    status: string;
+    occurredAt: string;
+  }>;
 }
 
 export interface OpportunityFormData {
@@ -264,6 +275,21 @@ export interface OpportunityFormData {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+
+  duration?: string;
+  isPaid?: boolean;
+  preferredAcademicBackground?: string;
+  startDate?: string;
+  endDate?: string;
+  fee?: number;
+  isFree?: boolean;
+  mentorName?: string;
+  professionalField?: string;
+  experience?: string;
+  mentorshipType?: 'Career guidance' | 'Technical guidance' | 'Internship guidance' | 'Portfolio guidance';
+  availability?: string;
+  paymentInfo?: string;
+  contactMethod?: string;
 }
 
 export interface LoginData {
@@ -278,4 +304,32 @@ export interface ApiError {
     field: string;
     message: string;
   }>;
+}
+
+export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
+
+export interface ResourceRequest {
+  _id: string;
+  studentId: string | User | ApplicationApplicant;
+  providerId: string | User;
+  resourceId: string | ResourceListing;
+  requestedAccessType: ResourceAccessType;
+  durationOrTerms?: string;
+  message?: string;
+  status: ResourceRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublicProviderProfile {
+  _id: string;
+  fullName: string;
+  providerProfile: ProviderProfile;
+  createdAt: string;
+}
+
+export interface PublicProviderResponse {
+  provider: PublicProviderProfile;
+  opportunities: Opportunity[];
+  resources: ResourceListing[];
 }

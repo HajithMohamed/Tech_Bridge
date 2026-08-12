@@ -12,6 +12,8 @@ const opportunityRoutes_1 = __importDefault(require("./routes/opportunityRoutes"
 const resourceRoutes_1 = __importDefault(require("./routes/resourceRoutes"));
 const applicationRoutes_1 = __importDefault(require("./routes/applicationRoutes"));
 const providerRoutes_1 = __importDefault(require("./routes/providerRoutes"));
+const publicProviderRoutes_1 = __importDefault(require("./routes/publicProviderRoutes"));
+const resourceRequestRoutes_1 = __importDefault(require("./routes/resourceRequestRoutes"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -29,6 +31,8 @@ app.use('/api/opportunities', opportunityRoutes_1.default);
 app.use('/api/resources', resourceRoutes_1.default);
 app.use('/api/applications', applicationRoutes_1.default);
 app.use('/api/provider', providerRoutes_1.default);
+app.use('/api/providers', publicProviderRoutes_1.default);
+app.use('/api/resource-requests', resourceRequestRoutes_1.default);
 // Health check
 app.get('/api/health', (_req, res) => {
     res.json({

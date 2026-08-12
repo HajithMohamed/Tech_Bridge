@@ -271,16 +271,45 @@ const OpportunityDetailPage = () => {
               <Description title="About this scholarship" value={opportunity.description} />
             </section>
           ) : (
-            <section className="mt-7">
+            <section className="mt-8 space-y-6">
+              
+              {opportunity.type === 'internship' && (
+                <div className="grid sm:grid-cols-3 gap-3 mb-6">
+                  <Stat label="Duration" value={opportunity.duration || '—'} />
+                  <Stat label="Compensation" value={opportunity.isPaid ? 'Paid' : 'Unpaid'} />
+                  <Stat label="Preferred background" value={opportunity.preferredAcademicBackground || 'Any'} />
+                </div>
+              )}
+              
+              {(opportunity.type === 'course' || opportunity.type === 'workshop') && (
+                <div className="grid sm:grid-cols-3 gap-3 mb-6">
+                  <Stat label="Duration" value={opportunity.duration || '—'} />
+                  <Stat label="Dates" value={`${opportunity.startDate ? new Date(opportunity.startDate).toLocaleDateString('en-LK') : '—'} to ${opportunity.endDate ? new Date(opportunity.endDate).toLocaleDateString('en-LK') : '—'}`} />
+                  <Stat label="Fee" value={opportunity.isFree ? 'Free for students' : opportunity.fee ? `LKR ${opportunity.fee}` : '—'} />
+                </div>
+              )}
+
+              {opportunity.type === 'mentorship' && (
+                <div className="grid sm:grid-cols-2 gap-3 mb-6">
+                  <Stat label="Mentor" value={opportunity.mentorName || '—'} />
+                  <Stat label="Focus area" value={opportunity.mentorshipType || 'Guidance'} />
+                  <Stat label="Professional field" value={opportunity.professionalField || '—'} />
+                  <Stat label="Availability" value={opportunity.availability || '—'} />
+                </div>
+              )}
+              
+              {(opportunity.type === 'job' || opportunity.type === 'freelance') && opportunity.paymentInfo && (
+                <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                  <p className="text-sm text-gray-500 font-semibold mb-1">Payment Information</p>
+                  <p className="text-gray-900">{opportunity.paymentInfo}</p>
+                </div>
+              )}
+
               <Description title="About this opportunity" value={opportunity.description} />
-              {!isStudent && (
-                <div className="mt-6">
-                  <h3 className="text-sm font-semibold text-gray-600 mb-2">Required skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {opportunity.requiredSkills.map((skill) => (
-                      <span key={skill} className="text-xs px-2.5 py-1 rounded-md bg-gray-100 text-gray-600 font-medium">{skill}</span>
-                    ))}
-                  </div>
+              {opportunity.contactMethod && (
+                <div className="mt-6 p-4 rounded-xl bg-primary-50 border border-primary-100">
+                  <p className="text-sm text-primary-600 font-semibold mb-1">Application Instructions</p>
+                  <p className="text-primary-900">{opportunity.contactMethod}</p>
                 </div>
               )}
               <p className="text-sm text-gray-400 mt-7">Application deadline: {deadline}</p>

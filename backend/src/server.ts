@@ -7,6 +7,7 @@ import opportunityRoutes from './routes/opportunityRoutes';
 import resourceRoutes from './routes/resourceRoutes';
 import applicationRoutes from './routes/applicationRoutes';
 import providerRoutes from './routes/providerRoutes';
+import publicProviderRoutes from './routes/publicProviderRoutes';
 import resourceRequestRoutes from './routes/resourceRequestRoutes';
 
 // Load environment variables
@@ -31,6 +32,7 @@ app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/provider', providerRoutes);
+app.use('/api/providers', publicProviderRoutes);
 app.use('/api/resource-requests', resourceRequestRoutes);
 
 // Health check
