@@ -64,6 +64,26 @@ const updateProviderProfile = async (req, res) => {
             res.status(400).json({ success: false, message: 'Enter a valid contact email.' });
             return;
         }
+        const offerings = ['jobs', 'internships', 'scholarships', 'training', 'mentorship', 'technical_resources'];
+        const resourceMethods = ['rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
+        if (req.body.opportunityCategories !== undefined) {
+            if (!Array.isArray(req.body.opportunityCategories) || req.body.opportunityCategories.length === 0 || req.body.opportunityCategories.some((item) => typeof item !== 'string' || !offerings.includes(item))) {
+                res.status(400).json({ success: false, message: 'Select at least one valid provider offering.' });
+                return;
+            }
+            provider.providerProfile.opportunityCategories = req.body.opportunityCategories;
+        }
+        if (req.body.resourceAccessMethods !== undefined) {
+            if (!Array.isArray(req.body.resourceAccessMethods) || req.body.resourceAccessMethods.some((item) => typeof item !== 'string' || !resourceMethods.includes(item))) {
+                res.status(400).json({ success: false, message: 'Select valid resource access methods.' });
+                return;
+            }
+            if (!provider.providerProfile.opportunityCategories.includes('technical_resources') && req.body.resourceAccessMethods.length) {
+                res.status(400).json({ success: false, message: 'Enable technical resources before selecting resource access methods.' });
+                return;
+            }
+            provider.providerProfile.resourceAccessMethods = req.body.resourceAccessMethods;
+        }
         await provider.save();
         res.status(200).json({ success: true, message: 'Provider profile updated', data: { user: provider } });
     }

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMe = exports.login = exports.register = void 0;
+exports.updateStudentProfile = exports.getMe = exports.login = exports.register = void 0;
 const User_1 = __importDefault(require("../models/User"));
 const jwt_1 = require("../utils/jwt");
 /**
@@ -174,4 +174,75 @@ const getMe = async (req, res) => {
     }
 };
 exports.getMe = getMe;
+/** PUT /api/auth/student-profile */
+const updateStudentProfile = async (req, res) => {
+    try {
+        const student = await User_1.default.findById(req.user._id);
+        if (!student || student.role !== 'student' || !student.studentProfile) {
+            res.status(404).json({ success: false, message: 'Student profile not found.' });
+            return;
+        }
+        const profile = req.body;
+        const text = (value, max) => typeof value === 'string' && value.trim().length <= max ? value.trim() : undefined;
+        const tags = (value, maxItems, maxLength) => Array.isArray(value)
+            ? value.filter((item) => typeof item === 'string' && Boolean(item.trim()))
+                .map((item) => item.trim().slice(0, maxLength)).slice(0, maxItems)
+            : undefined;
+        const institution = text(profile.institution, 150);
+        const location = text(profile.location, 100);
+        const careerGoal = text(profile.careerGoal, 150);
+        const portfolioUrl = text(profile.portfolioUrl, 500);
+        const skills = tags(profile.skills, 25, 50);
+        const learningGoals = tags(profile.learningGoals, 12, 100);
+        const certifications = tags(profile.certifications, 12, 160);
+        if (!institution) {
+            res.status(400).json({ success: false, message: 'Institution is required.' });
+            return;
+        }
+        if (!['ICT', 'ET', 'BST', 'other'].includes(profile.degree)) {
+            res.status(400).json({ success: false, message: 'Select a valid degree programme.' });
+            return;
+        }
+        if (!Number.isInteger(profile.studyYear) || profile.studyYear < 1 || profile.studyYear > 6) {
+            res.status(400).json({ success: false, message: 'Study year must be between 1 and 6.' });
+            return;
+        }
+        if (!skills?.length) {
+            res.status(400).json({ success: false, message: 'Add at least one skill or interest.' });
+            return;
+        }
+        if (profile.availabilityHours !== undefined && (!Number.isInteger(profile.availabilityHours) || profile.availabilityHours < 0 || profile.availabilityHours > 168)) {
+            res.status(400).json({ success: false, message: 'Availability must be between 0 and 168 hours.' });
+            return;
+        }
+        if (profile.preferredWorkType !== undefined && !['remote', 'on-site', 'hybrid', 'flexible'].includes(profile.preferredWorkType)) {
+            res.status(400).json({ success: false, message: 'Select a valid work preference.' });
+            return;
+        }
+        if (portfolioUrl && !/^https?:\/\//i.test(portfolioUrl)) {
+            res.status(400).json({ success: false, message: 'Portfolio URL must start with http:// or https://.' });
+            return;
+        }
+        student.studentProfile = {
+            institution,
+            degree: profile.degree,
+            studyYear: profile.studyYear,
+            skills,
+            ...(location ? { location } : {}),
+            ...(careerGoal ? { careerGoal } : {}),
+            ...(typeof profile.availabilityHours === 'number' ? { availabilityHours: profile.availabilityHours } : {}),
+            ...(profile.preferredWorkType ? { preferredWorkType: profile.preferredWorkType } : {}),
+            ...(learningGoals ? { learningGoals } : {}),
+            ...(certifications ? { certifications } : {}),
+            ...(portfolioUrl ? { portfolioUrl } : {}),
+        };
+        await student.save();
+        res.status(200).json({ success: true, message: 'Student profile updated.', data: { user: student } });
+    }
+    catch (error) {
+        console.error('Update student profile error:', error);
+        res.status(500).json({ success: false, message: 'Unable to update student profile.' });
+    }
+};
+exports.updateStudentProfile = updateStudentProfile;
 //# sourceMappingURL=authController.js.map

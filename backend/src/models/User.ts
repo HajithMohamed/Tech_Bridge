@@ -21,6 +21,11 @@ export interface IUser extends Document {
     location?: string;
     skills: string[];
     careerGoal?: string;
+    availabilityHours?: number;
+    preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
+    learningGoals?: string[];
+    certifications?: string[];
+    portfolioUrl?: string;
   };
   providerProfile?: {
     organizationName: string;
@@ -78,6 +83,11 @@ const userSchema = new Schema<IUser>(
       location: { type: String, trim: true, maxlength: 100 },
       skills: [{ type: String, trim: true, maxlength: 50 }],
       careerGoal: { type: String, trim: true, maxlength: 150 },
+      availabilityHours: { type: Number, min: 0, max: 168 },
+      preferredWorkType: { type: String, enum: ['remote', 'on-site', 'hybrid', 'flexible'] },
+      learningGoals: [{ type: String, trim: true, maxlength: 100 }],
+      certifications: [{ type: String, trim: true, maxlength: 160 }],
+      portfolioUrl: { type: String, trim: true, maxlength: 500 },
     },
     providerProfile: {
       organizationName: { type: String, trim: true, maxlength: 150 },

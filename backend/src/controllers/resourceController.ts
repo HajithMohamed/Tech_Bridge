@@ -12,8 +12,7 @@ const accessTypes: ResourceAccessType[] = ['borrow', 'share', 'rent', 'installme
 const statuses: ResourceStatus[] = ['available', 'claimed'];
 const studentAccessTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const peerToPeerAccessTypes: ResourceAccessType[] = ['borrow', 'share'];
-const providerManagedAccessTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship'];
-const providerOrganizationTypes = ['company', 'ngo', 'training_org'];
+const providerManagedAccessTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
 const listedBySelect = 'fullName email role providerProfile.organizationName providerProfile.organizationType providerProfile.verified providerProfile.verificationStatus providerProfile.contactEmail providerProfile.phone';
 
 type Payload = Record<string, unknown>;
@@ -152,7 +151,8 @@ const canOfferProviderManagedAccess = (req: Request): boolean => {
   if (req.user?.role === 'admin') return true;
   if (req.user?.role !== 'provider') return false;
   const profile = req.user.providerProfile;
-  return Boolean(profile?.verified) || providerOrganizationTypes.includes(profile?.organizationType || '');
+  return profile?.verified === true
+    && profile.opportunityCategories?.includes('technical_resources') === true;
 };
 
 /** POST /api/resources */
@@ -168,7 +168,11 @@ export const createResource = async (req: Request, res: Response): Promise<void>
       return;
     }
     if (providerManagedAccessTypes.includes(payload.accessType) && !canOfferProviderManagedAccess(req)) {
-      res.status(403).json({ success: false, message: 'Rent, installment, interest-free, and sponsorship listings require an eligible organization or verified provider account.' });
+      res.status(403).json({ success: false, message: 'Provider-managed resource listings require a verified provider account with technical resources enabled.' });
+      return;
+    }
+    if (providerManagedAccessTypes.includes(payload.accessType) && req.user?.role === 'provider' && !req.user.providerProfile?.resourceAccessMethods?.includes(payload.accessType)) {
+      res.status(403).json({ success: false, message: `Your provider profile is not enabled to offer ${payload.accessType.replace('_', ' ')} arrangements.` });
       return;
     }
 
@@ -230,15 +234,38 @@ export const updateResourceStatus = async (req: Request, res: Response): Promise
       res.status(400).json({ success: false, message: 'Status must be available or claimed.' });
       return;
     }
-    const resource = await Resource.findOneAndUpdate(
-      { _id: req.params.id, listedBy: req.user!._id },
-      { status: req.body.status as ResourceStatus },
-      { new: true }
-    );
-    if (!resource) { res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' }); return; }
+    const existing = await Resource.findOne({ _id: req.params.id, listedBy: req.user!._id });
+    if (!existing) { res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' }); return; }
+    if (req.body.status === 'available' && existing.quantityAvailable < 1) {
+      res.status(400).json({ success: false, message: 'Add at least one available unit before reopening this listing.' });
+      return;
+    }
+    existing.status = req.body.status as ResourceStatus;
+    await existing.save();
+    const resource = existing;
     res.status(200).json({ success: true, message: 'Listing status updated.', data: { resource } });
   } catch {
     res.status(400).json({ success: false, message: 'Unable to update listing status.' });
+  }
+};
+
+/** PATCH /api/resources/:id/inventory */
+export const updateResourceInventory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!validInteger(req.body.quantityAvailable, 0)) {
+      res.status(400).json({ success: false, message: 'Available units must be a whole number of zero or more.' });
+      return;
+    }
+    const quantityAvailable = req.body.quantityAvailable as number;
+    const resource = await Resource.findOneAndUpdate(
+      { _id: req.params.id, listedBy: req.user!._id },
+      { quantityAvailable, status: quantityAvailable > 0 ? 'available' : 'claimed' },
+      { new: true }
+    );
+    if (!resource) { res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' }); return; }
+    res.status(200).json({ success: true, message: 'Available units updated.', data: { resource } });
+  } catch {
+    res.status(400).json({ success: false, message: 'Unable to update available units.' });
   }
 };
 

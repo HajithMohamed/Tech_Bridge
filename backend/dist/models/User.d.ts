@@ -13,6 +13,11 @@ export interface IUser extends Document {
         location?: string;
         skills: string[];
         careerGoal?: string;
+        availabilityHours?: number;
+        preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
+        learningGoals?: string[];
+        certifications?: string[];
+        portfolioUrl?: string;
     };
     providerProfile?: {
         organizationName: string;

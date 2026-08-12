@@ -9,5 +9,7 @@ export declare const listMyResources: (req: Request, res: Response) => Promise<v
 export declare const getResource: (req: Request, res: Response) => Promise<void>;
 /** PATCH /api/resources/:id/status */
 export declare const updateResourceStatus: (req: Request, res: Response) => Promise<void>;
+/** PATCH /api/resources/:id/inventory */
+export declare const updateResourceInventory: (req: Request, res: Response) => Promise<void>;
 /** DELETE /api/resources/:id */
 export declare const deleteResource: (req: Request, res: Response) => Promise<void>;

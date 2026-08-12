@@ -8,6 +8,7 @@ router.get('/', resourceController_1.listResources);
 router.get('/mine', auth_1.protect, resourceController_1.listMyResources);
 router.post('/', auth_1.protect, resourceController_1.createResource);
 router.patch('/:id/status', auth_1.protect, resourceController_1.updateResourceStatus);
+router.patch('/:id/inventory', auth_1.protect, resourceController_1.updateResourceInventory);
 router.delete('/:id', auth_1.protect, resourceController_1.deleteResource);
 router.get('/:id', resourceController_1.getResource);
 exports.default = router;

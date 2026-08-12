@@ -34,6 +34,7 @@ const RegisterPage = () => {
       description: '',
       verificationDocumentName: '',
       opportunityCategories: [] as string[],
+      resourceAccessMethods: [] as string[],
     },
   });
 
@@ -64,6 +65,7 @@ const RegisterPage = () => {
       if (!formData.providerProfile.location.trim()) errors.location = 'Location is required';
       if (formData.providerProfile.description.trim().length < 20) errors.description = 'Add at least 20 characters about your organization';
       if (!formData.providerProfile.opportunityCategories.length) errors.opportunityCategories = 'Select at least one offering';
+      if (formData.providerProfile.opportunityCategories.includes('technical_resources') && !formData.providerProfile.resourceAccessMethods.length) errors.resourceAccessMethods = 'Select at least one resource access pathway';
     } else if (!formData.studentProfile.skills.trim()) {
       errors.skills = 'Add at least one skill or interest';
     }
@@ -111,7 +113,7 @@ const RegisterPage = () => {
             description: formData.providerProfile.description,
             verificationDocumentName: formData.providerProfile.verificationDocumentName || undefined,
             opportunityCategories: formData.providerProfile.opportunityCategories,
-            resourceAccessMethods: formData.providerProfile.opportunityCategories.includes('technical_resources') ? ['borrow', 'rent', 'donation'] : []
+            resourceAccessMethods: formData.providerProfile.opportunityCategories.includes('technical_resources') ? formData.providerProfile.resourceAccessMethods : []
           }
         })
       };
@@ -157,6 +159,14 @@ const RegisterPage = () => {
         ...prev,
         providerProfile: { ...prev.providerProfile, opportunityCategories: updated }
       };
+    });
+  };
+
+  const toggleResourceAccess = (method: string) => {
+    setFormData((prev) => {
+      const current = prev.providerProfile.resourceAccessMethods;
+      const updated = current.includes(method) ? current.filter((item) => item !== method) : [...current, method];
+      return { ...prev, providerProfile: { ...prev.providerProfile, resourceAccessMethods: updated } };
     });
   };
 
@@ -480,6 +490,7 @@ const RegisterPage = () => {
                           </label>
                         ))}
                       </div>
+                      {formData.providerProfile.opportunityCategories.includes('technical_resources') && <div className="mt-5 rounded-xl border border-primary-100 bg-primary-50/50 p-4"><label className="block text-sm font-semibold text-primary-800 mb-3">Technical resource access pathways</label><p className="text-xs text-primary-700 mb-3">Select the arrangements your organization can genuinely provide. TechBridge only connects students to your terms.</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{[{ id: 'rent', label: 'Rental' }, { id: 'installment', label: 'Installment payment' }, { id: 'interest_free', label: 'Interest-free payment' }, { id: 'sponsorship', label: 'Sponsorship' }, { id: 'donation', label: 'Donation' }].map((method) => <label key={method.id} className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={formData.providerProfile.resourceAccessMethods.includes(method.id)} onChange={() => toggleResourceAccess(method.id)} />{method.label}</label>)}</div>{getFieldError('resourceAccessMethods') && <p className="mt-2 text-xs text-red-500">{getFieldError('resourceAccessMethods')}</p>}</div>}
                     </div>
                   </>
                 )}

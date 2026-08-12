@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
 import { getResources } from '../api/resourceApi';
+import { useAuth } from '../hooks/useAuth';
 import type { ResourceAccessType, ResourceListing } from '../types';
 
 const accessTypes: Array<{ value: ResourceAccessType; label: string }> = [
@@ -23,7 +24,7 @@ const ownerName = (listing: ResourceListing) => {
   return listing.listedBy.providerProfile?.organizationName || listing.listedBy.fullName;
 };
 
-const ResourceCard = ({ listing }: { listing: ResourceListing }) => {
+const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRequest: boolean }) => {
   const unverifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && !listing.providerOrgVerified;
   const verifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && listing.providerOrgVerified;
   const details = listing.accessDetails;
@@ -77,12 +78,14 @@ const ResourceCard = ({ listing }: { listing: ResourceListing }) => {
     </div>
     <p className="mt-auto pt-5 text-xs text-gray-500">{listing.quantityAvailable} unit{listing.quantityAvailable === 1 ? '' : 's'} available</p>
     {providerArrangedTypes.includes(listing.accessType) && <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-relaxed text-amber-100/80">TechBridge does not provide loans or financing. These arrangements are offered directly by verified providers, subject to their own terms.</p>}
+    {canRequest && <Link to={`/resources/${listing._id}/request`} className="mt-5 inline-flex w-fit rounded-lg bg-primary-500 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-400">Request this resource</Link>}
   </article>;
 };
 
 const Criteria = ({ criteria }: { criteria: string[] }) => <div><p className="text-gray-400">Eligibility:</p><ul className="mt-1 space-y-1 text-xs text-gray-300">{criteria.map((criterion) => <li key={criterion}>• {criterion}</li>)}</ul></div>;
 
 const ResourceHubPage = () => {
+  const { user } = useAuth();
   const [resources, setResources] = useState<ResourceListing[]>([]);
   const [search, setSearch] = useState('');
   const [activeType, setActiveType] = useState<ResourceAccessType | 'all'>('all');
@@ -109,7 +112,7 @@ const ResourceHubPage = () => {
     <section className="glass-card p-4 mb-5"><input className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /></section>
     <div className="mb-7 flex gap-2 overflow-x-auto pb-2">{([{ value: 'all', label: 'All' } as const, ...accessTypes]).map((type) => <button key={type.value} onClick={() => setActiveType(type.value)} className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium ${activeType === type.value ? 'bg-primary-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}>{type.label}{type.value !== 'all' && <span className="ml-1.5 text-xs opacity-75">{resources.filter((listing) => listing.accessType === type.value).length}</span>}</button>)}</div>
     {error && <div className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-100">{error}</div>}
-    {loading ? <p className="py-14 text-center text-gray-400">Loading resource listings...</p> : visibleGroups.every((group) => group.listings.length === 0) ? <div className="glass-card p-12 text-center"><p className="font-semibold text-white">No available listings found.</p><p className="mt-2 text-sm text-gray-400">Try another item name or list the resource you can share.</p></div> : <div className="space-y-10">{visibleGroups.filter((group) => group.listings.length > 0).map((group) => <section key={group.value}><div className="mb-4 flex items-center gap-3"><h2 className="text-xl font-bold text-white">{group.label}</h2><span className="text-sm text-gray-500">{group.listings.length} listing{group.listings.length === 1 ? '' : 's'}</span></div><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{group.listings.map((listing) => <ResourceCard key={listing._id} listing={listing} />)}</div></section>)}</div>}
+    {loading ? <p className="py-14 text-center text-gray-400">Loading resource listings...</p> : visibleGroups.every((group) => group.listings.length === 0) ? <div className="glass-card p-12 text-center"><p className="font-semibold text-white">No available listings found.</p><p className="mt-2 text-sm text-gray-400">Try another item name or list the resource you can share.</p></div> : <div className="space-y-10">{visibleGroups.filter((group) => group.listings.length > 0).map((group) => <section key={group.value}><div className="mb-4 flex items-center gap-3"><h2 className="text-xl font-bold text-white">{group.label}</h2><span className="text-sm text-gray-500">{group.listings.length} listing{group.listings.length === 1 ? '' : 's'}</span></div><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{group.listings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div></section>)}</div>}
   </main></div>;
 };
 

@@ -14,6 +14,7 @@ const opportunityTypes: OpportunityType[] = [
 const workModes = ['remote', 'on-site', 'hybrid'];
 const coverageTypes = ['full', 'partial', 'tuition_only', 'equipment_only', 'stipend'];
 const opportunityStatuses = ['draft', 'open', 'closed', 'expired'];
+const mentorshipTypes = ['Career guidance', 'Technical guidance', 'Internship guidance', 'Portfolio guidance'];
 const editableFields = [
   'title',
   'description',
@@ -48,9 +49,21 @@ const scholarshipFields = ['amount', 'currency', 'coverageType', 'eligibilityCri
 
 const providerSelect = 'fullName email providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
 
-const isScholarshipProvider = (req: Request): boolean => {
-  const type = req.user?.providerProfile?.organizationType;
-  return type === 'scholarship_org' || type === 'ngo';
+const typeOffer: Record<OpportunityType, string> = {
+  job: 'jobs',
+  freelance: 'jobs',
+  internship: 'internships',
+  scholarship: 'scholarships',
+  course: 'training',
+  workshop: 'training',
+  mentorship: 'mentorship',
+};
+
+const canOfferType = (req: Request, type: OpportunityType): boolean => {
+  const profile = req.user?.providerProfile;
+  const selectedOffers = profile?.opportunityCategories || [];
+  if (!selectedOffers.includes(typeOffer[type])) return false;
+  return type !== 'scholarship' || profile?.organizationType === 'scholarship_org' || profile?.organizationType === 'ngo';
 };
 
 const hasValidDeadline = (deadline: unknown): boolean => {
@@ -84,6 +97,30 @@ const validateOpportunity = (values: Record<string, unknown>): string | null => 
     if (typeof values.renewable !== 'boolean') return 'Scholarships must state whether the award is renewable.';
   }
 
+  if (values.type === 'job' || values.type === 'freelance') {
+    if (typeof values.paymentInfo !== 'string' || !values.paymentInfo.trim()) return 'Add payment, budget, or salary information.';
+  }
+  if (values.type === 'internship') {
+    if (typeof values.duration !== 'string' || !values.duration.trim()) return 'Internships require a duration.';
+    if (typeof values.isPaid !== 'boolean') return 'State whether the internship is paid.';
+    if (typeof values.preferredAcademicBackground !== 'string' || !values.preferredAcademicBackground.trim()) return 'Add the preferred academic background.';
+    if (values.startDate !== undefined && Number.isNaN(new Date(String(values.startDate)).getTime())) return 'Enter a valid internship start date.';
+  }
+  if (values.type === 'course' || values.type === 'workshop') {
+    if (typeof values.duration !== 'string' || !values.duration.trim()) return 'Courses and workshops require a duration.';
+    if (typeof values.isFree !== 'boolean') return 'State whether this learning opportunity is free.';
+    if (values.isFree === false && (typeof values.fee !== 'number' || values.fee < 0)) return 'Enter a valid fee for this learning opportunity.';
+    if (values.startDate !== undefined && Number.isNaN(new Date(String(values.startDate)).getTime())) return 'Enter a valid start date.';
+    if (values.endDate !== undefined && Number.isNaN(new Date(String(values.endDate)).getTime())) return 'Enter a valid end date.';
+    if (values.startDate && values.endDate && new Date(String(values.endDate)) < new Date(String(values.startDate))) return 'End date must be after the start date.';
+  }
+  if (values.type === 'mentorship') {
+    if (typeof values.mentorName !== 'string' || !values.mentorName.trim()) return 'Mentorship listings require a mentor name.';
+    if (typeof values.professionalField !== 'string' || !values.professionalField.trim()) return 'Mentorship listings require a professional field.';
+    if (!mentorshipTypes.includes(values.mentorshipType as string)) return 'Select a valid mentorship focus.';
+    if (typeof values.availability !== 'string' || !values.availability.trim()) return 'Add mentor availability.';
+  }
+
   return null;
 };
 
@@ -104,10 +141,10 @@ export const createOpportunity = async (req: Request, res: Response): Promise<vo
       res.status(400).json({ success: false, message: validationError });
       return;
     }
-    if (payload.type === 'scholarship' && !isScholarshipProvider(req)) {
+    if (!canOfferType(req, payload.type as OpportunityType)) {
       res.status(403).json({
         success: false,
-        message: 'Only verified scholarship organizations and NGOs can publish scholarships.',
+        message: 'This opportunity type is not enabled in your provider services. Update your organization offerings before publishing it.',
       });
       return;
     }
@@ -207,10 +244,10 @@ export const updateOpportunity = async (req: Request, res: Response): Promise<vo
       res.status(400).json({ success: false, message: validationError });
       return;
     }
-    if (values.type === 'scholarship' && !isScholarshipProvider(req)) {
+    if (!canOfferType(req, values.type as OpportunityType)) {
       res.status(403).json({
         success: false,
-        message: 'Only verified scholarship organizations and NGOs can publish scholarships.',
+        message: 'This opportunity type is not enabled in your provider services.',
       });
       return;
     }

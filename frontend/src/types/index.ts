@@ -41,6 +41,11 @@ export interface StudentProfile {
   location?: string;
   skills: string[];
   careerGoal?: string;
+  availabilityHours?: number;
+  preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
+  learningGoals?: string[];
+  certifications?: string[];
+  portfolioUrl?: string;
 }
 
 export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'ngo' | 'individual';
@@ -264,6 +269,45 @@ export interface OpportunityFormData {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+  duration?: string;
+  isPaid?: boolean;
+  preferredAcademicBackground?: string;
+  startDate?: string;
+  endDate?: string;
+  fee?: number;
+  isFree?: boolean;
+  mentorName?: string;
+  professionalField?: string;
+  experience?: string;
+  mentorshipType?: 'Career guidance' | 'Technical guidance' | 'Internship guidance' | 'Portfolio guidance';
+  availability?: string;
+  paymentInfo?: string;
+  contactMethod?: string;
+}
+
+export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
+
+export interface ResourceRequestResource {
+  _id: string;
+  itemName: string;
+  category: ResourceCategory;
+  condition?: ResourceCondition;
+  accessType: ResourceAccessType;
+  quantityAvailable: number;
+  status: ResourceStatus;
+}
+
+export interface ResourceRequest {
+  _id: string;
+  studentId: string | ApplicationApplicant;
+  providerId: string | ResourceListingOwner;
+  resourceId: string | ResourceRequestResource;
+  requestedAccessType: ResourceAccessType;
+  durationOrTerms?: string;
+  message?: string;
+  status: ResourceRequestStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LoginData {

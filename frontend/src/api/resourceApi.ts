@@ -29,4 +29,9 @@ export const updateResourceStatus = async (id: string, status: ResourceStatus): 
   return response.data.data.resource;
 };
 
+export const updateResourceInventory = async (id: string, quantityAvailable: number): Promise<ResourceListing> => {
+  const response = await api.patch<ResourceResponse>(`/resources/${id}/inventory`, { quantityAvailable });
+  return response.data.data.resource;
+};
+
 export const deleteResource = async (id: string): Promise<void> => { await api.delete(`/resources/${id}`); };

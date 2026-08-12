@@ -7,10 +7,10 @@ import type { Opportunity, MatchedOpportunity, OpportunityType, WorkMode } from 
 import { Search, Filter, Briefcase, GraduationCap, BookOpen, Code, Wrench, Lightbulb, Target, ArrowRight, Sparkles } from 'lucide-react';
 
 const typeLabels: Record<OpportunityType, string> = {
-  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance', workshop: 'Workshop',
+  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance', workshop: 'Workshop', mentorship: 'Mentorship',
 };
 const typeIcons: Record<OpportunityType, typeof Briefcase> = {
-  job: Briefcase, internship: GraduationCap, scholarship: BookOpen, course: Lightbulb, freelance: Code, workshop: Wrench,
+  job: Briefcase, internship: GraduationCap, scholarship: BookOpen, course: Lightbulb, freelance: Code, workshop: Wrench, mentorship: Target,
 };
 const coverageLabels: Record<string, string> = {
   full: 'Full coverage', partial: 'Partial coverage', tuition_only: 'Tuition only', equipment_only: 'Equipment only', stipend: 'Stipend',
