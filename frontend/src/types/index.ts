@@ -333,3 +333,12 @@ export interface PublicProviderResponse {
   opportunities: Opportunity[];
   resources: ResourceListing[];
 }
+
+export interface ImpactStats {
+  totalStudents: number;
+  totalOpenOpportunities: number;
+  totalApplications: number;
+  totalResourceListings: number;
+  applicationsByStatus: Record<string, number>;
+  resourceListingsByAccessType: Record<string, number>;
+}

@@ -9,6 +9,7 @@ import applicationRoutes from './routes/applicationRoutes';
 import providerRoutes from './routes/providerRoutes';
 import publicProviderRoutes from './routes/publicProviderRoutes';
 import resourceRequestRoutes from './routes/resourceRequestRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/provider', providerRoutes);
 app.use('/api/providers', publicProviderRoutes);
 app.use('/api/resource-requests', resourceRequestRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
