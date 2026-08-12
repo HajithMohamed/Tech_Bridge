@@ -17,3 +17,5 @@ export declare const login: (req: Request, res: Response) => Promise<void>;
  * @access  Private
  */
 export declare const getMe: (req: Request, res: Response) => Promise<void>;
+/** PUT /api/auth/student-profile */
+export declare const updateStudentProfile: (req: Request, res: Response) => Promise<void>;

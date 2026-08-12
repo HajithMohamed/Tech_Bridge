@@ -1,13 +1,13 @@
 import api from './axios';
-import type { ResourceRequest, ResourceRequestStatus } from '../types';
+import type { ResourceAccessType, ResourceRequest, ResourceRequestStatus } from '../types';
 
-interface SingleRequestResponse {
+interface ResourceRequestResponse {
   success: boolean;
   message?: string;
   data: { request: ResourceRequest };
 }
 
-interface MultipleRequestsResponse {
+interface ResourceRequestsResponse {
   success: boolean;
   data: { requests: ResourceRequest[] };
 }
@@ -18,7 +18,7 @@ export const createResourceRequest = async (
   durationOrTerms?: string,
   message?: string
 ): Promise<ResourceRequest> => {
-  const response = await api.post<SingleRequestResponse>('/resource-requests', {
+  const response = await api.post<ResourceRequestResponse>('/resource-requests', {
     resourceId,
     requestedAccessType,
     durationOrTerms,
@@ -28,12 +28,17 @@ export const createResourceRequest = async (
 };
 
 export const getMyResourceRequests = async (): Promise<ResourceRequest[]> => {
-  const response = await api.get<MultipleRequestsResponse>('/resource-requests/mine');
+  const response = await api.get<ResourceRequestsResponse>('/resource-requests/mine');
+  return response.data.data.requests;
+};
+
+export const getReceivedResourceRequests = async (): Promise<ResourceRequest[]> => {
+  const response = await api.get<ResourceRequestsResponse>('/resource-requests/received');
   return response.data.data.requests;
 };
 
 export const getProviderResourceRequests = async (): Promise<ResourceRequest[]> => {
-  const response = await api.get<MultipleRequestsResponse>('/resource-requests/provider');
+  const response = await api.get<ResourceRequestsResponse>('/resource-requests/provider');
   return response.data.data.requests;
 };
 
@@ -41,6 +46,6 @@ export const updateResourceRequestStatus = async (
   id: string,
   status: ResourceRequestStatus
 ): Promise<ResourceRequest> => {
-  const response = await api.patch<SingleRequestResponse>(`/resource-requests/${id}/status`, { status });
+  const response = await api.patch<ResourceRequestResponse>(`/resource-requests/${id}/status`, { status });
   return response.data.data.request;
 };

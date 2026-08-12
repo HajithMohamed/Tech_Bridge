@@ -41,6 +41,11 @@ export interface StudentProfile {
   location?: string;
   skills: string[];
   careerGoal?: string;
+  availabilityHours?: number;
+  preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
+  learningGoals?: string[];
+  certifications?: string[];
+  portfolioUrl?: string;
 }
 
 export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'ngo' | 'individual';
@@ -290,6 +295,16 @@ export interface OpportunityFormData {
   availability?: string;
   paymentInfo?: string;
   contactMethod?: string;
+}
+
+export interface ResourceRequestResource {
+  _id: string;
+  itemName: string;
+  category: ResourceCategory;
+  condition?: ResourceCondition;
+  accessType: ResourceAccessType;
+  quantityAvailable: number;
+  status: ResourceStatus;
 }
 
 export interface LoginData {

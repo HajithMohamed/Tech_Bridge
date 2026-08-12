@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
 import { getResources } from '../api/resourceApi';
+import { useAuth } from '../hooks/useAuth';
 import type { ResourceAccessType, ResourceListing } from '../types';
 import { createResourceRequest } from '../api/resourceRequestApi';
 import { useAuth } from '../hooks/useAuth';
@@ -20,7 +21,7 @@ const ownerName = (listing: ResourceListing) => {
   return listing.listedBy.providerProfile?.organizationName || listing.listedBy.fullName;
 };
 
-const ResourceCard = ({ listing, onRequest, canRequest }: { listing: ResourceListing; onRequest: (listing: ResourceListing) => void; canRequest: boolean }) => {
+const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRequest: boolean }) => {
   const unverifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && !listing.providerOrgVerified;
   const verifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && listing.providerOrgVerified;
   const details = listing.accessDetails;
@@ -74,7 +75,7 @@ const ResourceCard = ({ listing, onRequest, canRequest }: { listing: ResourceLis
     </div>
     <p className="mt-auto pt-5 text-xs text-gray-500">{listing.quantityAvailable} unit{listing.quantityAvailable === 1 ? '' : 's'} available</p>
     {providerArrangedTypes.includes(listing.accessType) && <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-relaxed text-amber-100/80">TechBridge does not provide loans or financing. These arrangements are offered directly by verified providers, subject to their own terms.</p>}
-    {canRequest && <div className="mt-5 border-t border-white/10 pt-4"><button onClick={() => onRequest(listing)} className="w-full px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold rounded-lg transition-colors">Request Access</button></div>}
+    {canRequest && <Link to={`/resources/${listing._id}/request`} className="mt-5 inline-flex w-fit rounded-lg bg-primary-500 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-400">Request this resource</Link>}
   </article>;
 };
 
@@ -88,52 +89,6 @@ const ResourceHubPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Request flow state
-  const [selectedListing, setSelectedListing] = useState<ResourceListing | null>(null);
-  const [requestMessage, setRequestMessage] = useState('');
-  const [requestTerms, setRequestTerms] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [requestSuccess, setRequestSuccess] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setLoading(true);
-      setError('');
-      void getResources(search.trim() ? { item: search.trim() } : undefined)
-        .then(setResources)
-        .catch(() => setError('Unable to load resource listings right now.'))
-        .finally(() => setLoading(false));
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [search]);
-
-  const submitRequest = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!selectedListing) return;
-
-    setSubmitting(true);
-    setError('');
-
-    try {
-      await createResourceRequest(
-        selectedListing._id,
-        selectedListing.accessType,
-        requestTerms,
-        requestMessage
-      );
-      setRequestSuccess(true);
-      setTimeout(() => {
-        setSelectedListing(null);
-        setRequestSuccess(false);
-        setRequestMessage('');
-        setRequestTerms('');
-      }, 2000);
-    } catch {
-      setError('Unable to submit your request. Please try again later.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const visibleListings = useMemo(() => {
     if (activeTab === 'free') return resources.filter(r => freeTypes.includes(r.accessType));
@@ -152,58 +107,7 @@ const ResourceHubPage = () => {
     </div>
 
     {error && <div className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-100">{error}</div>}
-
-    {loading ? <p className="py-14 text-center text-gray-400">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-white">No available listings found in this category.</p><p className="mt-2 text-sm text-gray-400">Try searching or checking other tabs.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} onRequest={setSelectedListing} canRequest={user?.role === 'student'} />)}</div>}
-
-    {selectedListing && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div className="bg-surface-800 rounded-2xl w-full max-w-md p-6 border border-white/10 shadow-xl max-h-[90vh] overflow-y-auto">
-          <h2 className="text-xl font-bold text-white mb-1">Request {selectedListing.itemName}</h2>
-          <p className="text-gray-400 text-sm mb-6">You are requesting {readable(selectedListing.accessType)} access from {ownerName(selectedListing)}.</p>
-
-          {requestSuccess ? (
-            <div className="p-6 text-center text-emerald-300 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
-              <p className="font-bold text-lg mb-2">Request sent successfully!</p>
-              <p className="text-sm">The provider will review your application soon.</p>
-            </div>
-          ) : (
-            <form onSubmit={submitRequest} className="space-y-4">
-              {['rent', 'installment', 'borrow'].includes(selectedListing.accessType) && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-1">Duration or Specific Terms</label>
-                  <input
-                    type="text"
-                    required
-                    value={requestTerms}
-                    onChange={(e) => setRequestTerms(e.target.value)}
-                    placeholder={selectedListing.accessType === 'borrow' ? "e.g. 3 days" : "e.g. 6 months rental"}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1">Message to Provider</label>
-                <textarea
-                  required
-                  value={requestMessage}
-                  onChange={(e) => setRequestMessage(e.target.value)}
-                  placeholder="Explain why you need this resource and how you meet the criteria."
-                  className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 text-white text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 min-h-24"
-                />
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setSelectedListing(null)} className="flex-1 px-4 py-2 rounded-xl text-gray-300 bg-white/5 hover:bg-white/10 font-semibold transition-colors">Cancel</button>
-                <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 rounded-xl text-white bg-primary-600 hover:bg-primary-500 font-semibold transition-colors disabled:opacity-50">
-                  {submitting ? 'Sending...' : 'Send Request'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    )}
+    {loading ? <p className="py-14 text-center text-gray-400">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-white">No available listings found in this category.</p><p className="mt-2 text-sm text-gray-400">Try searching or checking other tabs.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div>}
   </main></div>;
 };
 

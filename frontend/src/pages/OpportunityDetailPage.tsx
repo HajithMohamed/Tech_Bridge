@@ -12,7 +12,7 @@ const coverageLabels: Record<string, string> = {
   full: 'Full coverage', partial: 'Partial coverage', tuition_only: 'Tuition only', equipment_only: 'Equipment only', stipend: 'Stipend',
 };
 const typeLabels: Record<string, string> = {
-  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', workshop: 'Workshop',
+  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', workshop: 'Workshop', mentorship: 'Mentorship',
 };
 
 const providerName = (opportunity: Opportunity) =>
@@ -306,12 +306,18 @@ const OpportunityDetailPage = () => {
               )}
 
               <Description title="About this opportunity" value={opportunity.description} />
-              {opportunity.contactMethod && (
-                <div className="mt-6 p-4 rounded-xl bg-primary-50 border border-primary-100">
-                  <p className="text-sm text-primary-600 font-semibold mb-1">Application Instructions</p>
-                  <p className="text-primary-900">{opportunity.contactMethod}</p>
+              <ServiceDetails opportunity={opportunity} />
+              {!isStudent && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">Required skills</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {opportunity.requiredSkills.map((skill) => (
+                      <span key={skill} className="text-xs px-2.5 py-1 rounded-md bg-gray-100 text-gray-600 font-medium">{skill}</span>
+                    ))}
+                  </div>
                 </div>
               )}
+              {opportunity.contactMethod && <div className="mt-6 rounded-xl border border-primary-100 bg-primary-50 p-4"><p className="text-sm font-semibold text-primary-800">Application instructions</p><p className="mt-1 text-sm text-primary-700">{opportunity.contactMethod}</p></div>}
               <p className="text-sm text-gray-400 mt-7">Application deadline: {deadline}</p>
             </section>
           )}
@@ -358,6 +364,22 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
     <p className="font-bold text-gray-900 mt-1">{value}</p>
   </div>
 );
+
+const ServiceDetails = ({ opportunity }: { opportunity: Opportunity }) => {
+  const formatDate = (date?: string) => date ? new Date(date).toLocaleDateString('en-LK', { dateStyle: 'medium' }) : '';
+  const fee = opportunity.fee !== undefined ? new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(opportunity.fee) : '';
+  if (opportunity.type === 'job' || opportunity.type === 'freelance') return opportunity.paymentInfo ? <Details title="Compensation" entries={[['Payment information', opportunity.paymentInfo]]} /> : null;
+  if (opportunity.type === 'internship') return <Details title="Internship details" entries={[["Duration", opportunity.duration], ["Start date", formatDate(opportunity.startDate)], ["Paid", opportunity.isPaid === undefined ? undefined : opportunity.isPaid ? 'Yes' : 'No'], ["Preferred background", opportunity.preferredAcademicBackground]]} />;
+  if (opportunity.type === 'course' || opportunity.type === 'workshop') return <Details title={`${typeLabels[opportunity.type]} details`} entries={[["Duration", opportunity.duration], ["Start date", formatDate(opportunity.startDate)], ["End date", formatDate(opportunity.endDate)], ["Fee", opportunity.isFree === true ? 'Free for students' : fee]]} />;
+  if (opportunity.type === 'mentorship') return <Details title="Mentorship details" entries={[["Mentor", opportunity.mentorName], ["Field", opportunity.professionalField], ["Experience", opportunity.experience], ["Focus", opportunity.mentorshipType], ["Availability", opportunity.availability]]} />;
+  return null;
+};
+
+const Details = ({ title, entries }: { title: string; entries: Array<[string, string | undefined]> }) => {
+  const available = entries.filter(([, value]) => Boolean(value));
+  if (!available.length) return null;
+  return <section className="mt-6"><h2 className="text-lg font-bold text-gray-900">{title}</h2><dl className="mt-3 grid sm:grid-cols-2 gap-3">{available.map(([label, value]) => <div key={label} className="rounded-xl border border-gray-100 bg-surface-50 p-3"><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-1 text-sm font-semibold text-gray-800">{value}</dd></div>)}</dl></section>;
+};
 
 const Description = ({ title, value }: { title: string; value: string }) => (
   <div>

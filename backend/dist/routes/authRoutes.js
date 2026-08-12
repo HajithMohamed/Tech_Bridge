@@ -111,5 +111,6 @@ router.post('/login', [
  * @access  Private
  */
 router.get('/me', auth_1.protect, authController_1.getMe);
+router.put('/student-profile', auth_1.protect, (0, auth_1.authorize)('student'), authController_1.updateStudentProfile);
 exports.default = router;
 //# sourceMappingURL=authRoutes.js.map

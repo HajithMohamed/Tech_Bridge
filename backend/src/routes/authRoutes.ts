@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe } from '../controllers/authController';
-import { protect } from '../middleware/auth';
+import { register, login, getMe, updateStudentProfile } from '../controllers/authController';
+import { authorize, protect } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 
 const router = Router();
@@ -121,5 +121,6 @@ router.post(
  * @access  Private
  */
 router.get('/me', protect, getMe);
+router.put('/student-profile', protect, authorize('student'), updateStudentProfile);
 
 export default router;

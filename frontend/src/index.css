@@ -69,6 +69,109 @@ h1, h2, h3, h4, h5, h6 {
   min-height: 100vh;
 }
 
+.profile-input {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  color: #334155;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.profile-input:focus {
+  border-color: var(--color-primary-500);
+  background: white;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 14%);
+}
+
+.help-text {
+  margin: 0.35rem 0 0;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* Shared portal components used by the student and provider workspaces. */
+.glass-card {
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 1rem;
+  background: rgb(30 41 59 / 82%);
+  box-shadow: 0 12px 30px rgb(15 23 42 / 12%);
+  backdrop-filter: blur(16px);
+}
+
+.feed-input {
+  width: 100%;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 6%);
+  color: white;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.feed-input::placeholder {
+  color: #94a3b8;
+}
+
+.feed-input:focus {
+  border-color: var(--color-primary-400);
+  background: rgb(255 255 255 / 9%);
+  box-shadow: 0 0 0 3px rgb(96 165 250 / 15%);
+}
+
+.feed-input option {
+  background: #1e293b;
+  color: white;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.tag-input {
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 5%);
+  padding: 0.65rem 0.85rem;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.375rem;
+  background: rgb(59 130 246 / 15%);
+  color: #bfdbfe;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.1;
+}
+
+.service-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid rgb(96 165 250 / 28%);
+  border-radius: 1rem;
+  background: rgb(59 130 246 / 6%);
+  padding: 1.25rem;
+}
+
+.service-panel h2 {
+  margin: 0;
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 /* ── Animations ──────────────────────────────────────────────── */
 @keyframes fadeInUp {
   from {

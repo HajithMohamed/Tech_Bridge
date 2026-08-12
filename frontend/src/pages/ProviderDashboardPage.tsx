@@ -1,18 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
 import { getProviderDashboard } from '../api/providerApi';
+import { getProviderResourceRequests } from '../api/resourceRequestApi';
 import { useAuth } from '../hooks/useAuth';
 import type { ProviderDashboard } from '../types';
+import { canManageResources, enabledOpportunityTypes, providerOfferings } from '../utils/providerCapabilities';
 
 const humanize = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const ProviderDashboardPage = () => {
   const { user } = useAuth();
   const [dashboard, setDashboard] = useState<ProviderDashboard | null>(null);
+  const [requestCount, setRequestCount] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const enabledTypes = enabledOpportunityTypes(user?.providerProfile);
+  const resourceEnabled = canManageResources(user?.providerProfile);
+  const selectedServices = useMemo(() => providerOfferings.filter((offering) => user?.providerProfile?.opportunityCategories?.includes(offering.id)), [user?.providerProfile?.opportunityCategories]);
 
-  useEffect(() => { void getProviderDashboard().then(setDashboard).catch(() => setError('Unable to load dashboard data.')); }, []);
+  useEffect(() => {
+    void getProviderDashboard().then(setDashboard).catch(() => setError('Unable to load dashboard data.'));
+    if (resourceEnabled) void getProviderResourceRequests().then((items) => setRequestCount(items.filter((item) => item.status === 'pending').length)).catch(() => undefined);
+  }, [resourceEnabled]);
+
   const stats = dashboard?.stats;
   const cards = [
     ['Active listings', stats?.activeListings ?? '—', 'Open opportunities and resources'],
@@ -34,7 +44,7 @@ const ProviderDashboardPage = () => {
   return <div className="min-h-screen"><AppHeader /><main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
     <section className="flex flex-col lg:flex-row justify-between gap-5 mb-8"><div><p className="text-accent-400 text-sm font-semibold mb-2">PROVIDER DASHBOARD</p><h1 className="text-3xl font-bold text-white">Welcome, {user?.providerProfile?.organizationName || user?.fullName}</h1><p className="text-gray-400 mt-2">Turn opportunities and resources into practical access for TechBridge students.</p></div><div className={`self-start px-4 py-2 rounded-full text-sm border ${user?.providerProfile?.verified ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200' : 'border-amber-400/30 bg-amber-500/10 text-amber-100'}`}>{user?.providerProfile?.verified ? '✓ Verified provider' : 'Pending verification'}</div></section>
     {error && <div className="mb-5 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-100">{error}</div>}
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{cards.map(([label, value, description]) => <div className="glass-card p-5" key={label}><p className="text-2xl font-bold text-white">{value}</p><p className="text-sm font-semibold text-gray-200 mt-2">{label}</p><p className="text-xs text-gray-500 mt-1">{description}</p></div>)}</div>
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{cards.map(([label, value, description]) => <div className="glass-card p-5" key={label as string}><p className="text-2xl font-bold text-white">{value as React.ReactNode}</p><p className="text-sm font-semibold text-gray-200 mt-2">{label as React.ReactNode}</p><p className="text-xs text-gray-500 mt-1">{description as React.ReactNode}</p></div>)}</div>
     <section className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
       {offersJobs && <ModuleCard to="/provider/opportunities" icon="💼" title="Jobs / Freelance" description="Post roles and projects." />}
       {offersInternships && <ModuleCard to="/provider/opportunities" icon="🎓" title="Internships" description="Hire student interns." />}

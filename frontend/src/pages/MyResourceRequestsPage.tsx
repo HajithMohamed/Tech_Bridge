@@ -1,39 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
-import { getMyResourceRequests } from '../api/resourceRequestApi';
+import { getMyResourceRequests, getReceivedResourceRequests, updateResourceRequestStatus } from '../api/resourceRequestApi';
 import type { ResourceRequest, ResourceRequestStatus } from '../types';
 
-const statusStyle: Record<ResourceRequestStatus, string> = {
-  pending: 'bg-amber-500/15 text-amber-100',
-  accepted: 'bg-emerald-500/15 text-emerald-200',
-  rejected: 'bg-red-500/15 text-red-200',
-  completed: 'bg-primary-500/15 text-primary-200',
-};
-const readable = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const styles: Record<ResourceRequestStatus, string> = { pending: 'bg-amber-100 text-amber-800', accepted: 'bg-emerald-100 text-emerald-700', rejected: 'bg-red-100 text-red-700', completed: 'bg-primary-100 text-primary-700' };
+const humanize = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 const resourceOf = (request: ResourceRequest) => typeof request.resourceId === 'string' ? undefined : request.resourceId;
 const providerOf = (request: ResourceRequest) => typeof request.providerId === 'string' ? undefined : request.providerId;
+const studentOf = (request: ResourceRequest) => typeof request.studentId === 'string' ? undefined : request.studentId;
 
 const MyResourceRequestsPage = () => {
-  const [requests, setRequests] = useState<ResourceRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void getMyResourceRequests()
-        .then(setRequests)
-        .catch(() => setError('Unable to load your resource requests.'))
-        .finally(() => setLoading(false));
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  return <div className="min-h-screen"><AppHeader /><main className="max-w-5xl mx-auto px-4 sm:px-6 py-9">
-    <section className="mb-8"><p className="text-primary-300 text-sm font-semibold mb-2">STUDENT DASHBOARD</p><h1 className="text-3xl font-bold text-white">My resource requests</h1><p className="text-gray-400 mt-2">Track each request from submission to access.</p></section>
-    {error && <div className="mb-5 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-100">{error}</div>}
-    {loading ? <p className="text-gray-400">Loading your resource requests...</p> : requests.length === 0 ? <div className="glass-card p-10 text-center"><p className="font-semibold text-white">You have not requested a resource yet.</p><Link to="/resources" className="inline-block mt-4 text-primary-300 font-semibold">Browse the Resource Hub →</Link></div> : <div className="space-y-4">{requests.map((request) => { const resource = resourceOf(request); const provider = providerOf(request); return <article key={request._id} className="glass-card p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"><div><p className="text-lg font-bold text-white">{resource?.itemName || 'Technical resource'}</p><p className="text-sm text-gray-400 mt-1">{readable(request.requestedAccessType)} access{provider ? ` · ${provider.fullName}` : ''}</p>{request.durationOrTerms && <p className="text-sm text-gray-300 mt-3">Requested terms: {request.durationOrTerms}</p>}{request.message && <p className="text-sm text-gray-400 mt-2 line-clamp-2">“{request.message}”</p>}<p className="text-xs text-gray-500 mt-3">Requested {new Date(request.createdAt).toLocaleDateString('en-LK')}</p></div><span className={`self-start px-3 py-1.5 rounded-full text-sm font-semibold ${statusStyle[request.status]}`}>{readable(request.status)}</span></article>; })}</div>}
-  </main></div>;
+  const [requests, setRequests] = useState<ResourceRequest[]>([]); const [received, setReceived] = useState<ResourceRequest[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  useEffect(() => { void Promise.all([getMyResourceRequests(), getReceivedResourceRequests()]).then(([outgoing, incoming]) => { setRequests(outgoing); setReceived(incoming); }).catch(() => setError('Unable to load all resource requests.')).finally(() => setLoading(false)); }, []);
+  const updateReceived = async (request: ResourceRequest, status: Exclude<ResourceRequestStatus, 'pending'>) => { setError(''); try { const updated = await updateResourceRequestStatus(request._id, status); setReceived((items) => items.map((item) => item._id === request._id ? { ...item, ...updated } : item)); } catch { setError('Unable to update this request.'); } };
+  return <div className="min-h-screen bg-surface-50"><AppHeader /><main className="max-w-5xl mx-auto px-4 sm:px-6 py-9"><section className="mb-7"><p className="text-primary-600 text-sm font-semibold uppercase tracking-wider">Student dashboard</p><h1 className="text-3xl font-bold text-gray-900 mt-2">Resource requests</h1><p className="text-gray-500 mt-2">Track resources you need and respond when another student asks to use something you listed.</p></section>{error && <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4 text-red-700">{error}</div>}{loading ? <p className="text-gray-400">Loading resource requests…</p> : <div className="space-y-9"><RequestSection title="Requests you sent" empty="No resource requests yet." link="/resources" linkLabel="Explore the Resource Hub →" requests={requests} render={(request) => { const resource = resourceOf(request); const provider = providerOf(request); return <article key={request._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"><div><h2 className="text-lg font-bold text-gray-900">{resource?.itemName || 'Resource listing'}</h2><p className="text-sm text-gray-500 mt-1">{humanize(request.requestedAccessType)} · {provider?.providerProfile?.organizationName || provider?.fullName || 'Listing owner'}</p>{request.durationOrTerms && <p className="text-sm text-gray-600 mt-2">Requested: {request.durationOrTerms}</p>}<p className="text-xs text-gray-400 mt-2">Sent {new Date(request.createdAt).toLocaleDateString('en-LK')}</p></div><Status status={request.status} /></article>; }} /><RequestSection title="Requests for your shared resources" empty="No one has requested a resource you listed." link="/resources/list" linkLabel="List a resource →" requests={received} render={(request) => { const resource = resourceOf(request); const student = studentOf(request); return <article key={request._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5"><div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"><div><div className="flex flex-wrap gap-2 items-center"><h2 className="text-lg font-bold text-gray-900">{resource?.itemName || 'Resource listing'}</h2><Status status={request.status} /></div><p className="text-sm text-gray-500 mt-2">Requested by {student?.fullName || 'Student'} · {student?.email || 'No email available'}</p>{request.durationOrTerms && <p className="text-sm text-gray-600 mt-2">Requested terms: {request.durationOrTerms}</p>}{request.message && <p className="mt-2 text-sm text-gray-600">“{request.message}”</p>}</div><RequestActions request={request} update={updateReceived} /></div></article>; }} /></div>}</main></div>;
 };
+
+const RequestSection = ({ title, empty, link, linkLabel, requests, render }: { title: string; empty: string; link: string; linkLabel: string; requests: ResourceRequest[]; render: (request: ResourceRequest) => React.ReactNode }) => <section><div className="flex flex-wrap items-end justify-between gap-2 mb-4"><h2 className="text-xl font-bold text-gray-900">{title}</h2><span className="text-sm text-gray-400">{requests.length} request{requests.length === 1 ? '' : 's'}</span></div>{requests.length === 0 ? <div className="rounded-2xl border border-gray-100 bg-white p-7"><p className="text-gray-600">{empty}</p><Link to={link} className="inline-block mt-3 text-primary-600 font-semibold">{linkLabel}</Link></div> : <div className="space-y-4">{requests.map(render)}</div>}</section>;
+const Status = ({ status }: { status: ResourceRequestStatus }) => <span className={`self-start rounded-full px-3 py-1.5 text-sm font-semibold ${styles[status]}`}>{humanize(status)}</span>;
+const RequestActions = ({ request, update }: { request: ResourceRequest; update: (request: ResourceRequest, status: Exclude<ResourceRequestStatus, 'pending'>) => void }) => request.status === 'pending' ? <div className="flex gap-2"><button onClick={() => update(request, 'accepted')} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Accept</button><button onClick={() => update(request, 'rejected')} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Decline</button></div> : request.status === 'accepted' ? <button onClick={() => update(request, 'completed')} className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700">Mark completed</button> : null;
 
 export default MyResourceRequestsPage;
