@@ -5,7 +5,6 @@ import { getResources } from '../api/resourceApi';
 import { useAuth } from '../hooks/useAuth';
 import type { ResourceAccessType, ResourceListing } from '../types';
 import { createResourceRequest } from '../api/resourceRequestApi';
-import { useAuth } from '../hooks/useAuth';
 
 const freeTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const subsidizedTypes: ResourceAccessType[] = ['installment', 'interest_free', 'sponsorship'];
