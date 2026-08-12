@@ -1,17 +1,36 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { Building, GraduationCap, Briefcase, ArrowRight, ArrowLeft } from 'lucide-react';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
   const { register, isLoading, error, fieldErrors, clearError } = useAuth();
 
+  const [step, setStep] = useState<1 | 2>(1);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
     role: 'student' as 'student' | 'provider',
+    studentProfile: {
+      institution: 'Faculty of Technology',
+      degree: 'ICT',
+      studyYear: 1,
+      skills: '',
+      location: '',
+      careerGoal: '',
+    },
+    providerProfile: {
+      organizationName: '',
+      organizationType: 'company',
+      contactPerson: '',
+      phone: '',
+      location: '',
+      website: '',
+      opportunityCategories: [] as string[],
+    },
   });
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
@@ -19,32 +38,31 @@ const RegisterPage = () => {
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!formData.fullName.trim()) {
-      errors.fullName = 'Full name is required';
-    } else if (formData.fullName.trim().length < 2) {
-      errors.fullName = 'Full name must be at least 2 characters';
-    }
+    // Common validations
+    if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
+    if (!formData.email.trim()) errors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Please enter a valid email';
+    
+    if (!formData.password) errors.password = 'Password is required';
+    else if (formData.password.length < 6) errors.password = 'At least 6 characters required';
+    
+    if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'Passwords do not match';
 
-    if (!formData.email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Please enter a valid email';
-    }
-
-    if (!formData.password) {
-      errors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
-    }
-
-    if (!formData.confirmPassword) {
-      errors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
+    // Role specific validations
+    if (formData.role === 'provider') {
+      if (!formData.providerProfile.organizationName.trim()) errors.organizationName = 'Organization name is required';
+      if (!formData.providerProfile.contactPerson.trim()) errors.contactPerson = 'Contact person is required';
+      if (!formData.providerProfile.phone.trim()) errors.phone = 'Phone number is required';
+      if (!formData.providerProfile.location.trim()) errors.location = 'Location is required';
     }
 
     setClientErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  const handleNextStep = () => {
+    setStep(2);
+    clearError();
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -54,16 +72,40 @@ const RegisterPage = () => {
     if (!validateForm()) return;
 
     try {
-      await register(formData);
+      const submissionData = {
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        role: formData.role,
+        ...(formData.role === 'student' ? {
+          studentProfile: {
+            ...formData.studentProfile,
+            skills: formData.studentProfile.skills.split(',').map(s => s.trim()).filter(s => s),
+          }
+        } : {
+          providerProfile: formData.providerProfile
+        })
+      };
+
+      // @ts-ignore - types might need slight adjustment but backend accepts this structure
+      await register(submissionData);
       navigate('/dashboard');
     } catch {
-      // Error is handled by AuthContext
+      // Error handled by context
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear field error on change
+  const handleInputChange = (field: string, value: any, profileField?: 'studentProfile' | 'providerProfile') => {
+    if (profileField) {
+      setFormData((prev) => ({
+        ...prev,
+        [profileField]: { ...prev[profileField], [field]: value }
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
+    
     if (clientErrors[field]) {
       setClientErrors((prev) => {
         const next = { ...prev };
@@ -74,215 +116,368 @@ const RegisterPage = () => {
     if (error) clearError();
   };
 
+  const toggleProviderOffer = (offer: string) => {
+    setFormData((prev) => {
+      const current = prev.providerProfile.opportunityCategories;
+      const updated = current.includes(offer)
+        ? current.filter(o => o !== offer)
+        : [...current, offer];
+      return {
+        ...prev,
+        providerProfile: { ...prev.providerProfile, opportunityCategories: updated }
+      };
+    });
+  };
+
   const getFieldError = (field: string): string | undefined => {
     if (clientErrors[field]) return clientErrors[field];
     return fieldErrors?.find((e) => e.field === field)?.message;
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Gradient Orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-primary-500/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-accent-500/15 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-600/10 rounded-full blur-3xl" />
+    <div className="min-h-screen flex flex-col md:flex-row bg-surface-50">
+      {/* Left Side: Branding & Illustration */}
+      <div className="hidden md:flex md:w-5/12 bg-primary-600 relative overflow-hidden flex-col justify-center px-10 lg:px-16 fixed top-0 bottom-0 left-0">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-primary-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-pulse-glow"></div>
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-primary-700 rounded-full mix-blend-multiply filter blur-3xl opacity-70"></div>
+        
+        <div className="relative z-10 animate-fade-in-up">
+          <Link to="/" className="inline-flex items-center gap-3 mb-12 group">
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-black/10 group-hover:scale-105 transition-transform duration-300">
+              <span className="text-2xl font-bold text-primary-600 font-heading">T</span>
+            </div>
+            <span className="text-3xl font-bold text-white font-heading tracking-tight">TechBridge</span>
+          </Link>
+          
+          <h1 className="text-4xl lg:text-5xl font-bold text-white mb-6 leading-tight">
+            Join the Platform
+          </h1>
+          <p className="text-primary-100 text-lg mb-12 max-w-md leading-relaxed">
+            Create a profile that helps us connect the right opportunities with the right talent.
+          </p>
+
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 text-white group">
+              <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                <GraduationCap className="w-6 h-6 text-primary-200" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">For Students</h3>
+                <p className="text-primary-200 text-sm">Find jobs, internships, and resources</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 text-white group">
+              <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                <Briefcase className="w-6 h-6 text-primary-200" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">For Providers</h3>
+                <p className="text-primary-200 text-sm">Post opportunities and find talent</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="w-full max-w-md relative z-10 animate-fade-in-up">
-        {/* Logo & Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 mb-4 shadow-lg shadow-primary-500/25">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+      {/* Right Side: Form Wizard */}
+      <div className="flex-1 flex md:ml-[41.666667%] min-h-screen">
+        <div className="w-full max-w-3xl mx-auto p-6 md:p-12 lg:p-16 animate-fade-in-up">
+          
+          <div className="md:hidden flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center shadow-md">
+              <span className="text-xl font-bold text-white font-heading">T</span>
+            </div>
+            <span className="text-2xl font-bold text-surface-800 font-heading">TechBridge</span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Join TechBridge
-          </h1>
-          <p className="text-gray-400 text-sm">
-            Create your account and bridge the opportunity gap
-          </p>
-        </div>
 
-        {/* Form Card */}
-        <div className="glass-card p-8">
-          {/* Server Error */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-surface-800 mb-2">
+              {step === 1 ? 'Join TechBridge' : `Create ${formData.role === 'student' ? 'Student' : 'Provider'} Account`}
+            </h2>
+            <p className="text-gray-500">
+              {step === 1 ? 'Step 1 of 2: Select your role on the platform' : 'Step 2 of 2: Fill out your profile details'}
+            </p>
+          </div>
+
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 animate-fade-in">
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3 animate-fade-in">
+              <div className="p-1 rounded-full bg-red-100/50 mt-0.5">
+                <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <p className="text-red-300 text-sm">{error}</p>
               </div>
+              <p className="text-red-700 text-sm font-medium">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Role Toggle */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-3">
-                I am a
-              </label>
-              <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6 sm:p-8">
+            
+            {/* --- STEP 1: Role Selection --- */}
+            {step === 1 && (
+              <div className="space-y-6 animate-fade-in">
+                <p className="font-semibold text-gray-700 mb-2 text-lg">I am joining as</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Student Card */}
+                  <label 
+                    className={`relative flex flex-col p-6 cursor-pointer rounded-2xl border-2 transition-all duration-200 ${
+                      formData.role === 'student' 
+                        ? 'border-primary-500 bg-primary-50/50 shadow-md shadow-primary-500/10' 
+                        : 'border-gray-100 hover:border-primary-200 hover:bg-surface-50'
+                    }`}
+                  >
+                    <input type="radio" name="role" value="student" checked={formData.role === 'student'} onChange={() => handleInputChange('role', 'student')} className="sr-only" />
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className={`p-3 rounded-xl ${formData.role === 'student' ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'}`}>
+                        <GraduationCap className="w-7 h-7" />
+                      </div>
+                      <h3 className={`font-semibold text-xl ${formData.role === 'student' ? 'text-primary-700' : 'text-gray-800'}`}>Student</h3>
+                    </div>
+                    <p className="text-gray-500 text-sm leading-relaxed">Find jobs, internships, scholarships, and technical resources to build your career.</p>
+                    {formData.role === 'student' && (
+                      <div className="absolute top-6 right-6 w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Provider Card */}
+                  <label 
+                    className={`relative flex flex-col p-6 cursor-pointer rounded-2xl border-2 transition-all duration-200 ${
+                      formData.role === 'provider' 
+                        ? 'border-secondary-500 bg-secondary-50/50 shadow-md shadow-secondary-500/10' 
+                        : 'border-gray-100 hover:border-secondary-200 hover:bg-surface-50'
+                    }`}
+                  >
+                    <input type="radio" name="role" value="provider" checked={formData.role === 'provider'} onChange={() => handleInputChange('role', 'provider')} className="sr-only" />
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className={`p-3 rounded-xl ${formData.role === 'provider' ? 'bg-secondary-100 text-secondary-600' : 'bg-gray-100 text-gray-500'}`}>
+                        <Building className="w-7 h-7" />
+                      </div>
+                      <h3 className={`font-semibold text-xl ${formData.role === 'provider' ? 'text-secondary-700' : 'text-gray-800'}`}>Opportunity Provider</h3>
+                    </div>
+                    <p className="text-gray-500 text-sm leading-relaxed">Publish opportunities, offer mentorship, or provide technical resources to students.</p>
+                    {formData.role === 'provider' && (
+                      <div className="absolute top-6 right-6 w-5 h-5 rounded-full bg-secondary-500 flex items-center justify-center">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                  </label>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => handleInputChange('role', 'student')}
-                  className={`relative py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer border ${
-                    formData.role === 'student'
-                      ? 'bg-primary-500/20 border-primary-500/50 text-primary-300 shadow-lg shadow-primary-500/10'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20'
-                  }`}
+                  onClick={handleNextStep}
+                  className="w-full py-4 mt-8 rounded-xl font-semibold text-white transition-all duration-300 cursor-pointer bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-600/20 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group"
                 >
-                  <div className="flex flex-col items-center gap-1.5">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                    Student
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleInputChange('role', 'provider')}
-                  className={`relative py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer border ${
-                    formData.role === 'provider'
-                      ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 shadow-lg shadow-accent-500/10'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className="flex flex-col items-center gap-1.5">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    Provider
-                  </div>
+                  Continue to Profile Details
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
-            </div>
+            )}
 
-            {/* Full Name */}
-            <div>
-              <label htmlFor="register-fullName" className="block text-sm font-medium text-gray-300 mb-2">
-                Full Name
-              </label>
-              <input
-                id="register-fullName"
-                type="text"
-                value={formData.fullName}
-                onChange={(e) => handleInputChange('fullName', e.target.value)}
-                placeholder="Enter your full name"
-                className={`w-full px-4 py-3 rounded-xl bg-white/5 border text-white placeholder-gray-500 text-sm transition-all duration-300 outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 ${
-                  getFieldError('fullName')
-                    ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50'
-                    : 'border-white/10 hover:border-white/20'
-                }`}
-              />
-              {getFieldError('fullName') && (
-                <p className="mt-1.5 text-xs text-red-400">{getFieldError('fullName')}</p>
-              )}
-            </div>
+            {/* --- STEP 2: Detailed Form --- */}
+            {step === 2 && (
+              <div className="space-y-6 animate-slide-in-left">
+                {formData.role === 'provider' && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
+                    <p className="text-sm text-amber-800 font-medium">Provider accounts are reviewed to keep opportunities and resource arrangements trustworthy.</p>
+                  </div>
+                )}
 
-            {/* Email */}
-            <div>
-              <label htmlFor="register-email" className="block text-sm font-medium text-gray-300 mb-2">
-                Email Address
-              </label>
-              <input
-                id="register-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="you@example.com"
-                className={`w-full px-4 py-3 rounded-xl bg-white/5 border text-white placeholder-gray-500 text-sm transition-all duration-300 outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 ${
-                  getFieldError('email')
-                    ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50'
-                    : 'border-white/10 hover:border-white/20'
-                }`}
-              />
-              {getFieldError('email') && (
-                <p className="mt-1.5 text-xs text-red-400">{getFieldError('email')}</p>
-              )}
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full name</label>
+                    <input type="text" value={formData.fullName} onChange={(e) => handleInputChange('fullName', e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                    {getFieldError('fullName') && <p className="mt-1 text-xs text-red-500">{getFieldError('fullName')}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email address</label>
+                    <input type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                    {getFieldError('email') && <p className="mt-1 text-xs text-red-500">{getFieldError('email')}</p>}
+                  </div>
+                </div>
 
-            {/* Password */}
-            <div>
-              <label htmlFor="register-password" className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                id="register-password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                placeholder="At least 6 characters"
-                className={`w-full px-4 py-3 rounded-xl bg-white/5 border text-white placeholder-gray-500 text-sm transition-all duration-300 outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 ${
-                  getFieldError('password')
-                    ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50'
-                    : 'border-white/10 hover:border-white/20'
-                }`}
-              />
-              {getFieldError('password') && (
-                <p className="mt-1.5 text-xs text-red-400">{getFieldError('password')}</p>
-              )}
-            </div>
+                {/* --- STUDENT FIELDS --- */}
+                {formData.role === 'student' && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Institution</label>
+                        <select value={formData.studentProfile.institution} onChange={(e) => handleInputChange('institution', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          <option value="Faculty of Technology">Faculty of Technology</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Programme</label>
+                        <select value={formData.studentProfile.degree} onChange={(e) => handleInputChange('degree', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          <option value="ICT">ICT</option>
+                          <option value="ET">Engineering Tech</option>
+                          <option value="BST">Biosystems Tech</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Study year</label>
+                        <select value={formData.studentProfile.studyYear} onChange={(e) => handleInputChange('studyYear', parseInt(e.target.value), 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                        </select>
+                      </div>
+                    </div>
 
-            {/* Confirm Password */}
-            <div>
-              <label htmlFor="register-confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                Confirm Password
-              </label>
-              <input
-                id="register-confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                placeholder="Re-enter your password"
-                className={`w-full px-4 py-3 rounded-xl bg-white/5 border text-white placeholder-gray-500 text-sm transition-all duration-300 outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 ${
-                  getFieldError('confirmPassword')
-                    ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50'
-                    : 'border-white/10 hover:border-white/20'
-                }`}
-              />
-              {getFieldError('confirmPassword') && (
-                <p className="mt-1.5 text-xs text-red-400">{getFieldError('confirmPassword')}</p>
-              )}
-            </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Skills or interests (comma separated)</label>
+                      <input type="text" placeholder="HTML, CSS, React..." value={formData.studentProfile.skills} onChange={(e) => handleInputChange('skills', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                    </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 px-6 rounded-xl font-semibold text-sm text-white transition-all duration-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-400 hover:to-accent-400 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 hover:-translate-y-0.5 active:translate-y-0"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" style={{ animation: 'spin 0.6s linear infinite' }} />
-                  Creating Account...
-                </span>
-              ) : (
-                'Create Account'
-              )}
-            </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Location <span className="font-normal text-gray-400">(optional)</span></label>
+                        <input type="text" value={formData.studentProfile.location} onChange={(e) => handleInputChange('location', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Career goal <span className="font-normal text-gray-400">(optional)</span></label>
+                        <input type="text" placeholder="Frontend developer" value={formData.studentProfile.careerGoal} onChange={(e) => handleInputChange('careerGoal', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* --- PROVIDER FIELDS --- */}
+                {formData.role === 'provider' && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Provider type</label>
+                        <select value={formData.providerProfile.organizationType} onChange={(e) => handleInputChange('organizationType', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          <option value="company">Company</option>
+                          <option value="ngo">NGO</option>
+                          <option value="training_org">Training Organization</option>
+                          <option value="scholarship_org">Scholarship Organization</option>
+                          <option value="individual">Individual</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Organization / professional name</label>
+                        <input type="text" value={formData.providerProfile.organizationName} onChange={(e) => handleInputChange('organizationName', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                        {getFieldError('organizationName') && <p className="mt-1 text-xs text-red-500">{getFieldError('organizationName')}</p>}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Contact person</label>
+                        <input type="text" value={formData.providerProfile.contactPerson} onChange={(e) => handleInputChange('contactPerson', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                        {getFieldError('contactPerson') && <p className="mt-1 text-xs text-red-500">{getFieldError('contactPerson')}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone number</label>
+                        <input type="tel" value={formData.providerProfile.phone} onChange={(e) => handleInputChange('phone', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                        {getFieldError('phone') && <p className="mt-1 text-xs text-red-500">{getFieldError('phone')}</p>}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Location</label>
+                        <input type="text" value={formData.providerProfile.location} onChange={(e) => handleInputChange('location', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                        {getFieldError('location') && <p className="mt-1 text-xs text-red-500">{getFieldError('location')}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Website <span className="font-normal text-gray-400">(optional)</span></label>
+                        <input type="url" value={formData.providerProfile.website} onChange={(e) => handleInputChange('website', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">What can you offer?</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { id: 'jobs', label: 'Jobs / freelance projects' },
+                          { id: 'internships', label: 'Internships / hiring' },
+                          { id: 'scholarships', label: 'Scholarships / financial assistance' },
+                          { id: 'training', label: 'Training / workshops' },
+                          { id: 'mentorship', label: 'Mentorship / guidance' },
+                          { id: 'resources', label: 'Technical resources' },
+                        ].map(offer => (
+                          <label key={offer.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-surface-50 cursor-pointer hover:bg-white hover:border-primary-300 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={formData.providerProfile.opportunityCategories.includes(offer.id)}
+                              onChange={() => toggleProviderOffer(offer.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer" 
+                            />
+                            <span className="text-sm font-medium text-gray-700">{offer.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* --- PASSWORD FIELDS --- */}
+                <div className="pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-5 mt-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+                    <input type="password" placeholder="At least 6 characters" value={formData.password} onChange={(e) => handleInputChange('password', e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                    {getFieldError('password') && <p className="mt-1 text-xs text-red-500">{getFieldError('password')}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Confirm password</label>
+                    <input type="password" value={formData.confirmPassword} onChange={(e) => handleInputChange('confirmPassword', e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                    {getFieldError('confirmPassword') && <p className="mt-1 text-xs text-red-500">{getFieldError('confirmPassword')}</p>}
+                  </div>
+                </div>
+
+                <div className="flex gap-4 mt-8 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="px-5 py-3.5 rounded-xl font-semibold text-gray-600 bg-surface-100 hover:bg-surface-200 transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className={`flex-1 py-3.5 px-6 rounded-xl font-bold text-white transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 group ${
+                      formData.role === 'student' 
+                        ? 'bg-primary-600 hover:bg-primary-700 shadow-primary-600/25 hover:shadow-primary-600/40' 
+                        : 'bg-secondary-600 hover:bg-secondary-700 shadow-secondary-600/25 hover:shadow-secondary-600/40'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      <>
+                        Create {formData.role === 'student' ? 'student' : 'provider'} account
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
 
-          {/* Login Link */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-400">
+          <div className="mt-8 text-center pb-8">
+            <p className="text-sm text-gray-500">
               Already have an account?{' '}
               <Link
                 to="/login"
-                className="text-primary-400 hover:text-primary-300 font-semibold transition-colors duration-200"
+                className="text-primary-600 hover:text-primary-700 font-bold transition-colors duration-200"
               >
                 Sign in
               </Link>
             </p>
           </div>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-xs text-gray-600 mt-6">
-          By creating an account, you agree to TechBridge's Terms of Service
-        </p>
       </div>
     </div>
   );

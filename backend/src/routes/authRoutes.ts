@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe } from '../controllers/authController';
-import { protect } from '../middleware/auth';
+import { register, login, getMe, updateProviderVerification } from '../controllers/authController';
+import { authorize, protect } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 
 const router = Router();
@@ -42,9 +42,47 @@ router.post(
         return true;
       }),
     body('role')
-      .optional()
+      .notEmpty()
       .isIn(['student', 'provider'])
       .withMessage('Role must be student or provider'),
+    body('studentProfile.institution')
+      .if(body('role').equals('student'))
+      .trim().notEmpty().withMessage('Institution is required'),
+    body('studentProfile.degree')
+      .if(body('role').equals('student'))
+      .isIn(['ICT', 'ET', 'BST', 'other']).withMessage('Select a valid degree programme'),
+    body('studentProfile.studyYear')
+      .if(body('role').equals('student'))
+      .isInt({ min: 1, max: 6 }).withMessage('Study year must be between 1 and 6'),
+    body('studentProfile.skills')
+      .if(body('role').equals('student'))
+      .isArray({ min: 1 }).withMessage('Add at least one skill or interest'),
+    body('providerProfile.organizationType')
+      .if(body('role').equals('provider'))
+      .isIn(['company', 'training_org', 'scholarship_org', 'ngo', 'individual'])
+      .withMessage('Select a valid organization type'),
+    body('providerProfile.organizationName')
+      .if(body('role').equals('provider'))
+      .trim().isLength({ min: 2, max: 150 }).withMessage('Organization or professional name is required'),
+    body('providerProfile.contactPerson')
+      .if(body('role').equals('provider'))
+      .trim().isLength({ min: 2, max: 100 }).withMessage('Contact person is required'),
+    body('providerProfile.contactEmail')
+      .if(body('role').equals('provider'))
+      .trim().isEmail().withMessage('A valid provider contact email is required')
+      .normalizeEmail(),
+    body('providerProfile.phone')
+      .if(body('role').equals('provider'))
+      .trim().matches(/^[+0-9][0-9\\s-]{7,28}$/).withMessage('Enter a valid phone number'),
+    body('providerProfile.location')
+      .if(body('role').equals('provider'))
+      .trim().notEmpty().withMessage('Location is required'),
+    body('providerProfile.opportunityCategories')
+      .if(body('role').equals('provider'))
+      .isArray({ min: 1 }).withMessage('Select at least one offering'),
+    body('providerProfile.resourceAccessMethods')
+      .if(body('providerProfile.opportunityCategories').custom((value) => Array.isArray(value) && value.includes('technical_resources')))
+      .isArray({ min: 1 }).withMessage('Select at least one resource access method'),
     validate,
   ],
   register
@@ -77,5 +115,13 @@ router.post(
  * @access  Private
  */
 router.get('/me', protect, getMe);
+
+router.patch(
+  '/providers/:id/verification',
+  protect,
+  authorize('admin'),
+  [body('verified').isBoolean().withMessage('verified must be true or false'), validate],
+  updateProviderVerification
+);
 
 export default router;

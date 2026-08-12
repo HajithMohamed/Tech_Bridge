@@ -1,12 +1,41 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+export type OrganizationType =
+  | 'company'
+  | 'training_org'
+  | 'scholarship_org'
+  | 'ngo'
+  | 'individual';
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   fullName: string;
   email: string;
   password: string;
   role: 'student' | 'provider' | 'admin';
+  studentProfile?: {
+    institution: string;
+    degree: 'ICT' | 'ET' | 'BST' | 'other';
+    studyYear: number;
+    location?: string;
+    skills: string[];
+    careerGoal?: string;
+  };
+  providerProfile?: {
+    organizationName: string;
+    organizationType: OrganizationType;
+    verified: boolean;
+    contactEmail: string;
+    contactPerson: string;
+    phone: string;
+    location: string;
+    website?: string;
+    logoUrl?: string;
+    description?: string;
+    opportunityCategories: string[];
+    resourceAccessMethods?: string[];
+  };
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -27,43 +56,59 @@ const userSchema = new Schema<IUser>(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-        'Please provide a valid email address',
-      ],
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please provide a valid email address'],
     },
     password: {
       type: String,
       required: [true, 'Password is required'],
       minlength: [6, 'Password must be at least 6 characters'],
-      select: false, // Don't return password by default in queries
+      select: false,
     },
     role: {
       type: String,
-      enum: {
-        values: ['student', 'provider', 'admin'],
-        message: 'Role must be student, provider, or admin',
-      },
+      enum: ['student', 'provider', 'admin'],
       default: 'student',
     },
+    studentProfile: {
+      institution: { type: String, trim: true },
+      degree: { type: String, enum: ['ICT', 'ET', 'BST', 'other'] },
+      studyYear: { type: Number, min: 1, max: 6 },
+      location: { type: String, trim: true, maxlength: 100 },
+      skills: [{ type: String, trim: true, maxlength: 50 }],
+      careerGoal: { type: String, trim: true, maxlength: 150 },
+    },
+    providerProfile: {
+      organizationName: { type: String, trim: true, maxlength: 150 },
+      organizationType: {
+        type: String,
+        enum: ['company', 'training_org', 'scholarship_org', 'ngo', 'individual'],
+      },
+      verified: { type: Boolean, default: false },
+      contactEmail: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please provide a valid contact email'],
+      },
+      contactPerson: { type: String, trim: true, maxlength: 100 },
+      phone: { type: String, trim: true, maxlength: 30 },
+      location: { type: String, trim: true, maxlength: 100 },
+      website: { type: String, trim: true, maxlength: 200 },
+      logoUrl: { type: String, trim: true, maxlength: 500 },
+      description: { type: String, trim: true, maxlength: 1000 },
+      opportunityCategories: [{ type: String, trim: true }],
+      resourceAccessMethods: [{ type: String, trim: true }],
+    },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Hash password before saving
 userSchema.pre('save', async function () {
-  // Only hash if password is modified
-  if (!this.isModified('password')) {
-    return;
-  }
-
+  if (!this.isModified('password')) return;
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Compare password method
 userSchema.methods.comparePassword = async function (
   candidatePassword: string
 ): Promise<boolean> {

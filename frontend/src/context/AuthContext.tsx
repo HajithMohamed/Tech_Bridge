@@ -13,6 +13,7 @@ interface AuthContextType {
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
+  updateStoredUser: (user: User) => void;
   clearError: () => void;
 }
 
@@ -71,6 +72,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const response = await loginUser(data);
       const { user: userData, token: newToken } = response.data;
 
+      if (!newToken) {
+        throw new Error('Login did not return an access token');
+      }
+
       localStorage.setItem('techbridge_token', newToken);
       localStorage.setItem('techbridge_user', JSON.stringify(userData));
 
@@ -100,6 +105,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const response = await registerUser(data);
       const { user: userData, token: newToken } = response.data;
+
+      if (!newToken) {
+        return;
+      }
 
       localStorage.setItem('techbridge_token', newToken);
       localStorage.setItem('techbridge_user', JSON.stringify(userData));
@@ -136,6 +145,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setFieldErrors(null);
   }, []);
 
+  const updateStoredUser = useCallback((updatedUser: User) => {
+    localStorage.setItem('techbridge_user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -148,6 +162,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         login,
         register,
         logout,
+        updateStoredUser,
         clearError,
       }}
     >

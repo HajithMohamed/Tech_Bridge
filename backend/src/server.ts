@@ -3,6 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db';
 import authRoutes from './routes/authRoutes';
+import opportunityRoutes from './routes/opportunityRoutes';
+import resourceRoutes from './routes/resourceRoutes';
+import applicationRoutes from './routes/applicationRoutes';
+import providerRoutes from './routes/providerRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -22,6 +26,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/opportunities', opportunityRoutes);
+app.use('/api/resources', resourceRoutes);
+app.use('/api/applications', applicationRoutes);
+app.use('/api/provider', providerRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

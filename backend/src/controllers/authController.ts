@@ -9,7 +9,7 @@ import { generateToken } from '../utils/jwt';
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { fullName, email, password, role } = req.body;
+    const { fullName, email, password, role, studentProfile, providerProfile } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
@@ -32,23 +32,36 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email,
       password,
       role: userRole,
+      ...(userRole === 'student'
+        ? { studentProfile }
+        : {
+            providerProfile: {
+              ...providerProfile,
+              verified: false,
+            },
+          }),
     });
 
-    // Generate token
-    const token = generateToken(user._id.toString(), user.role);
+    // Providers must be reviewed before they can access the provider portal.
+    const isPendingProvider = user.role === 'provider' && !user.providerProfile?.verified;
+    const token = isPendingProvider ? undefined : generateToken(user._id.toString(), user.role);
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message: isPendingProvider
+        ? 'Provider application received. Your account will be activated after verification.'
+        : 'Registration successful',
       data: {
         user: {
           _id: user._id,
           fullName: user.fullName,
           email: user.email,
           role: user.role,
+          studentProfile: user.studentProfile,
+          providerProfile: user.providerProfile,
           createdAt: user.createdAt,
         },
-        token,
+        ...(token ? { token } : {}),
       },
     });
   } catch (error) {
@@ -93,6 +106,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (user.role === 'provider' && !user.providerProfile?.verified) {
+      res.status(403).json({
+        success: false,
+        message: 'This provider account is awaiting verification.',
+      });
+      return;
+    }
+
     // Generate token
     const token = generateToken(user._id.toString(), user.role);
 
@@ -105,6 +126,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           fullName: user.fullName,
           email: user.email,
           role: user.role,
+          studentProfile: user.studentProfile,
+          providerProfile: user.providerProfile,
           createdAt: user.createdAt,
         },
         token,
@@ -116,6 +139,44 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       success: false,
       message: 'Server error during login',
     });
+  }
+};
+
+/**
+ * @route   PATCH /api/auth/providers/:id/verification
+ * @desc    Approve or revoke a provider account. Only administrators may do this.
+ * @access  Private/Admin
+ */
+export const updateProviderVerification = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const provider = await User.findOne({ _id: req.params.id, role: 'provider' });
+
+    if (!provider || !provider.providerProfile) {
+      res.status(404).json({ success: false, message: 'Provider not found' });
+      return;
+    }
+
+    provider.providerProfile.verified = req.body.verified;
+    await provider.save();
+
+    res.status(200).json({
+      success: true,
+      message: req.body.verified ? 'Provider verified' : 'Provider verification revoked',
+      data: {
+        provider: {
+          _id: provider._id,
+          fullName: provider.fullName,
+          email: provider.email,
+          providerProfile: provider.providerProfile,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Provider verification error:', error);
+    res.status(500).json({ success: false, message: 'Server error updating provider verification' });
   }
 };
 
@@ -144,6 +205,8 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
           fullName: user.fullName,
           email: user.email,
           role: user.role,
+          studentProfile: user.studentProfile,
+          providerProfile: user.providerProfile,
           createdAt: user.createdAt,
         },
       },
