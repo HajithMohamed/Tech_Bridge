@@ -3,15 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteResource = exports.updateResourceStatus = exports.getResource = exports.listMyResources = exports.listResources = exports.createResource = void 0;
+exports.deleteResource = exports.updateResourceInventory = exports.updateResourceStatus = exports.getResource = exports.listMyResources = exports.listResources = exports.createResource = void 0;
 const Resource_1 = __importDefault(require("../models/Resource"));
 const categories = ['laptop', 'arduino', 'raspberry_pi', 'sensor', 'electronic_component', 'dev_board', 'other'];
 const accessTypes = ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
 const statuses = ['available', 'claimed'];
 const studentAccessTypes = ['borrow', 'share', 'donation'];
 const peerToPeerAccessTypes = ['borrow', 'share'];
-const providerManagedAccessTypes = ['rent', 'installment', 'interest_free', 'sponsorship'];
-const providerOrganizationTypes = ['company', 'ngo', 'training_org'];
+const providerManagedAccessTypes = ['rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
 const listedBySelect = 'fullName email role providerProfile.organizationName providerProfile.organizationType providerProfile.verified providerProfile.verificationStatus providerProfile.contactEmail providerProfile.phone';
 const isRecord = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const validNumber = (value, minimum = 0) => typeof value === 'number' && Number.isFinite(value) && value >= minimum;
@@ -169,7 +168,8 @@ const canOfferProviderManagedAccess = (req) => {
     if (req.user?.role !== 'provider')
         return false;
     const profile = req.user.providerProfile;
-    return Boolean(profile?.verified) || providerOrganizationTypes.includes(profile?.organizationType || '');
+    return profile?.verified === true
+        && profile.opportunityCategories?.includes('technical_resources') === true;
 };
 /** POST /api/resources */
 const createResource = async (req, res) => {
@@ -184,7 +184,11 @@ const createResource = async (req, res) => {
             return;
         }
         if (providerManagedAccessTypes.includes(payload.accessType) && !canOfferProviderManagedAccess(req)) {
-            res.status(403).json({ success: false, message: 'Rent, installment, interest-free, and sponsorship listings require an eligible organization or verified provider account.' });
+            res.status(403).json({ success: false, message: 'Provider-managed resource listings require a verified provider account with technical resources enabled.' });
+            return;
+        }
+        if (providerManagedAccessTypes.includes(payload.accessType) && req.user?.role === 'provider' && !req.user.providerProfile?.resourceAccessMethods?.includes(payload.accessType)) {
+            res.status(403).json({ success: false, message: `Your provider profile is not enabled to offer ${payload.accessType.replace('_', ' ')} arrangements.` });
             return;
         }
         const resource = await Resource_1.default.create({
@@ -254,11 +258,18 @@ const updateResourceStatus = async (req, res) => {
             res.status(400).json({ success: false, message: 'Status must be available or claimed.' });
             return;
         }
-        const resource = await Resource_1.default.findOneAndUpdate({ _id: req.params.id, listedBy: req.user._id }, { status: req.body.status }, { new: true });
-        if (!resource) {
+        const existing = await Resource_1.default.findOne({ _id: req.params.id, listedBy: req.user._id });
+        if (!existing) {
             res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' });
             return;
         }
+        if (req.body.status === 'available' && existing.quantityAvailable < 1) {
+            res.status(400).json({ success: false, message: 'Add at least one available unit before reopening this listing.' });
+            return;
+        }
+        existing.status = req.body.status;
+        await existing.save();
+        const resource = existing;
         res.status(200).json({ success: true, message: 'Listing status updated.', data: { resource } });
     }
     catch {
@@ -266,6 +277,26 @@ const updateResourceStatus = async (req, res) => {
     }
 };
 exports.updateResourceStatus = updateResourceStatus;
+/** PATCH /api/resources/:id/inventory */
+const updateResourceInventory = async (req, res) => {
+    try {
+        if (!validInteger(req.body.quantityAvailable, 0)) {
+            res.status(400).json({ success: false, message: 'Available units must be a whole number of zero or more.' });
+            return;
+        }
+        const quantityAvailable = req.body.quantityAvailable;
+        const resource = await Resource_1.default.findOneAndUpdate({ _id: req.params.id, listedBy: req.user._id }, { quantityAvailable, status: quantityAvailable > 0 ? 'available' : 'claimed' }, { new: true });
+        if (!resource) {
+            res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' });
+            return;
+        }
+        res.status(200).json({ success: true, message: 'Available units updated.', data: { resource } });
+    }
+    catch {
+        res.status(400).json({ success: false, message: 'Unable to update available units.' });
+    }
+};
+exports.updateResourceInventory = updateResourceInventory;
 /** DELETE /api/resources/:id */
 const deleteResource = async (req, res) => {
     try {

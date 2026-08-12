@@ -12,7 +12,7 @@ const coverageLabels: Record<string, string> = {
   full: 'Full coverage', partial: 'Partial coverage', tuition_only: 'Tuition only', equipment_only: 'Equipment only', stipend: 'Stipend',
 };
 const typeLabels: Record<string, string> = {
-  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', workshop: 'Workshop',
+  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', workshop: 'Workshop', mentorship: 'Mentorship',
 };
 
 const providerName = (opportunity: Opportunity) =>
@@ -271,8 +271,42 @@ const OpportunityDetailPage = () => {
               <Description title="About this scholarship" value={opportunity.description} />
             </section>
           ) : (
-            <section className="mt-7">
+            <section className="mt-8 space-y-6">
+              
+              {opportunity.type === 'internship' && (
+                <div className="grid sm:grid-cols-3 gap-3 mb-6">
+                  <Stat label="Duration" value={opportunity.duration || '—'} />
+                  <Stat label="Compensation" value={opportunity.isPaid ? 'Paid' : 'Unpaid'} />
+                  <Stat label="Preferred background" value={opportunity.preferredAcademicBackground || 'Any'} />
+                </div>
+              )}
+              
+              {(opportunity.type === 'course' || opportunity.type === 'workshop') && (
+                <div className="grid sm:grid-cols-3 gap-3 mb-6">
+                  <Stat label="Duration" value={opportunity.duration || '—'} />
+                  <Stat label="Dates" value={`${opportunity.startDate ? new Date(opportunity.startDate).toLocaleDateString('en-LK') : '—'} to ${opportunity.endDate ? new Date(opportunity.endDate).toLocaleDateString('en-LK') : '—'}`} />
+                  <Stat label="Fee" value={opportunity.isFree ? 'Free for students' : opportunity.fee ? `LKR ${opportunity.fee}` : '—'} />
+                </div>
+              )}
+
+              {opportunity.type === 'mentorship' && (
+                <div className="grid sm:grid-cols-2 gap-3 mb-6">
+                  <Stat label="Mentor" value={opportunity.mentorName || '—'} />
+                  <Stat label="Focus area" value={opportunity.mentorshipType || 'Guidance'} />
+                  <Stat label="Professional field" value={opportunity.professionalField || '—'} />
+                  <Stat label="Availability" value={opportunity.availability || '—'} />
+                </div>
+              )}
+              
+              {(opportunity.type === 'job' || opportunity.type === 'freelance') && opportunity.paymentInfo && (
+                <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                  <p className="text-sm text-gray-500 font-semibold mb-1">Payment Information</p>
+                  <p className="text-gray-900">{opportunity.paymentInfo}</p>
+                </div>
+              )}
+
               <Description title="About this opportunity" value={opportunity.description} />
+              <ServiceDetails opportunity={opportunity} />
               {!isStudent && (
                 <div className="mt-6">
                   <h3 className="text-sm font-semibold text-gray-600 mb-2">Required skills</h3>
@@ -283,6 +317,7 @@ const OpportunityDetailPage = () => {
                   </div>
                 </div>
               )}
+              {opportunity.contactMethod && <div className="mt-6 rounded-xl border border-primary-100 bg-primary-50 p-4"><p className="text-sm font-semibold text-primary-800">Application instructions</p><p className="mt-1 text-sm text-primary-700">{opportunity.contactMethod}</p></div>}
               <p className="text-sm text-gray-400 mt-7">Application deadline: {deadline}</p>
             </section>
           )}
@@ -329,6 +364,22 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
     <p className="font-bold text-gray-900 mt-1">{value}</p>
   </div>
 );
+
+const ServiceDetails = ({ opportunity }: { opportunity: Opportunity }) => {
+  const formatDate = (date?: string) => date ? new Date(date).toLocaleDateString('en-LK', { dateStyle: 'medium' }) : '';
+  const fee = opportunity.fee !== undefined ? new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(opportunity.fee) : '';
+  if (opportunity.type === 'job' || opportunity.type === 'freelance') return opportunity.paymentInfo ? <Details title="Compensation" entries={[['Payment information', opportunity.paymentInfo]]} /> : null;
+  if (opportunity.type === 'internship') return <Details title="Internship details" entries={[["Duration", opportunity.duration], ["Start date", formatDate(opportunity.startDate)], ["Paid", opportunity.isPaid === undefined ? undefined : opportunity.isPaid ? 'Yes' : 'No'], ["Preferred background", opportunity.preferredAcademicBackground]]} />;
+  if (opportunity.type === 'course' || opportunity.type === 'workshop') return <Details title={`${typeLabels[opportunity.type]} details`} entries={[["Duration", opportunity.duration], ["Start date", formatDate(opportunity.startDate)], ["End date", formatDate(opportunity.endDate)], ["Fee", opportunity.isFree === true ? 'Free for students' : fee]]} />;
+  if (opportunity.type === 'mentorship') return <Details title="Mentorship details" entries={[["Mentor", opportunity.mentorName], ["Field", opportunity.professionalField], ["Experience", opportunity.experience], ["Focus", opportunity.mentorshipType], ["Availability", opportunity.availability]]} />;
+  return null;
+};
+
+const Details = ({ title, entries }: { title: string; entries: Array<[string, string | undefined]> }) => {
+  const available = entries.filter(([, value]) => Boolean(value));
+  if (!available.length) return null;
+  return <section className="mt-6"><h2 className="text-lg font-bold text-gray-900">{title}</h2><dl className="mt-3 grid sm:grid-cols-2 gap-3">{available.map(([label, value]) => <div key={label} className="rounded-xl border border-gray-100 bg-surface-50 p-3"><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-1 text-sm font-semibold text-gray-800">{value}</dd></div>)}</dl></section>;
+};
 
 const Description = ({ title, value }: { title: string; value: string }) => (
   <div>

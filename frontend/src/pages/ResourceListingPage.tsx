@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
 import { createResource, deleteResource, getMyResources, updateResourceStatus } from '../api/resourceApi';
 import { useAuth } from '../hooks/useAuth';
 import type { ResourceAccessDetails, ResourceAccessType, ResourceCategory, ResourceCondition, ResourceListing, ResourceListingFormData } from '../types';
+import { enabledResourceAccess, resourceAccessOptions } from '../utils/providerCapabilities';
 
 const categories: Array<{ value: ResourceCategory; label: string }> = [
   { value: 'laptop', label: 'Laptop' }, { value: 'arduino', label: 'Arduino' }, { value: 'raspberry_pi', label: 'Raspberry Pi' },
   { value: 'sensor', label: 'Sensor' }, { value: 'electronic_component', label: 'Electronic component' }, { value: 'dev_board', label: 'Development board' }, { value: 'other', label: 'Other' },
 ];
-const basicTypes: Array<{ value: ResourceAccessType; label: string }> = [{ value: 'borrow', label: 'Borrow' }, { value: 'share', label: 'Share' }, { value: 'donation', label: 'Donation' }];
-const providerTypes: Array<{ value: ResourceAccessType; label: string }> = [{ value: 'rent', label: 'Rent' }, { value: 'installment', label: 'Installment' }, { value: 'interest_free', label: 'Interest-Free' }, { value: 'sponsorship', label: 'Sponsorship' }];
+const studentTypes: Array<{ value: ResourceAccessType; label: string }> = [{ value: 'borrow', label: 'Borrow' }, { value: 'share', label: 'Share' }, { value: 'donation', label: 'Donation' }];
 const financialTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship'];
 const readable = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 const dateForInput = (daysFromNow: number) => { const date = new Date(); date.setDate(date.getDate() + daysFromNow); return date.toISOString().slice(0, 10); };
@@ -36,9 +36,12 @@ const TextInput = ({ value, onChange, type = 'text', required = true, min, place
 
 const ResourceListingPage = () => {
   const { user } = useAuth();
-  const providerIsEligible = user?.role === 'provider' && (user.providerProfile?.verified === true || ['company', 'ngo', 'training_org'].includes(user.providerProfile?.organizationType || ''));
-  const allowedTypes = useMemo(() => user?.role === 'admin' || providerIsEligible ? [...basicTypes, ...providerTypes] : basicTypes, [providerIsEligible, user?.role]);
-  const [form, setForm] = useState<ResourceListingFormData>(() => emptyForm(allowedTypes[0].value));
+  const allowedTypes = (() => {
+    if (user?.role === 'student') return studentTypes;
+    if (user?.role === 'provider') return resourceAccessOptions.filter((option) => enabledResourceAccess(user.providerProfile).includes(option.value));
+    return [...studentTypes, ...resourceAccessOptions];
+  })();
+  const [form, setForm] = useState<ResourceListingFormData>(() => emptyForm(user?.role === 'provider' ? enabledResourceAccess(user.providerProfile)[0] || 'borrow' : 'borrow'));
   const [listings, setListings] = useState<ResourceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,7 +66,7 @@ const ResourceListingPage = () => {
     try {
       await createResource({ ...form, ...(isServiceStock ? { condition: undefined } : {}) });
       setNotice('Resource listing published.');
-      setForm(emptyForm(allowedTypes[0].value));
+      setForm(emptyForm(allowedTypes[0]?.value || 'borrow'));
       await load();
     } catch (requestError) {
       setError(axios.isAxiosError(requestError) ? requestError.response?.data?.message || 'Unable to publish listing.' : 'Unable to publish listing.');
@@ -87,7 +90,7 @@ const ResourceListingPage = () => {
     <div className="flex items-center justify-between gap-4 mb-7"><div><p className="text-primary-300 text-sm font-semibold mb-2">TECHNICAL RESOURCE ACCESS HUB</p><h1 className="text-3xl font-bold text-white">List a resource</h1><p className="text-gray-400 mt-2">Choose one access pathway and provide the exact terms students need to see.</p></div><Link to="/resources" className="text-sm text-primary-200 hover:text-white">Browse the hub</Link></div>
     {error && <div className="mb-5 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-100">{error}</div>}
     {notice && <div className="mb-5 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-100">{notice}</div>}
-    <form onSubmit={submit} className="glass-card p-5 sm:p-7 space-y-6">
+    {allowedTypes.length === 0 ? <div className="glass-card p-7"><p className="font-semibold text-white">Technical resource listings are not enabled for this provider.</p><p className="mt-2 text-sm text-gray-400">Enable Technical resources and at least one resource access pathway in your provider profile.</p><Link to="/provider/profile" className="inline-block mt-4 text-primary-200 font-semibold">Update provider services →</Link></div> : <form onSubmit={submit} className="glass-card p-5 sm:p-7 space-y-6">
       <fieldset><legend className="field-label">1. Access type</legend><div className="flex flex-wrap gap-2">{allowedTypes.map((type) => <button key={type.value} type="button" onClick={() => selectType(type.value)} className={`px-4 py-2.5 rounded-xl text-sm font-medium border ${form.accessType === type.value ? 'bg-primary-500/20 border-primary-400/70 text-white' : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`}>{type.label}</button>)}</div>{user?.role === 'student' && <p className="mt-3 text-xs text-gray-500">Students can list resources for borrowing, sharing, or donation only.</p>}</fieldset>
       <div className="grid sm:grid-cols-2 gap-4"><Field label="Item name"><TextInput value={form.itemName} onChange={(itemName) => setForm((current) => ({ ...current, itemName }))} placeholder="e.g. Arduino UNO" /></Field><Field label="Category"><select className="feed-input" value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as ResourceCategory }))}>{categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></Field></div>
       <div className="grid sm:grid-cols-2 gap-4"><Field label="Quantity available"><TextInput type="number" min={1} value={form.quantityAvailable} onChange={(quantityAvailable) => setForm((current) => ({ ...current, quantityAvailable: Number(quantityAvailable) }))} /></Field>{!isServiceStock && <Field label="Condition"><select className="feed-input" value={form.condition || ''} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value as ResourceCondition }))}><option value="new">New</option><option value="used_good">Used — good</option><option value="used_fair">Used — fair</option></select></Field>}</div>
@@ -100,7 +103,7 @@ const ResourceListingPage = () => {
       {form.accessType === 'donation' && donation && <div className="space-y-4"><h2 className="font-semibold text-white">Donation details</h2><div className="grid sm:grid-cols-2 gap-4"><Field label="Item age (years)"><TextInput type="number" min={0} value={donation.itemAgeYears} onChange={(itemAgeYears) => patchDetails('donation', { itemAgeYears: Number(itemAgeYears) })} /></Field><Field label="Claim deadline"><TextInput type="date" value={donation.claimDeadline} onChange={(claimDeadline) => patchDetails('donation', { claimDeadline })} /></Field><Field label="Pickup or delivery method"><TextInput value={donation.pickupOrDeliveryMethod} onChange={(pickupOrDeliveryMethod) => patchDetails('donation', { pickupOrDeliveryMethod })} placeholder="Pickup / delivery / both" /></Field></div><Field label="Condition notes"><textarea required className="feed-input min-h-24" value={donation.conditionNotes} onChange={(event) => patchDetails('donation', { conditionNotes: event.target.value })} placeholder="Describe item condition and included accessories." /></Field></div>}
       {financialTypes.includes(form.accessType) && <p className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">TechBridge does not provide loans or financing. These arrangements are offered directly by verified providers, subject to their own terms.</p>}
       <button disabled={saving} className="px-5 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-primary-500 to-accent-500 disabled:opacity-50">{saving ? 'Publishing...' : 'Publish listing'}</button>
-    </form>
+    </form>}
     <section className="mt-10"><h2 className="text-xl font-bold text-white mb-4">Your listings</h2>{loading ? <p className="text-gray-400">Loading your listings...</p> : listings.length === 0 ? <div className="glass-card p-6 text-gray-400">You have not listed any resources yet.</div> : <div className="grid md:grid-cols-2 gap-4">{listings.map((listing) => <article key={listing._id} className="glass-card p-5"><div className="flex justify-between gap-3"><div><h3 className="font-semibold text-white">{listing.itemName}</h3><p className="mt-1 text-xs text-gray-400">{readable(listing.accessType)} · {listing.quantityAvailable} units</p></div><select value={listing.status} onChange={(event) => void setStatus(listing, event.target.value as 'available' | 'claimed')} className="feed-input !w-auto !py-1.5 text-sm"><option value="available">Available</option><option value="claimed">Claimed</option></select></div><div className="mt-4 flex items-center justify-between"><span className={`text-xs px-2 py-1 rounded ${listing.providerOrgVerified ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/10 text-gray-300'}`}>{listing.providerOrgVerified ? 'Verified provider' : 'Community listing'}</span><button onClick={() => void remove(listing._id)} className="text-sm text-red-200 hover:text-red-100">Delete</button></div></article>)}</div>}</section>
   </main></div>;
 };

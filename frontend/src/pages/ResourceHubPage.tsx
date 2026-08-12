@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
 import { getResources } from '../api/resourceApi';
+import { useAuth } from '../hooks/useAuth';
 import type { ResourceAccessType, ResourceListing } from '../types';
+import { createResourceRequest } from '../api/resourceRequestApi';
+import { useAuth } from '../hooks/useAuth';
 
-const accessTypes: Array<{ value: ResourceAccessType; label: string }> = [
-  { value: 'borrow', label: 'Borrow' },
-  { value: 'share', label: 'Share' },
-  { value: 'rent', label: 'Rent' },
-  { value: 'installment', label: 'Installment' },
-  { value: 'interest_free', label: 'Interest-Free' },
-  { value: 'sponsorship', label: 'Sponsorship' },
-  { value: 'donation', label: 'Donation' },
-];
+const freeTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
+const subsidizedTypes: ResourceAccessType[] = ['installment', 'interest_free', 'sponsorship'];
+const marketplaceTypes: ResourceAccessType[] = ['rent'];
+
 
 const providerArrangedTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship'];
 const readable = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -23,7 +21,7 @@ const ownerName = (listing: ResourceListing) => {
   return listing.listedBy.providerProfile?.organizationName || listing.listedBy.fullName;
 };
 
-const ResourceCard = ({ listing }: { listing: ResourceListing }) => {
+const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRequest: boolean }) => {
   const unverifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && !listing.providerOrgVerified;
   const verifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && listing.providerOrgVerified;
   const details = listing.accessDetails;
@@ -35,7 +33,7 @@ const ResourceCard = ({ listing }: { listing: ResourceListing }) => {
     </div>
     <h3 className="mt-4 text-lg font-bold text-white">{listing.itemName}</h3>
     {listing.condition && <p className="mt-1 text-sm text-gray-400">Condition: {readable(listing.condition)}</p>}
-    <p className="mt-3 text-sm text-primary-200">Listed by {ownerName(listing)}</p>
+    {typeof listing.listedBy === 'string' ? <p className="mt-3 text-sm text-primary-200">Listed by {ownerName(listing)}</p> : <Link to={`/providers/${listing.listedBy._id}`} className="mt-3 w-fit text-sm text-primary-200 hover:text-white">Listed by {ownerName(listing)}</Link>}
     {verifiedProvider && <span className="mt-2 w-fit text-xs rounded-full bg-emerald-500/15 border border-emerald-400/30 px-2.5 py-1 text-emerald-200">Verified provider</span>}
     {unverifiedProvider && <span className="mt-2 w-fit text-xs rounded-full bg-amber-500/15 border border-amber-400/30 px-2.5 py-1 text-amber-100">Unverified — proceed with caution</span>}
 
@@ -77,39 +75,39 @@ const ResourceCard = ({ listing }: { listing: ResourceListing }) => {
     </div>
     <p className="mt-auto pt-5 text-xs text-gray-500">{listing.quantityAvailable} unit{listing.quantityAvailable === 1 ? '' : 's'} available</p>
     {providerArrangedTypes.includes(listing.accessType) && <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-relaxed text-amber-100/80">TechBridge does not provide loans or financing. These arrangements are offered directly by verified providers, subject to their own terms.</p>}
+    {canRequest && <Link to={`/resources/${listing._id}/request`} className="mt-5 inline-flex w-fit rounded-lg bg-primary-500 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-400">Request this resource</Link>}
   </article>;
 };
 
 const Criteria = ({ criteria }: { criteria: string[] }) => <div><p className="text-gray-400">Eligibility:</p><ul className="mt-1 space-y-1 text-xs text-gray-300">{criteria.map((criterion) => <li key={criterion}>• {criterion}</li>)}</ul></div>;
 
 const ResourceHubPage = () => {
+  const { user } = useAuth();
   const [resources, setResources] = useState<ResourceListing[]>([]);
   const [search, setSearch] = useState('');
-  const [activeType, setActiveType] = useState<ResourceAccessType | 'all'>('all');
+  const [activeTab, setActiveTab] = useState<'free' | 'subsidized' | 'marketplace'>('free');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setLoading(true);
-      setError('');
-      void getResources(search.trim() ? { item: search.trim() } : undefined)
-        .then(setResources)
-        .catch(() => setError('Unable to load resource listings right now.'))
-        .finally(() => setLoading(false));
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [search]);
 
-  const grouped = useMemo(() => accessTypes.map((type) => ({ ...type, listings: resources.filter((listing) => listing.accessType === type.value) })), [resources]);
-  const visibleGroups = activeType === 'all' ? grouped : grouped.filter((group) => group.value === activeType);
+  const visibleListings = useMemo(() => {
+    if (activeTab === 'free') return resources.filter(r => freeTypes.includes(r.accessType));
+    if (activeTab === 'subsidized') return resources.filter(r => subsidizedTypes.includes(r.accessType));
+    if (activeTab === 'marketplace') return resources.filter(r => marketplaceTypes.includes(r.accessType));
+    return [];
+  }, [activeTab, resources]);
 
   return <div className="min-h-screen"><AppHeader /><main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
     <section className="mb-7 flex flex-col md:flex-row md:items-end justify-between gap-5"><div><p className="text-primary-300 text-sm font-semibold mb-2">TECHNICAL RESOURCE ACCESS HUB</p><h1 className="text-3xl font-bold text-white">Get the tools to build your future</h1><p className="text-gray-400 mt-2 max-w-2xl">Explore structured, transparent ways to borrow, share, rent, receive sponsorship, or claim the equipment you need.</p></div><Link to="/resources/list" className="w-fit px-5 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-primary-500 to-accent-500">List a resource</Link></section>
     <section className="glass-card p-4 mb-5"><input className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /></section>
-    <div className="mb-7 flex gap-2 overflow-x-auto pb-2">{([{ value: 'all', label: 'All' } as const, ...accessTypes]).map((type) => <button key={type.value} onClick={() => setActiveType(type.value)} className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium ${activeType === type.value ? 'bg-primary-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}>{type.label}{type.value !== 'all' && <span className="ml-1.5 text-xs opacity-75">{resources.filter((listing) => listing.accessType === type.value).length}</span>}</button>)}</div>
+    <div className="mb-7 flex gap-1 border-b border-white/10">
+      <button onClick={() => setActiveTab('free')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'free' ? 'text-primary-300 border-primary-500' : 'text-gray-400 border-transparent hover:text-gray-300'}`}>Free Access <span className="opacity-70 text-xs ml-1">(Borrow, Donate)</span></button>
+      <button onClick={() => setActiveTab('subsidized')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'subsidized' ? 'text-emerald-300 border-emerald-500' : 'text-gray-400 border-transparent hover:text-gray-300'}`}>Subsidized <span className="opacity-70 text-xs ml-1">(Installment, 0% Interest)</span></button>
+      <button onClick={() => setActiveTab('marketplace')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'marketplace' ? 'text-amber-300 border-amber-500' : 'text-gray-400 border-transparent hover:text-gray-300'}`}>Marketplace <span className="opacity-70 text-xs ml-1">(Rent)</span></button>
+    </div>
+
     {error && <div className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-100">{error}</div>}
-    {loading ? <p className="py-14 text-center text-gray-400">Loading resource listings...</p> : visibleGroups.every((group) => group.listings.length === 0) ? <div className="glass-card p-12 text-center"><p className="font-semibold text-white">No available listings found.</p><p className="mt-2 text-sm text-gray-400">Try another item name or list the resource you can share.</p></div> : <div className="space-y-10">{visibleGroups.filter((group) => group.listings.length > 0).map((group) => <section key={group.value}><div className="mb-4 flex items-center gap-3"><h2 className="text-xl font-bold text-white">{group.label}</h2><span className="text-sm text-gray-500">{group.listings.length} listing{group.listings.length === 1 ? '' : 's'}</span></div><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{group.listings.map((listing) => <ResourceCard key={listing._id} listing={listing} />)}</div></section>)}</div>}
+    {loading ? <p className="py-14 text-center text-gray-400">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-white">No available listings found in this category.</p><p className="mt-2 text-sm text-gray-400">Try searching or checking other tabs.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div>}
   </main></div>;
 };
 

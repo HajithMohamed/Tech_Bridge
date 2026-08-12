@@ -12,6 +12,13 @@ import ProviderProfilePage from './pages/ProviderProfilePage';
 import ResourceHubPage from './pages/ResourceHubPage';
 import ResourceListingPage from './pages/ResourceListingPage';
 import MyApplicationsPage from './pages/MyApplicationsPage';
+import MyResourceRequestsPage from './pages/MyResourceRequestsPage';
+import PublicProviderProfilePage from './pages/PublicProviderProfilePage';
+import ImpactDashboardPage from './pages/ImpactDashboardPage';
+import LandingPage from './pages/LandingPage';
+import ResourceRequestPage from './pages/ResourceRequestPage';
+import StudentProfilePage from './pages/StudentProfilePage';
+import ProviderResourceRequestsPage from './pages/ProviderResourceRequestsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -48,11 +55,17 @@ function App() {
       <Route path="/provider/profile" element={<ProtectedRoute allowedRoles={['provider']}><ProviderProfilePage /></ProtectedRoute>} />
       <Route path="/resources" element={<ProtectedRoute><ResourceHubPage /></ProtectedRoute>} />
       <Route path="/resources/list" element={<ProtectedRoute><ResourceListingPage /></ProtectedRoute>} />
+      <Route path="/resources/:id/request" element={<ProtectedRoute allowedRoles={['student']}><ResourceRequestPage /></ProtectedRoute>} />
       <Route path="/my-applications" element={<ProtectedRoute allowedRoles={['student']}><MyApplicationsPage /></ProtectedRoute>} />
+      <Route path="/my-resource-requests" element={<ProtectedRoute allowedRoles={['student']}><MyResourceRequestsPage /></ProtectedRoute>} />
+      <Route path="/providers/:id" element={<ProtectedRoute><PublicProviderProfilePage /></ProtectedRoute>} />
+      <Route path="/impact" element={<ProtectedRoute><ImpactDashboardPage /></ProtectedRoute>} />
+      <Route path="/student-profile" element={<ProtectedRoute allowedRoles={['student']}><StudentProfilePage /></ProtectedRoute>} />
+      <Route path="/provider/resource-requests" element={<ProtectedRoute allowedRoles={['provider']}><ProviderResourceRequestsPage /></ProtectedRoute>} />
 
       {/* Redirects */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

@@ -85,6 +85,20 @@ const opportunitySchema = new mongoose_1.Schema({
         type: Boolean,
         required: function () { return this.type === 'scholarship'; },
     },
+    duration: { type: String, trim: true, maxlength: 120 },
+    isPaid: { type: Boolean },
+    preferredAcademicBackground: { type: String, trim: true, maxlength: 250 },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    fee: { type: Number, min: 0 },
+    isFree: { type: Boolean },
+    mentorName: { type: String, trim: true, maxlength: 120 },
+    professionalField: { type: String, trim: true, maxlength: 160 },
+    experience: { type: String, trim: true, maxlength: 120 },
+    mentorshipType: { type: String, enum: ['Career guidance', 'Technical guidance', 'Internship guidance', 'Portfolio guidance'] },
+    availability: { type: String, trim: true, maxlength: 250 },
+    paymentInfo: { type: String, trim: true, maxlength: 500 },
+    contactMethod: { type: String, trim: true, maxlength: 500 },
 }, { timestamps: true });
 opportunitySchema.index({ status: 1, type: 1, applicationDeadline: 1 });
 const Opportunity = mongoose_1.default.model('Opportunity', opportunitySchema);

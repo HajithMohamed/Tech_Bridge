@@ -41,6 +41,11 @@ export interface StudentProfile {
   location?: string;
   skills: string[];
   careerGoal?: string;
+  availabilityHours?: number;
+  preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
+  learningGoals?: string[];
+  certifications?: string[];
+  portfolioUrl?: string;
 }
 
 export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'ngo' | 'individual';
@@ -241,12 +246,23 @@ export interface ProviderDashboard {
     totalOpportunities: number;
     scholarships: number;
     applicationsReceived: number;
+    resourceRequestsReceived: number;
+    pendingRequests: number;
+    acceptedRequests: number;
     activeListings: number;
     resourceCount: number;
     expiringSoon: number;
     views: number;
   };
   recentOpportunities: Array<Pick<Opportunity, '_id' | 'title' | 'type' | 'status' | 'applicationDeadline' | 'createdAt' | 'views'>>;
+  recentActivity: Array<{
+    id: string;
+    kind: 'opportunity' | 'application' | 'resource_request';
+    title: string;
+    detail: string;
+    status: string;
+    occurredAt: string;
+  }>;
 }
 
 export interface OpportunityFormData {
@@ -264,6 +280,31 @@ export interface OpportunityFormData {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+
+  duration?: string;
+  isPaid?: boolean;
+  preferredAcademicBackground?: string;
+  startDate?: string;
+  endDate?: string;
+  fee?: number;
+  isFree?: boolean;
+  mentorName?: string;
+  professionalField?: string;
+  experience?: string;
+  mentorshipType?: 'Career guidance' | 'Technical guidance' | 'Internship guidance' | 'Portfolio guidance';
+  availability?: string;
+  paymentInfo?: string;
+  contactMethod?: string;
+}
+
+export interface ResourceRequestResource {
+  _id: string;
+  itemName: string;
+  category: ResourceCategory;
+  condition?: ResourceCondition;
+  accessType: ResourceAccessType;
+  quantityAvailable: number;
+  status: ResourceStatus;
 }
 
 export interface LoginData {
@@ -278,4 +319,41 @@ export interface ApiError {
     field: string;
     message: string;
   }>;
+}
+
+export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
+
+export interface ResourceRequest {
+  _id: string;
+  studentId: string | User | ApplicationApplicant;
+  providerId: string | User;
+  resourceId: string | ResourceListing;
+  requestedAccessType: ResourceAccessType;
+  durationOrTerms?: string;
+  message?: string;
+  status: ResourceRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublicProviderProfile {
+  _id: string;
+  fullName: string;
+  providerProfile: ProviderProfile;
+  createdAt: string;
+}
+
+export interface PublicProviderResponse {
+  provider: PublicProviderProfile;
+  opportunities: Opportunity[];
+  resources: ResourceListing[];
+}
+
+export interface ImpactStats {
+  totalStudents: number;
+  totalOpenOpportunities: number;
+  totalApplications: number;
+  totalResourceListings: number;
+  applicationsByStatus: Record<string, number>;
+  resourceListingsByAccessType: Record<string, number>;
 }
