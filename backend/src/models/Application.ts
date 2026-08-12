@@ -1,33 +1,37 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type ApplicationStatus = 'submitted' | 'reviewing' | 'accepted' | 'rejected';
+export type ApplicationStatus = 'applied' | 'reviewed' | 'accepted' | 'rejected';
 
 export interface IApplication extends Document {
   _id: mongoose.Types.ObjectId;
+  studentId: mongoose.Types.ObjectId;
+  providerId: mongoose.Types.ObjectId;
   opportunityId: mongoose.Types.ObjectId;
-  applicantId: mongoose.Types.ObjectId;
-  message?: string;
   status: ApplicationStatus;
-  createdAt: Date;
+  appliedAt: Date;
+  message?: string;
   updatedAt: Date;
 }
 
 const applicationSchema = new Schema<IApplication>(
   {
+    studentId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    providerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     opportunityId: { type: Schema.Types.ObjectId, ref: 'Opportunity', required: true, index: true },
-    applicantId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    message: { type: String, trim: true, maxlength: 1000 },
     status: {
       type: String,
-      enum: ['submitted', 'reviewing', 'accepted', 'rejected'],
-      default: 'submitted',
+      enum: ['applied', 'reviewed', 'accepted', 'rejected'],
+      default: 'applied',
       index: true,
     },
+    appliedAt: { type: Date, default: Date.now, immutable: true, index: true },
+    message: { type: String, trim: true, maxlength: 1000 },
   },
-  { timestamps: true }
+  { timestamps: { createdAt: false, updatedAt: true } }
 );
 
-applicationSchema.index({ opportunityId: 1, applicantId: 1 }, { unique: true });
+// A student may apply to each opportunity once only.
+applicationSchema.index({ studentId: 1, opportunityId: 1 }, { unique: true });
 
 const Application = mongoose.model<IApplication>('Application', applicationSchema);
 

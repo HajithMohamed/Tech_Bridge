@@ -9,6 +9,7 @@ const opportunityTypes: OpportunityType[] = [
   'course',
   'freelance',
   'workshop',
+  'mentorship',
 ];
 const workModes = ['remote', 'on-site', 'hybrid'];
 const coverageTypes = ['full', 'partial', 'tuition_only', 'equipment_only', 'stipend'];
@@ -28,6 +29,20 @@ const editableFields = [
   'eligibilityCriteria',
   'numberOfAwards',
   'renewable',
+  'duration',
+  'isPaid',
+  'preferredAcademicBackground',
+  'startDate',
+  'endDate',
+  'fee',
+  'isFree',
+  'mentorName',
+  'professionalField',
+  'experience',
+  'mentorshipType',
+  'availability',
+  'paymentInfo',
+  'contactMethod'
 ] as const;
 const scholarshipFields = ['amount', 'currency', 'coverageType', 'eligibilityCriteria', 'numberOfAwards', 'renewable'] as const;
 

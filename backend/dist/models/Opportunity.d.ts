@@ -1,5 +1,5 @@
 import mongoose, { Document } from 'mongoose';
-export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'workshop';
+export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'workshop' | 'mentorship';
 export interface IOpportunity extends Document {
     _id: mongoose.Types.ObjectId;
     title: string;
@@ -18,6 +18,20 @@ export interface IOpportunity extends Document {
     eligibilityCriteria?: string[];
     numberOfAwards?: number;
     renewable?: boolean;
+    duration?: string;
+    isPaid?: boolean;
+    preferredAcademicBackground?: string;
+    startDate?: Date;
+    endDate?: Date;
+    fee?: number;
+    isFree?: boolean;
+    mentorName?: string;
+    professionalField?: string;
+    experience?: string;
+    mentorshipType?: 'Career guidance' | 'Technical guidance' | 'Internship guidance' | 'Portfolio guidance';
+    availability?: string;
+    paymentInfo?: string;
+    contactMethod?: string;
     createdAt: Date;
     updatedAt: Date;
 }

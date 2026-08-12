@@ -1,12 +1,13 @@
 import mongoose, { Document } from 'mongoose';
-export type ApplicationStatus = 'submitted' | 'reviewing' | 'accepted' | 'rejected';
+export type ApplicationStatus = 'applied' | 'reviewed' | 'accepted' | 'rejected';
 export interface IApplication extends Document {
     _id: mongoose.Types.ObjectId;
+    studentId: mongoose.Types.ObjectId;
+    providerId: mongoose.Types.ObjectId;
     opportunityId: mongoose.Types.ObjectId;
-    applicantId: mongoose.Types.ObjectId;
-    message?: string;
     status: ApplicationStatus;
-    createdAt: Date;
+    appliedAt: Date;
+    message?: string;
     updatedAt: Date;
 }
 declare const Application: mongoose.Model<IApplication, {}, {}, {}, Document<unknown, {}, IApplication, {}, {}> & IApplication & Required<{

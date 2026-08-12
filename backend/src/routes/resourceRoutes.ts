@@ -5,17 +5,17 @@ import {
   getResource,
   listMyResources,
   listResources,
-  updateResource,
+  updateResourceStatus,
 } from '../controllers/resourceController';
-import { authorize, protect } from '../middleware/auth';
+import { protect } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/', listResources);
-router.get('/mine', protect, authorize('provider'), listMyResources);
-router.post('/', protect, authorize('provider'), createResource);
+router.get('/mine', protect, listMyResources);
+router.post('/', protect, createResource);
+router.patch('/:id/status', protect, updateResourceStatus);
+router.delete('/:id', protect, deleteResource);
 router.get('/:id', getResource);
-router.put('/:id', protect, authorize('provider'), updateResource);
-router.delete('/:id', protect, authorize('provider'), deleteResource);
 
 export default router;

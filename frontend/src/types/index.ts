@@ -62,7 +62,7 @@ export interface ProviderProfile {
   resourceAccessMethods?: string[];
 }
 
-export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'workshop';
+export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'workshop' | 'mentorship';
 export type WorkMode = 'remote' | 'on-site' | 'hybrid';
 export type OpportunityStatus = 'draft' | 'open' | 'closed' | 'expired';
 export type CoverageType = 'full' | 'partial' | 'tuition_only' | 'equipment_only' | 'stipend';
@@ -93,51 +93,121 @@ export interface Opportunity {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+
+  duration?: string;
+  isPaid?: boolean;
+  preferredAcademicBackground?: string;
+  startDate?: string;
+  endDate?: string;
+  fee?: number;
+  isFree?: boolean;
+  mentorName?: string;
+  professionalField?: string;
+  experience?: string;
+  mentorshipType?: 'Career guidance' | 'Technical guidance' | 'Internship guidance' | 'Portfolio guidance';
+  availability?: string;
+  paymentInfo?: string;
+  contactMethod?: string;
+
   createdAt: string;
   updatedAt: string;
 }
 
-export type ResourceCategory = 'laptop' | 'arduino' | 'raspberry_pi' | 'sensor' | 'development_board' | 'electronic_component' | 'project_equipment' | 'other';
-export type AccessMethod = 'borrow' | 'share' | 'rent' | 'installment' | 'interest_free' | 'sponsorship' | 'donation';
-export type ResourceAvailability = 'available' | 'unavailable';
+export interface SkillResource {
+  skill: string;
+  label: string;
+  url: string;
+}
 
-export interface ResourceProvider {
+export interface MatchedOpportunity extends Opportunity {
+  matchPercentage: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  skillScore: number;
+  careerRelevanceScore: number;
+  locationScore: number;
+  skillResources: SkillResource[];
+}
+
+export type ResourceCategory = 'laptop' | 'arduino' | 'raspberry_pi' | 'sensor' | 'electronic_component' | 'dev_board' | 'other';
+export type ResourceCondition = 'new' | 'used_good' | 'used_fair';
+export type ResourceAccessType = 'borrow' | 'share' | 'rent' | 'installment' | 'interest_free' | 'sponsorship' | 'donation';
+export type ResourceStatus = 'available' | 'claimed';
+
+export interface ResourceListingOwner {
   _id: string;
   fullName: string;
   email: string;
+  role: User['role'];
   providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'verificationStatus' | 'contactEmail' | 'phone'>;
 }
 
-export interface Resource {
+export interface ResourceAccessDetails {
+  borrowShare?: {
+    borrowDurationDays: number;
+    pickupLocation: string;
+    returnCondition: string;
+  };
+  rent?: {
+    pricePerMonth: number;
+    currency: string;
+    minRentalMonths: number;
+    securityDeposit?: number;
+  };
+  installment?: {
+    totalPrice: number;
+    downPayment: number;
+    monthlyInstallmentAmount: number;
+    numberOfMonths: number;
+    lateFeePolicy: string;
+  };
+  interestFree?: {
+    totalPrice: number;
+    monthlyInstallmentAmount: number;
+    numberOfMonths: number;
+    eligibilityCriteria: string[];
+    repaymentStartDate: string;
+    interestRate: 0;
+  };
+  sponsorship?: {
+    eligibilityCriteria: string[];
+    applicationDeadline: string;
+    numberOfUnitsAvailable: number;
+    sponsorOrganization: string;
+  };
+  donation?: {
+    itemAgeYears: number;
+    conditionNotes: string;
+    pickupOrDeliveryMethod: string;
+    claimDeadline: string;
+  };
+}
+
+export interface ResourceListing {
   _id: string;
-  name: string;
-  description: string;
+  itemName: string;
   category: ResourceCategory;
-  accessMethods: AccessMethod[];
-  location: string;
-  availability: ResourceAvailability;
-  quantity: number;
-  rentalRate?: number;
-  currency?: string;
-  providerId: string | ResourceProvider;
-  views: number;
+  condition?: ResourceCondition;
+  accessType: ResourceAccessType;
+  listedBy: string | ResourceListingOwner;
+  providerOrgVerified: boolean;
+  quantityAvailable: number;
+  status: ResourceStatus;
+  accessDetails: ResourceAccessDetails;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ResourceFormData {
-  name: string;
-  description: string;
+export interface ResourceListingFormData {
+  itemName: string;
   category: ResourceCategory;
-  accessMethods: AccessMethod[];
-  location: string;
-  availability: ResourceAvailability;
-  quantity: number;
-  rentalRate?: number;
-  currency?: string;
+  condition?: ResourceCondition;
+  accessType: ResourceAccessType;
+  quantityAvailable: number;
+  accessDetails: ResourceAccessDetails;
 }
 
-export type ApplicationStatus = 'submitted' | 'reviewing' | 'accepted' | 'rejected';
+export type ApplicationStatus = 'applied' | 'reviewed' | 'accepted' | 'rejected';
 
 export interface ApplicationApplicant {
   _id: string;
@@ -159,10 +229,10 @@ export interface ApplicationOpportunity {
 export interface OpportunityApplication {
   _id: string;
   opportunityId: string | ApplicationOpportunity;
-  applicantId: string | ApplicationApplicant;
+  studentId: string | ApplicationApplicant;
   message?: string;
   status: ApplicationStatus;
-  createdAt: string;
+  appliedAt: string;
   updatedAt: string;
 }
 

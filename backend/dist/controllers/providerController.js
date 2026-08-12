@@ -20,7 +20,7 @@ const getProviderDashboard = async (req, res) => {
         const ids = opportunities.map((opportunity) => opportunity._id);
         const [applicationsReceived, resourceCount] = await Promise.all([
             Application_1.default.countDocuments({ opportunityId: { $in: ids } }),
-            Resource_1.default.countDocuments({ providerId }),
+            Resource_1.default.countDocuments({ listedBy: providerId }),
         ]);
         const now = new Date();
         const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);

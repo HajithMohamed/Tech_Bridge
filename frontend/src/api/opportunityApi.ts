@@ -1,5 +1,14 @@
 import api from './axios';
-import type { Opportunity, OpportunityFormData, OpportunityType, WorkMode } from '../types';
+import type { Opportunity, MatchedOpportunity, OpportunityFormData, OpportunityType, WorkMode } from '../types';
+
+interface MatchedOpportunitiesResponse {
+  success: boolean;
+  data: {
+    opportunities: MatchedOpportunity[];
+    studentSkills: string[];
+    careerGoal: string;
+  };
+}
 
 interface OpportunityResponse {
   success: boolean;
@@ -48,4 +57,13 @@ export const updateOpportunity = async (id: string, data: OpportunityFormData): 
 
 export const deleteOpportunity = async (id: string): Promise<void> => {
   await api.delete(`/opportunities/${id}`);
+};
+
+export const getMatchedOpportunities = async (): Promise<{
+  opportunities: MatchedOpportunity[];
+  studentSkills: string[];
+  careerGoal: string;
+}> => {
+  const response = await api.get<MatchedOpportunitiesResponse>('/opportunities/matched');
+  return response.data.data;
 };

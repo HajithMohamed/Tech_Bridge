@@ -60,6 +60,7 @@ const RegisterPage = () => {
       if (!formData.providerProfile.contactEmail.trim()) errors.contactEmail = 'Provider contact email is required';
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.providerProfile.contactEmail)) errors.contactEmail = 'Please enter a valid contact email';
       if (!formData.providerProfile.phone.trim()) errors.phone = 'Phone number is required';
+      else if (!/^[+0-9][0-9\s-]{7,28}$/.test(formData.providerProfile.phone)) errors.phone = 'Enter a valid phone number (e.g. +94771234567)';
       if (!formData.providerProfile.location.trim()) errors.location = 'Location is required';
       if (formData.providerProfile.description.trim().length < 20) errors.description = 'Add at least 20 characters about your organization';
       if (!formData.providerProfile.opportunityCategories.length) errors.opportunityCategories = 'Select at least one offering';

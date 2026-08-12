@@ -9,8 +9,8 @@ import {
   listScholarships,
   updateOpportunity,
 } from '../controllers/opportunityController';
+import { getMatchedOpportunities } from '../controllers/matchController';
 import { authorize, protect } from '../middleware/auth';
-import { createApplication, listOpportunityApplications } from '../controllers/applicationController';
 
 const router = Router();
 
@@ -25,9 +25,8 @@ const verifiedProviderOnly = (req: Request, res: Response, next: NextFunction): 
 router.get('/', listOpportunities);
 router.get('/scholarships', listScholarships);
 router.get('/mine', protect, authorize('provider'), verifiedProviderOnly, listMyOpportunities);
+router.get('/matched', protect, authorize('student'), getMatchedOpportunities);
 router.post('/', protect, authorize('provider'), verifiedProviderOnly, createOpportunity);
-router.post('/:id/applications', protect, authorize('student'), createApplication);
-router.get('/:id/applications', protect, authorize('provider'), verifiedProviderOnly, listOpportunityApplications);
 router.get('/:id', getOpportunity);
 router.put('/:id', protect, authorize('provider'), verifiedProviderOnly, updateOpportunity);
 router.delete('/:id', protect, authorize('provider'), verifiedProviderOnly, deleteOpportunity);

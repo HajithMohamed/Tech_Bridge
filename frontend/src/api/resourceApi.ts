@@ -1,26 +1,31 @@
 import api from './axios';
-import type { Resource, ResourceFormData, ResourceCategory, AccessMethod } from '../types';
+import type { ResourceAccessType, ResourceCategory, ResourceListing, ResourceListingFormData, ResourceStatus } from '../types';
 
-interface ResourceResponse { success: boolean; message?: string; data: { resource: Resource } }
-interface ResourcesResponse { success: boolean; data: { resources: Resource[] } }
+interface ResourceResponse { success: boolean; message?: string; data: { resource: ResourceListing } }
+interface ResourcesResponse { success: boolean; data: { resources: ResourceListing[] } }
 
-export const getResources = async (filters?: { category?: ResourceCategory; accessMethod?: AccessMethod; search?: string }): Promise<Resource[]> => {
+export const getResources = async (filters?: { item?: string; accessType?: ResourceAccessType; category?: ResourceCategory }): Promise<ResourceListing[]> => {
   const response = await api.get<ResourcesResponse>('/resources', { params: filters });
   return response.data.data.resources;
 };
 
-export const getMyResources = async (search?: string): Promise<Resource[]> => {
-  const response = await api.get<ResourcesResponse>('/resources/mine', { params: search ? { search } : undefined });
+export const getResource = async (id: string): Promise<ResourceListing> => {
+  const response = await api.get<ResourceResponse>(`/resources/${id}`);
+  return response.data.data.resource;
+};
+
+export const getMyResources = async (): Promise<ResourceListing[]> => {
+  const response = await api.get<ResourcesResponse>('/resources/mine');
   return response.data.data.resources;
 };
 
-export const createResource = async (data: ResourceFormData): Promise<Resource> => {
+export const createResource = async (data: ResourceListingFormData): Promise<ResourceListing> => {
   const response = await api.post<ResourceResponse>('/resources', data);
   return response.data.data.resource;
 };
 
-export const updateResource = async (id: string, data: ResourceFormData): Promise<Resource> => {
-  const response = await api.put<ResourceResponse>(`/resources/${id}`, data);
+export const updateResourceStatus = async (id: string, status: ResourceStatus): Promise<ResourceListing> => {
+  const response = await api.patch<ResourceResponse>(`/resources/${id}/status`, { status });
   return response.data.data.resource;
 };
 

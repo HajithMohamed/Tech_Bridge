@@ -34,21 +34,26 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-const applicationSchema = new mongoose_1.Schema({
+const resourceRequestSchema = new mongoose_1.Schema({
     studentId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     providerId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    opportunityId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Opportunity', required: true, index: true },
+    resourceId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Resource', required: true, index: true },
+    requestedAccessType: {
+        type: String,
+        required: true,
+        enum: ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'],
+    },
+    durationOrTerms: { type: String, trim: true, maxlength: 200 },
+    message: { type: String, trim: true, maxlength: 1000 },
     status: {
         type: String,
-        enum: ['applied', 'reviewed', 'accepted', 'rejected'],
-        default: 'applied',
+        enum: ['pending', 'accepted', 'rejected', 'completed'],
+        default: 'pending',
         index: true,
     },
-    appliedAt: { type: Date, default: Date.now, immutable: true, index: true },
-    message: { type: String, trim: true, maxlength: 1000 },
-}, { timestamps: { createdAt: false, updatedAt: true } });
-// A student may apply to each opportunity once only.
-applicationSchema.index({ studentId: 1, opportunityId: 1 }, { unique: true });
-const Application = mongoose_1.default.model('Application', applicationSchema);
-exports.default = Application;
-//# sourceMappingURL=Application.js.map
+}, { timestamps: true });
+// Prevent duplicate pending requests for the same resource from the same student
+resourceRequestSchema.index({ studentId: 1, resourceId: 1 }, { unique: true, partialFilterExpression: { status: 'pending' } });
+const ResourceRequest = mongoose_1.default.model('ResourceRequest', resourceRequestSchema);
+exports.default = ResourceRequest;
+//# sourceMappingURL=ResourceRequest.js.map

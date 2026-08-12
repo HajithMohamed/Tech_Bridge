@@ -6,7 +6,8 @@ export type OpportunityType =
   | 'scholarship'
   | 'course'
   | 'freelance'
-  | 'workshop';
+  | 'workshop'
+  | 'mentorship';
 
 export interface IOpportunity extends Document {
   _id: mongoose.Types.ObjectId;
@@ -26,6 +27,26 @@ export interface IOpportunity extends Document {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+  
+  // Conditional fields
+  duration?: string; // For internships, training
+  isPaid?: boolean; // For internships
+  preferredAcademicBackground?: string; // For internships
+  
+  startDate?: Date; // For training
+  endDate?: Date; // For training
+  fee?: number; // For training
+  isFree?: boolean; // For training
+  
+  mentorName?: string; // For mentorship
+  professionalField?: string; // For mentorship
+  experience?: string; // For mentorship
+  mentorshipType?: 'Career guidance' | 'Technical guidance' | 'Internship guidance' | 'Portfolio guidance'; // For mentorship
+  availability?: string; // For mentorship
+  
+  paymentInfo?: string; // For jobs/projects (e.g. budget)
+  contactMethod?: string; // General application instructions
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,7 +58,7 @@ const opportunitySchema = new Schema<IOpportunity>(
     type: {
       type: String,
       required: true,
-      enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'workshop'],
+      enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'workshop', 'mentorship'],
     },
     requiredSkills: [{ type: String, trim: true, maxlength: 60 }],
     location: { type: String, required: true, trim: true, maxlength: 120 },

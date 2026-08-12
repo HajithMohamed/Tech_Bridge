@@ -40,7 +40,7 @@ const opportunitySchema = new mongoose_1.Schema({
     type: {
         type: String,
         required: true,
-        enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'workshop'],
+        enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'workshop', 'mentorship'],
     },
     requiredSkills: [{ type: String, trim: true, maxlength: 60 }],
     location: { type: String, required: true, trim: true, maxlength: 120 },
