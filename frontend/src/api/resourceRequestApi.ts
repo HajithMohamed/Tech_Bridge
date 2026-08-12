@@ -12,13 +12,18 @@ interface ResourceRequestsResponse {
   data: { requests: ResourceRequest[] };
 }
 
-export const createResourceRequest = async (data: {
-  resourceId: string;
-  requestedAccessType: ResourceAccessType;
-  durationOrTerms?: string;
-  message?: string;
-}): Promise<ResourceRequest> => {
-  const response = await api.post<ResourceRequestResponse>('/resource-requests', data);
+export const createResourceRequest = async (
+  resourceId: string,
+  requestedAccessType: string,
+  durationOrTerms?: string,
+  message?: string
+): Promise<ResourceRequest> => {
+  const response = await api.post<ResourceRequestResponse>('/resource-requests', {
+    resourceId,
+    requestedAccessType,
+    durationOrTerms,
+    message,
+  });
   return response.data.data.request;
 };
 
@@ -37,7 +42,10 @@ export const getProviderResourceRequests = async (): Promise<ResourceRequest[]> 
   return response.data.data.requests;
 };
 
-export const updateResourceRequestStatus = async (id: string, status: Exclude<ResourceRequestStatus, 'pending'>): Promise<ResourceRequest> => {
+export const updateResourceRequestStatus = async (
+  id: string,
+  status: ResourceRequestStatus
+): Promise<ResourceRequest> => {
   const response = await api.patch<ResourceRequestResponse>(`/resource-requests/${id}/status`, { status });
   return response.data.data.request;
 };

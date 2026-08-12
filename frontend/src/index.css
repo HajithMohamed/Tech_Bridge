@@ -5,19 +5,19 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Poppins', system-ui, sans-serif;
 
-  /* Primary: Blue */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* Primary: TechBridge Green (#4F9D69) */
+  --color-primary-50: #eaf5ee;
+  --color-primary-100: #cbe6d4;
+  --color-primary-200: #abd6b9;
+  --color-primary-300: #8bc79e;
+  --color-primary-400: #6cb784;
+  --color-primary-500: #4f9d69;
+  --color-primary-600: #3e7d53;
+  --color-primary-700: #2e5d3e;
+  --color-primary-800: #1e3e29;
+  --color-primary-900: #0e1f14;
 
-  /* Secondary: Green */
+  /* Secondary: Bright Accent Green (Former emerald, adjusted slightly) */
   --color-secondary-50: #ecfdf5;
   --color-secondary-100: #d1fae5;
   --color-secondary-200: #a7f3d0;
@@ -32,12 +32,12 @@
   --color-accent-500: #f59e0b;
   --color-accent-600: #d97706;
 
-  /* Surface */
-  --color-surface-50: #f8fafc;
-  --color-surface-100: #f1f5f9;
-  --color-surface-200: #e2e8f0;
-  --color-surface-800: #1e293b;
-  --color-surface-900: #0f172a;
+  /* Surface (Based on #F7FAF8 / #10251A) */
+  --color-surface-50: #f7faf8;
+  --color-surface-100: #edf3ef;
+  --color-surface-200: #d9e6de;
+  --color-surface-800: #18231d;
+  --color-surface-900: #10251a;
 }
 
 /* ── Global Base Styles ──────────────────────────────────────── */
@@ -232,4 +232,38 @@ h1, h2, h3, h4, h5, h6 {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(37, 99, 235, 0.4);
+}
+
+/* ── Landing Page Animations ─────────────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes float-delayed {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 5s ease-in-out 1s infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out forwards;
 }

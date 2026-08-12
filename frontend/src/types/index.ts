@@ -252,6 +252,9 @@ export interface ProviderDashboard {
     applicationsReceived: number;
     acceptedApplications: number;
     studentsConnected: number;
+    resourceRequestsReceived: number;
+    pendingRequests: number;
+    acceptedRequests: number;
     activeListings: number;
     resourceCount: number;
     resourceRequestsAccepted: number;
@@ -260,6 +263,14 @@ export interface ProviderDashboard {
     views: number;
   };
   recentOpportunities: Array<Pick<Opportunity, '_id' | 'title' | 'type' | 'status' | 'applicationDeadline' | 'createdAt' | 'views'>>;
+  recentActivity: Array<{
+    id: string;
+    kind: 'opportunity' | 'application' | 'resource_request';
+    title: string;
+    detail: string;
+    status: string;
+    occurredAt: string;
+  }>;
 }
 
 export interface OpportunityFormData {
@@ -277,6 +288,7 @@ export interface OpportunityFormData {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+
   duration?: string;
   isPaid?: boolean;
   preferredAcademicBackground?: string;
@@ -293,8 +305,6 @@ export interface OpportunityFormData {
   contactMethod?: string;
 }
 
-export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
-
 export interface ResourceRequestResource {
   _id: string;
   itemName: string;
@@ -303,19 +313,6 @@ export interface ResourceRequestResource {
   accessType: ResourceAccessType;
   quantityAvailable: number;
   status: ResourceStatus;
-}
-
-export interface ResourceRequest {
-  _id: string;
-  studentId: string | ApplicationApplicant;
-  providerId: string | ResourceListingOwner;
-  resourceId: string | ResourceRequestResource;
-  requestedAccessType: ResourceAccessType;
-  durationOrTerms?: string;
-  message?: string;
-  status: ResourceRequestStatus;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface LoginData {
@@ -330,4 +327,41 @@ export interface ApiError {
     field: string;
     message: string;
   }>;
+}
+
+export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
+
+export interface ResourceRequest {
+  _id: string;
+  studentId: string | User | ApplicationApplicant;
+  providerId: string | User;
+  resourceId: string | ResourceListing;
+  requestedAccessType: ResourceAccessType;
+  durationOrTerms?: string;
+  message?: string;
+  status: ResourceRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublicProviderProfile {
+  _id: string;
+  fullName: string;
+  providerProfile: ProviderProfile;
+  createdAt: string;
+}
+
+export interface PublicProviderResponse {
+  provider: PublicProviderProfile;
+  opportunities: Opportunity[];
+  resources: ResourceListing[];
+}
+
+export interface ImpactStats {
+  totalStudents: number;
+  totalOpenOpportunities: number;
+  totalApplications: number;
+  totalResourceListings: number;
+  applicationsByStatus: Record<string, number>;
+  resourceListingsByAccessType: Record<string, number>;
 }
