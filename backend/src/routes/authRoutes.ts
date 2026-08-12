@@ -59,7 +59,7 @@ router.post(
       .isArray({ min: 1 }).withMessage('Add at least one skill or interest'),
     body('providerProfile.organizationType')
       .if(body('role').equals('provider'))
-      .isIn(['company', 'training_org', 'scholarship_org', 'ngo', 'individual'])
+      .isIn(['company', 'training_org', 'scholarship_org', 'resource_provider', 'local_business', 'alumni', 'faculty', 'ngo', 'individual'])
       .withMessage('Select a valid organization type'),
     body('providerProfile.organizationName')
       .if(body('role').equals('provider'))

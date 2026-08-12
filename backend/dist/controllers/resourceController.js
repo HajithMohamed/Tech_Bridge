@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteResource = exports.updateResourceInventory = exports.updateResourceStatus = exports.getResource = exports.listMyResources = exports.listResources = exports.createResource = void 0;
 const Resource_1 = __importDefault(require("../models/Resource"));
+const providerCapabilities_1 = require("../utils/providerCapabilities");
 const categories = ['laptop', 'arduino', 'raspberry_pi', 'sensor', 'electronic_component', 'dev_board', 'other'];
 const accessTypes = ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
 const statuses = ['available', 'claimed'];
@@ -169,7 +170,8 @@ const canOfferProviderManagedAccess = (req) => {
         return false;
     const profile = req.user.providerProfile;
     return profile?.verified === true
-        && profile.opportunityCategories?.includes('technical_resources') === true;
+        && profile.opportunityCategories?.includes('technical_resources') === true
+        && (0, providerCapabilities_1.isProviderOfferingAllowed)(profile.organizationType, 'technical_resources');
 };
 /** POST /api/resources */
 const createResource = async (req, res) => {

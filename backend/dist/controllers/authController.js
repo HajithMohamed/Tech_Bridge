@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateStudentProfile = exports.getMe = exports.login = exports.register = void 0;
 const User_1 = __importDefault(require("../models/User"));
 const jwt_1 = require("../utils/jwt");
+const providerCapabilities_1 = require("../utils/providerCapabilities");
 /**
  * @route   POST /api/auth/register
  * @desc    Register a new user
@@ -26,6 +27,14 @@ const register = async (req, res) => {
         // Only allow student and provider roles through registration
         const allowedRoles = ['student', 'provider'];
         const userRole = allowedRoles.includes(role) ? role : 'student';
+        if (userRole === 'provider') {
+            const organizationType = providerProfile?.organizationType;
+            const offerings = providerProfile?.opportunityCategories;
+            if (!organizationType || !Array.isArray(offerings) || offerings.some((offering) => typeof offering !== 'string' || !(0, providerCapabilities_1.isProviderOfferingAllowed)(organizationType, offering))) {
+                res.status(400).json({ success: false, message: 'Select only the services that are valid for your provider type.' });
+                return;
+            }
+        }
         // Create new user
         const user = await User_1.default.create({
             fullName,

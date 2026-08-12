@@ -6,6 +6,7 @@ import Resource, {
   ResourceCondition,
   ResourceStatus,
 } from '../models/Resource';
+import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
 
 const categories: ResourceCategory[] = ['laptop', 'arduino', 'raspberry_pi', 'sensor', 'electronic_component', 'dev_board', 'other'];
 const accessTypes: ResourceAccessType[] = ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
@@ -152,7 +153,8 @@ const canOfferProviderManagedAccess = (req: Request): boolean => {
   if (req.user?.role !== 'provider') return false;
   const profile = req.user.providerProfile;
   return profile?.verified === true
-    && profile.opportunityCategories?.includes('technical_resources') === true;
+    && profile.opportunityCategories?.includes('technical_resources') === true
+    && isProviderOfferingAllowed(profile.organizationType, 'technical_resources');
 };
 
 /** POST /api/resources */

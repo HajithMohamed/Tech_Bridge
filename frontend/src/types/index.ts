@@ -48,7 +48,7 @@ export interface StudentProfile {
   portfolioUrl?: string;
 }
 
-export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'ngo' | 'individual';
+export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'resource_provider' | 'local_business' | 'alumni' | 'faculty' | 'ngo' | 'individual';
 
 export interface ProviderProfile {
   organizationName: string;
@@ -245,9 +245,17 @@ export interface ProviderDashboard {
   stats: {
     totalOpportunities: number;
     scholarships: number;
+    paidProjects: number;
+    internships: number;
+    trainingPrograms: number;
+    mentorshipListings: number;
     applicationsReceived: number;
+    acceptedApplications: number;
+    studentsConnected: number;
     activeListings: number;
     resourceCount: number;
+    resourceRequestsAccepted: number;
+    resourceStudentsConnected: number;
     expiringSoon: number;
     views: number;
   };

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Opportunity, { IOpportunity, OpportunityType } from '../models/Opportunity';
 import Application from '../models/Application';
+import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
 
 const opportunityTypes: OpportunityType[] = [
   'job',
@@ -63,7 +64,7 @@ const canOfferType = (req: Request, type: OpportunityType): boolean => {
   const profile = req.user?.providerProfile;
   const selectedOffers = profile?.opportunityCategories || [];
   if (!selectedOffers.includes(typeOffer[type])) return false;
-  return type !== 'scholarship' || profile?.organizationType === 'scholarship_org' || profile?.organizationType === 'ngo';
+  return Boolean(profile && isProviderOfferingAllowed(profile.organizationType, typeOffer[type]));
 };
 
 const hasValidDeadline = (deadline: unknown): boolean => {

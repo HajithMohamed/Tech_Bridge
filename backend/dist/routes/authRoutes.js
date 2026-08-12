@@ -57,7 +57,7 @@ router.post('/register', [
         .isArray({ min: 1 }).withMessage('Add at least one skill or interest'),
     (0, express_validator_1.body)('providerProfile.organizationType')
         .if((0, express_validator_1.body)('role').equals('provider'))
-        .isIn(['company', 'training_org', 'scholarship_org', 'ngo', 'individual'])
+        .isIn(['company', 'training_org', 'scholarship_org', 'resource_provider', 'local_business', 'alumni', 'faculty', 'ngo', 'individual'])
         .withMessage('Select a valid organization type'),
     (0, express_validator_1.body)('providerProfile.organizationName')
         .if((0, express_validator_1.body)('role').equals('provider'))

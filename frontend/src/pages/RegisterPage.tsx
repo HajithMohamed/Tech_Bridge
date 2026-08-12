@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Building, GraduationCap, Briefcase, ArrowRight, ArrowLeft } from 'lucide-react';
 import type { OrganizationType, RegisterData } from '../types';
+import { providerTypeConfigs, providerTypeOptions } from '../utils/providerCapabilities';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -160,6 +161,13 @@ const RegisterPage = () => {
         providerProfile: { ...prev.providerProfile, opportunityCategories: updated }
       };
     });
+  };
+
+  const changeProviderType = (organizationType: OrganizationType) => {
+    setFormData((previous) => ({
+      ...previous,
+      providerProfile: { ...previous.providerProfile, organizationType, opportunityCategories: [], resourceAccessMethods: [] },
+    }));
   };
 
   const toggleResourceAccess = (method: string) => {
@@ -408,12 +416,8 @@ const RegisterPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Provider type</label>
-                        <select value={formData.providerProfile.organizationType} onChange={(e) => handleInputChange('organizationType', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
-                          <option value="company">Company</option>
-                          <option value="ngo">NGO</option>
-                          <option value="training_org">Training Organization</option>
-                          <option value="scholarship_org">Scholarship Organization</option>
-                          <option value="individual">Individual</option>
+                        <select value={formData.providerProfile.organizationType} onChange={(e) => changeProviderType(e.target.value as OrganizationType)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          {providerTypeOptions.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                         </select>
                       </div>
                       <div>
@@ -471,14 +475,9 @@ const RegisterPage = () => {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-3">What can you offer?</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {[
-                          { id: 'jobs', label: 'Jobs / freelance projects' },
-                          { id: 'internships', label: 'Internships / hiring' },
-                          { id: 'scholarships', label: 'Scholarships / financial assistance' },
-                          { id: 'training', label: 'Training / workshops' },
-                          { id: 'mentorship', label: 'Mentorship / guidance' },
-                          { id: 'technical_resources', label: 'Technical resources' },
-                        ].map(offer => (
+                        {providerTypeConfigs[formData.providerProfile.organizationType as OrganizationType].allowedOfferings.map((offerId) => {
+                          const offer = { id: offerId, label: offerId === 'jobs' ? 'Jobs / paid student projects' : offerId === 'internships' ? 'Internships / referrals' : offerId === 'scholarships' ? 'Scholarships / financial assistance' : offerId === 'training' ? 'Training / workshops / certifications' : offerId === 'mentorship' ? 'Mentorship / guidance' : 'Technical resources' };
+                          return (
                           <label key={offer.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-surface-50 cursor-pointer hover:bg-white hover:border-primary-300 transition-colors">
                             <input 
                               type="checkbox" 
@@ -488,7 +487,7 @@ const RegisterPage = () => {
                             />
                             <span className="text-sm font-medium text-gray-700">{offer.label}</span>
                           </label>
-                        ))}
+                        ); })}
                       </div>
                       {formData.providerProfile.opportunityCategories.includes('technical_resources') && <div className="mt-5 rounded-xl border border-primary-100 bg-primary-50/50 p-4"><label className="block text-sm font-semibold text-primary-800 mb-3">Technical resource access pathways</label><p className="text-xs text-primary-700 mb-3">Select the arrangements your organization can genuinely provide. TechBridge only connects students to your terms.</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{[{ id: 'rent', label: 'Rental' }, { id: 'installment', label: 'Installment payment' }, { id: 'interest_free', label: 'Interest-free payment' }, { id: 'sponsorship', label: 'Sponsorship' }, { id: 'donation', label: 'Donation' }].map((method) => <label key={method.id} className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={formData.providerProfile.resourceAccessMethods.includes(method.id)} onChange={() => toggleResourceAccess(method.id)} />{method.label}</label>)}</div>{getFieldError('resourceAccessMethods') && <p className="mt-2 text-xs text-red-500">{getFieldError('resourceAccessMethods')}</p>}</div>}
                     </div>

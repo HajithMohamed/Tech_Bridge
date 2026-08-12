@@ -82,7 +82,7 @@ const userSchema = new mongoose_1.Schema({
         organizationName: { type: String, trim: true, maxlength: 150 },
         organizationType: {
             type: String,
-            enum: ['company', 'training_org', 'scholarship_org', 'ngo', 'individual'],
+            enum: ['company', 'training_org', 'scholarship_org', 'resource_provider', 'local_business', 'alumni', 'faculty', 'ngo', 'individual'],
         },
         verified: { type: Boolean, default: false },
         verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED'], default: 'PENDING' },

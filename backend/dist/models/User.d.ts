@@ -1,5 +1,5 @@
 import mongoose, { Document } from 'mongoose';
-export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'ngo' | 'individual';
+export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'resource_provider' | 'local_business' | 'alumni' | 'faculty' | 'ngo' | 'individual';
 export interface IUser extends Document {
     _id: mongoose.Types.ObjectId;
     fullName: string;

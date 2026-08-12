@@ -2,7 +2,9 @@ import { Request, Response } from 'express';
 import Application from '../models/Application';
 import Opportunity from '../models/Opportunity';
 import Resource from '../models/Resource';
+import ResourceRequest from '../models/ResourceRequest';
 import User from '../models/User';
+import { isProviderOfferingAllowed, providerOfferings } from '../utils/providerCapabilities';
 
 const expireOpportunities = async (): Promise<void> => {
   await Opportunity.updateMany(
@@ -17,15 +19,22 @@ export const getProviderDashboard = async (req: Request, res: Response): Promise
     await expireOpportunities();
     const providerId = req.user!._id;
     const opportunities = await Opportunity.find({ providerId }).select('_id title type status applicationDeadline createdAt views');
-    const ids = opportunities.map((opportunity) => opportunity._id);
-    const [applicationsReceived, resourceCount] = await Promise.all([
-      Application.countDocuments({ opportunityId: { $in: ids } }),
+    const [applicationsReceived, acceptedApplications, connectedStudentIds, resourceCount, resourceRequestsAccepted, resourceStudentIds] = await Promise.all([
+      Application.countDocuments({ providerId }),
+      Application.countDocuments({ providerId, status: 'accepted' }),
+      Application.distinct('studentId', { providerId, status: 'accepted' }),
       Resource.countDocuments({ listedBy: providerId }),
+      ResourceRequest.countDocuments({ providerId, status: { $in: ['accepted', 'completed'] } }),
+      ResourceRequest.distinct('studentId', { providerId, status: { $in: ['accepted', 'completed'] } }),
     ]);
     const now = new Date();
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const activeListings = opportunities.filter((opportunity) => opportunity.status === 'open').length;
     const scholarships = opportunities.filter((opportunity) => opportunity.type === 'scholarship').length;
+    const paidProjects = opportunities.filter((opportunity) => opportunity.type === 'job' || opportunity.type === 'freelance').length;
+    const internships = opportunities.filter((opportunity) => opportunity.type === 'internship').length;
+    const trainingPrograms = opportunities.filter((opportunity) => opportunity.type === 'course' || opportunity.type === 'workshop').length;
+    const mentorshipListings = opportunities.filter((opportunity) => opportunity.type === 'mentorship').length;
     const expiringSoon = opportunities.filter((opportunity) => opportunity.status === 'open' && opportunity.applicationDeadline <= nextWeek).length;
     const views = opportunities.reduce((total, opportunity) => total + opportunity.views, 0);
     const recentOpportunities = [...opportunities].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 4);
@@ -33,7 +42,7 @@ export const getProviderDashboard = async (req: Request, res: Response): Promise
     res.status(200).json({
       success: true,
       data: {
-        stats: { totalOpportunities: opportunities.length, scholarships, applicationsReceived, activeListings, resourceCount, expiringSoon, views },
+        stats: { totalOpportunities: opportunities.length, scholarships, paidProjects, internships, trainingPrograms, mentorshipListings, applicationsReceived, acceptedApplications, studentsConnected: connectedStudentIds.length, activeListings, resourceCount, resourceRequestsAccepted, resourceStudentsConnected: resourceStudentIds.length, expiringSoon, views },
         recentOpportunities,
       },
     });
@@ -60,10 +69,9 @@ export const updateProviderProfile = async (req: Request, res: Response): Promis
       res.status(400).json({ success: false, message: 'Enter a valid contact email.' });
       return;
     }
-    const offerings = ['jobs', 'internships', 'scholarships', 'training', 'mentorship', 'technical_resources'];
     const resourceMethods = ['rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
     if (req.body.opportunityCategories !== undefined) {
-      if (!Array.isArray(req.body.opportunityCategories) || req.body.opportunityCategories.length === 0 || req.body.opportunityCategories.some((item: unknown) => typeof item !== 'string' || !offerings.includes(item))) {
+      if (!Array.isArray(req.body.opportunityCategories) || req.body.opportunityCategories.length === 0 || req.body.opportunityCategories.some((item: unknown) => typeof item !== 'string' || !providerOfferings.includes(item as typeof providerOfferings[number]) || !isProviderOfferingAllowed(provider.providerProfile!.organizationType, item))) {
         res.status(400).json({ success: false, message: 'Select at least one valid provider offering.' });
         return;
       }
