@@ -24,7 +24,10 @@ const ProviderResourcesPage = () => {
   const [notice, setNotice] = useState('');
   const isRental = form.accessMethods.includes('rent');
   const load = async (term?: string) => { setLoading(true); try { setResources(await getMyResources(term)); } catch { setError('Unable to load your resources.'); } finally { setLoading(false); } };
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const change = <K extends keyof ResourceFormData>(key: K, value: ResourceFormData[K]) => { setForm((previous) => ({ ...previous, [key]: value })); setError(''); };
   const toggleMethod = (method: AccessMethod) => change('accessMethods', form.accessMethods.includes(method) ? form.accessMethods.filter((item) => item !== method) : [...form.accessMethods, method]);
   const submit = async (event: FormEvent) => {

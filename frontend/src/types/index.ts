@@ -49,6 +49,7 @@ export interface ProviderProfile {
   organizationName: string;
   organizationType: OrganizationType;
   verified?: boolean;
+  verificationStatus?: 'PENDING' | 'VERIFIED';
   contactEmail: string;
   contactPerson: string;
   phone: string;
@@ -56,6 +57,7 @@ export interface ProviderProfile {
   website?: string;
   logoUrl?: string;
   description?: string;
+  verificationDocumentName?: string;
   opportunityCategories: string[];
   resourceAccessMethods?: string[];
 }
@@ -69,7 +71,7 @@ export interface OpportunityProvider {
   _id: string;
   fullName: string;
   email: string;
-  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified'>;
+  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'verificationStatus'>;
 }
 
 export interface Opportunity {
@@ -103,7 +105,7 @@ export interface ResourceProvider {
   _id: string;
   fullName: string;
   email: string;
-  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'contactEmail' | 'phone'>;
+  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'verificationStatus' | 'contactEmail' | 'phone'>;
 }
 
 export interface Resource {

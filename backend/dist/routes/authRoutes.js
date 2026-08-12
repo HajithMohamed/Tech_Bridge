@@ -75,6 +75,12 @@ router.post('/register', [
     (0, express_validator_1.body)('providerProfile.location')
         .if((0, express_validator_1.body)('role').equals('provider'))
         .trim().notEmpty().withMessage('Location is required'),
+    (0, express_validator_1.body)('providerProfile.description')
+        .if((0, express_validator_1.body)('role').equals('provider'))
+        .trim().isLength({ min: 20, max: 1000 }).withMessage('Organization description must be between 20 and 1000 characters'),
+    (0, express_validator_1.body)('providerProfile.verificationDocumentName')
+        .optional()
+        .trim().isLength({ max: 255 }).withMessage('Verification document filename cannot exceed 255 characters'),
     (0, express_validator_1.body)('providerProfile.opportunityCategories')
         .if((0, express_validator_1.body)('role').equals('provider'))
         .isArray({ min: 1 }).withMessage('Select at least one offering'),
@@ -105,6 +111,5 @@ router.post('/login', [
  * @access  Private
  */
 router.get('/me', auth_1.protect, authController_1.getMe);
-router.patch('/providers/:id/verification', auth_1.protect, (0, auth_1.authorize)('admin'), [(0, express_validator_1.body)('verified').isBoolean().withMessage('verified must be true or false'), validate_1.validate], authController_1.updateProviderVerification);
 exports.default = router;
 //# sourceMappingURL=authRoutes.js.map

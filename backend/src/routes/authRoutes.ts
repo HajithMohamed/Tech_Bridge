@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe, updateProviderVerification } from '../controllers/authController';
-import { authorize, protect } from '../middleware/auth';
+import { register, login, getMe } from '../controllers/authController';
+import { protect } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 
 const router = Router();
@@ -77,6 +77,12 @@ router.post(
     body('providerProfile.location')
       .if(body('role').equals('provider'))
       .trim().notEmpty().withMessage('Location is required'),
+    body('providerProfile.description')
+      .if(body('role').equals('provider'))
+      .trim().isLength({ min: 20, max: 1000 }).withMessage('Organization description must be between 20 and 1000 characters'),
+    body('providerProfile.verificationDocumentName')
+      .optional()
+      .trim().isLength({ max: 255 }).withMessage('Verification document filename cannot exceed 255 characters'),
     body('providerProfile.opportunityCategories')
       .if(body('role').equals('provider'))
       .isArray({ min: 1 }).withMessage('Select at least one offering'),
@@ -115,13 +121,5 @@ router.post(
  * @access  Private
  */
 router.get('/me', protect, getMe);
-
-router.patch(
-  '/providers/:id/verification',
-  protect,
-  authorize('admin'),
-  [body('verified').isBoolean().withMessage('verified must be true or false'), validate],
-  updateProviderVerification
-);
 
 export default router;

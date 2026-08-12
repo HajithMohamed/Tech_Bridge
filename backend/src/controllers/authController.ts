@@ -38,6 +38,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
             providerProfile: {
               ...providerProfile,
               verified: false,
+              verificationStatus: 'PENDING',
             },
           }),
     });
@@ -49,7 +50,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     res.status(201).json({
       success: true,
       message: isPendingProvider
-        ? 'Provider application received. Your account will be activated after verification.'
+        ? 'Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.'
         : 'Registration successful',
       data: {
         user: {
@@ -106,10 +107,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (user.role === 'provider' && !user.providerProfile?.verified) {
+    if (user.role === 'provider' && (
+      user.providerProfile?.verified !== true ||
+      user.providerProfile.verificationStatus !== 'VERIFIED'
+    )) {
       res.status(403).json({
         success: false,
-        message: 'This provider account is awaiting verification.',
+        message: 'This provider account is awaiting verification. Your organization is under review by the TechBridge team.',
       });
       return;
     }
@@ -139,44 +143,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       success: false,
       message: 'Server error during login',
     });
-  }
-};
-
-/**
- * @route   PATCH /api/auth/providers/:id/verification
- * @desc    Approve or revoke a provider account. Only administrators may do this.
- * @access  Private/Admin
- */
-export const updateProviderVerification = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const provider = await User.findOne({ _id: req.params.id, role: 'provider' });
-
-    if (!provider || !provider.providerProfile) {
-      res.status(404).json({ success: false, message: 'Provider not found' });
-      return;
-    }
-
-    provider.providerProfile.verified = req.body.verified;
-    await provider.save();
-
-    res.status(200).json({
-      success: true,
-      message: req.body.verified ? 'Provider verified' : 'Provider verification revoked',
-      data: {
-        provider: {
-          _id: provider._id,
-          fullName: provider.fullName,
-          email: provider.email,
-          providerProfile: provider.providerProfile,
-        },
-      },
-    });
-  } catch (error) {
-    console.error('Provider verification error:', error);
-    res.status(500).json({ success: false, message: 'Server error updating provider verification' });
   }
 };
 

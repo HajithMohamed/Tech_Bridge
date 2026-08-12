@@ -14,7 +14,10 @@ const ProviderApplicationsPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const load = async (status?: ApplicationStatus) => { setLoading(true); try { setApplications(await getProviderApplications(status)); } catch { setError('Unable to load applications.'); } finally { setLoading(false); } };
-  useEffect(() => { void load(filter || undefined); }, [filter]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(filter || undefined); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [filter]);
   const changeStatus = async (id: string, status: ApplicationStatus) => {
     try { const updated = await updateApplicationStatus(id, status); setApplications((items) => items.map((item) => item._id === id ? updated : item)); } catch { setError('Unable to update application status.'); }
   };

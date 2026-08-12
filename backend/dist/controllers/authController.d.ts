@@ -12,12 +12,6 @@ export declare const register: (req: Request, res: Response) => Promise<void>;
  */
 export declare const login: (req: Request, res: Response) => Promise<void>;
 /**
- * @route   PATCH /api/auth/providers/:id/verification
- * @desc    Approve or revoke a provider account. Only administrators may do this.
- * @access  Private/Admin
- */
-export declare const updateProviderVerification: (req: Request, res: Response) => Promise<void>;
-/**
  * @route   GET /api/auth/me
  * @desc    Get current authenticated user
  * @access  Private

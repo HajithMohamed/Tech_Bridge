@@ -18,6 +18,7 @@ export interface IUser extends Document {
         organizationName: string;
         organizationType: OrganizationType;
         verified: boolean;
+        verificationStatus: 'PENDING' | 'VERIFIED';
         contactEmail: string;
         contactPerson: string;
         phone: string;
@@ -25,6 +26,7 @@ export interface IUser extends Document {
         website?: string;
         logoUrl?: string;
         description?: string;
+        verificationDocumentName?: string;
         opportunityCategories: string[];
         resourceAccessMethods?: string[];
     };

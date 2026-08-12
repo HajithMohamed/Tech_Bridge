@@ -26,6 +26,7 @@ export interface IUser extends Document {
     organizationName: string;
     organizationType: OrganizationType;
     verified: boolean;
+    verificationStatus: 'PENDING' | 'VERIFIED';
     contactEmail: string;
     contactPerson: string;
     phone: string;
@@ -33,6 +34,7 @@ export interface IUser extends Document {
     website?: string;
     logoUrl?: string;
     description?: string;
+    verificationDocumentName?: string;
     opportunityCategories: string[];
     resourceAccessMethods?: string[];
   };
@@ -84,6 +86,7 @@ const userSchema = new Schema<IUser>(
         enum: ['company', 'training_org', 'scholarship_org', 'ngo', 'individual'],
       },
       verified: { type: Boolean, default: false },
+      verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED'], default: 'PENDING' },
       contactEmail: {
         type: String,
         trim: true,
@@ -96,6 +99,7 @@ const userSchema = new Schema<IUser>(
       website: { type: String, trim: true, maxlength: 200 },
       logoUrl: { type: String, trim: true, maxlength: 500 },
       description: { type: String, trim: true, maxlength: 1000 },
+      verificationDocumentName: { type: String, trim: true, maxlength: 255 },
       opportunityCategories: [{ type: String, trim: true }],
       resourceAccessMethods: [{ type: String, trim: true }],
     },

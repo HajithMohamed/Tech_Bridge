@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Building, GraduationCap, Briefcase, ArrowRight, ArrowLeft } from 'lucide-react';
+import type { OrganizationType, RegisterData } from '../types';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -26,14 +27,18 @@ const RegisterPage = () => {
       organizationName: '',
       organizationType: 'company',
       contactPerson: '',
+      contactEmail: '',
       phone: '',
       location: '',
       website: '',
+      description: '',
+      verificationDocumentName: '',
       opportunityCategories: [] as string[],
     },
   });
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const [providerSubmitted, setProviderSubmitted] = useState(false);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -52,8 +57,14 @@ const RegisterPage = () => {
     if (formData.role === 'provider') {
       if (!formData.providerProfile.organizationName.trim()) errors.organizationName = 'Organization name is required';
       if (!formData.providerProfile.contactPerson.trim()) errors.contactPerson = 'Contact person is required';
+      if (!formData.providerProfile.contactEmail.trim()) errors.contactEmail = 'Provider contact email is required';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.providerProfile.contactEmail)) errors.contactEmail = 'Please enter a valid contact email';
       if (!formData.providerProfile.phone.trim()) errors.phone = 'Phone number is required';
       if (!formData.providerProfile.location.trim()) errors.location = 'Location is required';
+      if (formData.providerProfile.description.trim().length < 20) errors.description = 'Add at least 20 characters about your organization';
+      if (!formData.providerProfile.opportunityCategories.length) errors.opportunityCategories = 'Select at least one offering';
+    } else if (!formData.studentProfile.skills.trim()) {
+      errors.skills = 'Add at least one skill or interest';
     }
 
     setClientErrors(errors);
@@ -72,7 +83,7 @@ const RegisterPage = () => {
     if (!validateForm()) return;
 
     try {
-      const submissionData = {
+      const submissionData: RegisterData = {
         fullName: formData.fullName,
         email: formData.email,
         password: formData.password,
@@ -80,23 +91,42 @@ const RegisterPage = () => {
         role: formData.role,
         ...(formData.role === 'student' ? {
           studentProfile: {
-            ...formData.studentProfile,
+            institution: formData.studentProfile.institution,
+            degree: formData.studentProfile.degree as 'ICT' | 'ET' | 'BST' | 'other',
+            studyYear: formData.studentProfile.studyYear,
+            location: formData.studentProfile.location,
+            careerGoal: formData.studentProfile.careerGoal,
             skills: formData.studentProfile.skills.split(',').map(s => s.trim()).filter(s => s),
           }
         } : {
-          providerProfile: formData.providerProfile
+          providerProfile: {
+            organizationName: formData.providerProfile.organizationName,
+            organizationType: formData.providerProfile.organizationType as OrganizationType,
+            contactPerson: formData.providerProfile.contactPerson,
+            contactEmail: formData.providerProfile.contactEmail || formData.email,
+            phone: formData.providerProfile.phone,
+            location: formData.providerProfile.location,
+            website: formData.providerProfile.website,
+            description: formData.providerProfile.description,
+            verificationDocumentName: formData.providerProfile.verificationDocumentName || undefined,
+            opportunityCategories: formData.providerProfile.opportunityCategories,
+            resourceAccessMethods: formData.providerProfile.opportunityCategories.includes('technical_resources') ? ['borrow', 'rent', 'donation'] : []
+          }
         })
       };
 
-      // @ts-ignore - types might need slight adjustment but backend accepts this structure
       await register(submissionData);
+      if (formData.role === 'provider') {
+        setProviderSubmitted(true);
+        return;
+      }
       navigate('/dashboard');
     } catch {
       // Error handled by context
     }
   };
 
-  const handleInputChange = (field: string, value: any, profileField?: 'studentProfile' | 'providerProfile') => {
+  const handleInputChange = (field: string, value: string | number, profileField?: 'studentProfile' | 'providerProfile') => {
     if (profileField) {
       setFormData((prev) => ({
         ...prev,
@@ -134,10 +164,24 @@ const RegisterPage = () => {
     return fieldErrors?.find((e) => e.field === field)?.message;
   };
 
+  if (providerSubmitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-surface-50">
+        <div className="max-w-lg bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 text-center">
+          <div className="w-14 h-14 mx-auto rounded-full bg-amber-100 text-amber-700 grid place-items-center text-2xl">⌛</div>
+          <h1 className="mt-5 text-2xl font-bold text-surface-800">Provider verification pending</h1>
+          <p className="mt-3 text-gray-600 leading-7">Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.</p>
+          <p className="mt-3 text-sm text-gray-500">For this MVP, verification is completed manually before your provider account is activated.</p>
+          <Link to="/login" className="inline-flex mt-6 px-5 py-3 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700">Back to sign in</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-surface-50">
       {/* Left Side: Branding & Illustration */}
-      <div className="hidden md:flex md:w-5/12 bg-primary-600 relative overflow-hidden flex-col justify-center px-10 lg:px-16 fixed top-0 bottom-0 left-0">
+      <div className="hidden md:flex md:w-5/12 bg-primary-600 relative overflow-hidden flex-col justify-center px-10 lg:px-16 sticky top-0 h-screen">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-primary-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-pulse-glow"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-primary-700 rounded-full mix-blend-multiply filter blur-3xl opacity-70"></div>
         
@@ -181,7 +225,7 @@ const RegisterPage = () => {
       </div>
 
       {/* Right Side: Form Wizard */}
-      <div className="flex-1 flex md:ml-[41.666667%] min-h-screen">
+      <div className="flex-1 flex min-h-screen">
         <div className="w-full max-w-3xl mx-auto p-6 md:p-12 lg:p-16 animate-fade-in-up">
           
           <div className="md:hidden flex items-center gap-3 mb-8">
@@ -281,7 +325,7 @@ const RegisterPage = () => {
               <div className="space-y-6 animate-slide-in-left">
                 {formData.role === 'provider' && (
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
-                    <p className="text-sm text-amber-800 font-medium">Provider accounts are reviewed to keep opportunities and resource arrangements trustworthy.</p>
+                    <p className="text-sm text-amber-800 font-medium">Provider accounts are reviewed manually by the TechBridge team to keep opportunities and resource arrangements trustworthy.</p>
                   </div>
                 )}
 
@@ -375,11 +419,18 @@ const RegisterPage = () => {
                         {getFieldError('contactPerson') && <p className="mt-1 text-xs text-red-500">{getFieldError('contactPerson')}</p>}
                       </div>
                       <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Provider contact email</label>
+                        <input type="email" value={formData.providerProfile.contactEmail} onChange={(e) => handleInputChange('contactEmail', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                        {getFieldError('contactEmail') && <p className="mt-1 text-xs text-red-500">{getFieldError('contactEmail')}</p>}
+                      </div>
+                      <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone number</label>
                         <input type="tel" value={formData.providerProfile.phone} onChange={(e) => handleInputChange('phone', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
                         {getFieldError('phone') && <p className="mt-1 text-xs text-red-500">{getFieldError('phone')}</p>}
                       </div>
                     </div>
+
+                    {formData.providerProfile.organizationType === 'scholarship_org' && <div className="p-3 rounded-xl border border-primary-200 bg-primary-50 text-primary-800 text-sm">Verified scholarship provider badge requested. The TechBridge team will manually review this provider before scholarship publishing is enabled.</div>}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
@@ -387,10 +438,23 @@ const RegisterPage = () => {
                         <input type="text" value={formData.providerProfile.location} onChange={(e) => handleInputChange('location', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
                         {getFieldError('location') && <p className="mt-1 text-xs text-red-500">{getFieldError('location')}</p>}
                       </div>
+                      {getFieldError('opportunityCategories') && <p className="mt-2 text-xs text-red-500">{getFieldError('opportunityCategories')}</p>}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Website <span className="font-normal text-gray-400">(optional)</span></label>
                         <input type="url" value={formData.providerProfile.website} onChange={(e) => handleInputChange('website', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Organization description</label>
+                      <textarea value={formData.providerProfile.description} onChange={(e) => handleInputChange('description', e.target.value, 'providerProfile')} minLength={20} className="w-full min-h-28 px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" placeholder="Briefly describe your organization and the support you offer students." />
+                      {getFieldError('description') && <p className="mt-1 text-xs text-red-500">{getFieldError('description')}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Supporting document <span className="font-normal text-gray-400">(optional)</span></label>
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleInputChange('verificationDocumentName', e.target.files?.[0]?.name || '', 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 text-sm text-gray-600" />
+                      <p className="mt-1 text-xs text-gray-500">For the MVP, TechBridge records the filename for manual review; file storage can be added later.</p>
                     </div>
 
                     <div>
@@ -402,7 +466,7 @@ const RegisterPage = () => {
                           { id: 'scholarships', label: 'Scholarships / financial assistance' },
                           { id: 'training', label: 'Training / workshops' },
                           { id: 'mentorship', label: 'Mentorship / guidance' },
-                          { id: 'resources', label: 'Technical resources' },
+                          { id: 'technical_resources', label: 'Technical resources' },
                         ].map(offer => (
                           <label key={offer.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-surface-50 cursor-pointer hover:bg-white hover:border-primary-300 transition-colors">
                             <input 

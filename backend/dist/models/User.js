@@ -80,6 +80,7 @@ const userSchema = new mongoose_1.Schema({
             enum: ['company', 'training_org', 'scholarship_org', 'ngo', 'individual'],
         },
         verified: { type: Boolean, default: false },
+        verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED'], default: 'PENDING' },
         contactEmail: {
             type: String,
             trim: true,
@@ -92,6 +93,7 @@ const userSchema = new mongoose_1.Schema({
         website: { type: String, trim: true, maxlength: 200 },
         logoUrl: { type: String, trim: true, maxlength: 500 },
         description: { type: String, trim: true, maxlength: 1000 },
+        verificationDocumentName: { type: String, trim: true, maxlength: 255 },
         opportunityCategories: [{ type: String, trim: true }],
         resourceAccessMethods: [{ type: String, trim: true }],
     },
