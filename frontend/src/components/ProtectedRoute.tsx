@@ -21,9 +21,9 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     );
   }
 
-  // Redirect to login if not authenticated
+  // Keep the public landing page as the entry point for signed-out visitors.
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // Check role authorization

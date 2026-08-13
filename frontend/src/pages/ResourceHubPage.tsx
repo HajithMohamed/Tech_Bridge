@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
+
 import { getResources } from '../api/resourceApi';
 import { useAuth } from '../hooks/useAuth';
-import type { ResourceAccessType, ResourceListing } from '../types';
+import type { ResourceAccessType, ResourceCategory, ResourceListing } from '../types';
 
 const freeTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const subsidizedTypes: ResourceAccessType[] = ['installment', 'interest_free', 'sponsorship'];
 const marketplaceTypes: ResourceAccessType[] = ['rent'];
+const categories: Array<{ value: ResourceCategory; label: string }> = [
+  { value: 'laptop', label: 'Laptops' },
+  { value: 'arduino', label: 'Arduino' },
+  { value: 'raspberry_pi', label: 'Raspberry Pi' },
+  { value: 'sensor', label: 'Sensors' },
+  { value: 'electronic_component', label: 'Electronic components' },
+  { value: 'dev_board', label: 'Development boards' },
+  { value: 'other', label: 'Other resources' },
+];
 
 
 const providerArrangedTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship'];
@@ -18,6 +27,7 @@ const ownerName = (listing: ResourceListing) => {
   if (typeof listing.listedBy === 'string') return 'TechBridge member';
   return listing.listedBy.providerProfile?.organizationName || listing.listedBy.fullName;
 };
+void ownerName;
 
 const itemSpecifications = (listing: ResourceListing): string[] => {
   const { laptop, arduino, raspberryPi, sensor, electronicComponent, devBoard, other } = listing.itemDetails || {};
@@ -32,9 +42,27 @@ const itemSpecifications = (listing: ResourceListing): string[] => {
 };
 
 const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRequest: boolean }) => {
-  const unverifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && !listing.providerOrgVerified;
-  const verifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && listing.providerOrgVerified;
   const details = listing.accessDetails;
+/* Legacy card layout:
+  return <article className="glass-card p-5 flex flex-col h-full">
+    <div className="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <h3 className="font-bold text-surface-900 text-lg leading-tight">{listing.itemName}</h3>
+        <span className="inline-block mt-2 tag">{readable(listing.category)}</span>
+      </div>
+      <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-semibold whitespace-nowrap text-right">
+        {readable(listing.accessType)}
+      </span>
+    </div>
+    
+    <div className="flex gap-2 items-center">
+      {typeof listing.listedBy !== 'string' && (
+        <span className={`text-xs px-2 py-1 rounded-md ${listing.providerOrgVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+          {listing.providerOrgVerified ? 'Verified Provider' : 'Community'}
+        </span>
+      )}
+      {typeof listing.listedBy === 'string' ? <p className="text-sm text-gray-500">By {ownerName(listing)}</p> : <Link to={`/providers/${listing.listedBy._id}`} className="text-sm text-primary-600 hover:text-primary-700">By {ownerName(listing)}</Link>}
+*/
   const specifications = itemSpecifications(listing);
 
   return <article className="glass-card p-5 flex flex-col h-full">
@@ -43,63 +71,59 @@ const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRe
       <span className="tag">{readable(listing.category)}</span>
       <span className="text-xs text-primary-200 font-semibold">{readable(listing.accessType)}</span>
     </div>
-    <h3 className="mt-4 text-lg font-bold text-white">{listing.itemName}</h3>
-    {listing.condition && <p className="mt-1 text-sm text-gray-400">Condition: {readable(listing.condition)}</p>}
-    {typeof listing.listedBy === 'string' ? <p className="mt-3 text-sm text-primary-200">Listed by {ownerName(listing)}</p> : <Link to={`/providers/${listing.listedBy._id}`} className="mt-3 w-fit text-sm text-primary-200 hover:text-white">Listed by {ownerName(listing)}</Link>}
-    {verifiedProvider && <span className="mt-2 w-fit text-xs rounded-full bg-emerald-500/15 border border-emerald-400/30 px-2.5 py-1 text-emerald-200">Verified provider</span>}
-    {unverifiedProvider && <span className="mt-2 w-fit text-xs rounded-full bg-amber-500/15 border border-amber-400/30 px-2.5 py-1 text-amber-100">Unverified — proceed with caution</span>}
 
     {specifications.length > 0 && <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Specifications</p><ul className="mt-2 space-y-1 text-sm text-gray-200">{specifications.map((specification) => <li key={specification}>• {specification}</li>)}</ul></div>}
 
     <div className="mt-4 space-y-2 text-sm text-gray-200">
       {(listing.accessType === 'borrow' || listing.accessType === 'share') && details.borrowShare && <>
-        <p><span className="text-gray-400">Duration:</span> Up to {details.borrowShare.borrowDurationDays} days</p>
-        <p><span className="text-gray-400">Pickup:</span> {details.borrowShare.pickupLocation}</p>
-        <p><span className="text-gray-400">Return:</span> {details.borrowShare.returnCondition}</p>
+        <p><span className="text-gray-500">Duration:</span> Up to {details.borrowShare.borrowDurationDays} days</p>
+        <p><span className="text-gray-500">Pickup:</span> {details.borrowShare.pickupLocation}</p>
+        <p><span className="text-gray-500">Return:</span> {details.borrowShare.returnCondition}</p>
       </>}
       {listing.accessType === 'rent' && details.rent && <>
-        <p className="font-semibold text-amber-100">{formatMoney(details.rent.pricePerMonth, details.rent.currency)} / month</p>
-        <p><span className="text-gray-400">Minimum period:</span> {details.rent.minRentalMonths} month{details.rent.minRentalMonths === 1 ? '' : 's'}</p>
-        {details.rent.securityDeposit !== undefined && <p><span className="text-gray-400">Security deposit:</span> {formatMoney(details.rent.securityDeposit, details.rent.currency)}</p>}
+        <p className="font-semibold text-primary-700">{formatMoney(details.rent.pricePerMonth, details.rent.currency)} / month</p>
+        <p><span className="text-gray-500">Minimum period:</span> {details.rent.minRentalMonths} month{details.rent.minRentalMonths === 1 ? '' : 's'}</p>
+        {details.rent.securityDeposit !== undefined && <p><span className="text-gray-500">Security deposit:</span> {formatMoney(details.rent.securityDeposit, details.rent.currency)}</p>}
       </>}
       {listing.accessType === 'installment' && details.installment && <>
-        <p className="font-semibold text-amber-100">{formatMoney(details.installment.monthlyInstallmentAmount)} / month for {details.installment.numberOfMonths} months</p>
-        <p><span className="text-gray-400">Down payment:</span> {formatMoney(details.installment.downPayment)}</p>
-        <p><span className="text-gray-400">Total price:</span> {formatMoney(details.installment.totalPrice)}</p>
-        <p className="text-xs text-gray-400">Late fee: {details.installment.lateFeePolicy}</p>
+        <p className="font-semibold text-primary-700">{formatMoney(details.installment.monthlyInstallmentAmount)} / month for {details.installment.numberOfMonths} months</p>
+        <p><span className="text-gray-500">Down payment:</span> {formatMoney(details.installment.downPayment)}</p>
+        <p><span className="text-gray-500">Total price:</span> {formatMoney(details.installment.totalPrice)}</p>
+        <p className="text-xs text-gray-500">Late fee: {details.installment.lateFeePolicy}</p>
       </>}
       {listing.accessType === 'interest_free' && details.interestFree && <>
-        <p className="font-bold text-emerald-200">0% interest</p>
-        <p><span className="text-gray-400">Plan:</span> {formatMoney(details.interestFree.monthlyInstallmentAmount)} / month for {details.interestFree.numberOfMonths} months</p>
-        <p><span className="text-gray-400">Repayment starts:</span> {formatDate(details.interestFree.repaymentStartDate)}</p>
+        <p className="font-bold text-emerald-600">0% interest</p>
+        <p><span className="text-gray-500">Plan:</span> {formatMoney(details.interestFree.monthlyInstallmentAmount)} / month for {details.interestFree.numberOfMonths} months</p>
+        <p><span className="text-gray-500">Repayment starts:</span> {formatDate(details.interestFree.repaymentStartDate)}</p>
         <Criteria criteria={details.interestFree.eligibilityCriteria} />
       </>}
       {listing.accessType === 'sponsorship' && details.sponsorship && <>
-        <p><span className="text-gray-400">Sponsor:</span> {details.sponsorship.sponsorOrganization}</p>
-        <p><span className="text-gray-400">Units available:</span> {details.sponsorship.numberOfUnitsAvailable}</p>
-        <p><span className="text-gray-400">Apply by:</span> {formatDate(details.sponsorship.applicationDeadline)}</p>
+        <p><span className="text-gray-500">Sponsor:</span> {details.sponsorship.sponsorOrganization}</p>
+        <p><span className="text-gray-500">Units available:</span> {details.sponsorship.numberOfUnitsAvailable}</p>
+        <p><span className="text-gray-500">Apply by:</span> {formatDate(details.sponsorship.applicationDeadline)}</p>
         <Criteria criteria={details.sponsorship.eligibilityCriteria} />
       </>}
       {listing.accessType === 'donation' && details.donation && <>
-        <p><span className="text-gray-400">Item age:</span> {details.donation.itemAgeYears} year{details.donation.itemAgeYears === 1 ? '' : 's'}</p>
-        <p><span className="text-gray-400">Condition:</span> {details.donation.conditionNotes}</p>
-        <p><span className="text-gray-400">Collection:</span> {details.donation.pickupOrDeliveryMethod}</p>
-        <p><span className="text-gray-400">Claim by:</span> {formatDate(details.donation.claimDeadline)}</p>
+        <p><span className="text-gray-500">Item age:</span> {details.donation.itemAgeYears} year{details.donation.itemAgeYears === 1 ? '' : 's'}</p>
+        <p><span className="text-gray-500">Condition:</span> {details.donation.conditionNotes}</p>
+        <p><span className="text-gray-500">Collection:</span> {details.donation.pickupOrDeliveryMethod}</p>
+        <p><span className="text-gray-500">Claim by:</span> {formatDate(details.donation.claimDeadline)}</p>
       </>}
     </div>
-    <p className="mt-auto pt-5 text-xs text-gray-500">{listing.quantityAvailable} unit{listing.quantityAvailable === 1 ? '' : 's'} available</p>
-    {providerArrangedTypes.includes(listing.accessType) && <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-relaxed text-amber-100/80">TechBridge does not provide loans or financing. These arrangements are offered directly by verified providers, subject to their own terms.</p>}
-    {canRequest && <Link to={`/resources/${listing._id}/request`} className="mt-5 inline-flex w-fit rounded-lg bg-primary-500 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-400">Request this resource</Link>}
+    <p className="mt-auto pt-5 text-xs text-gray-400">{listing.quantityAvailable} unit{listing.quantityAvailable === 1 ? '' : 's'} available</p>
+    {providerArrangedTypes.includes(listing.accessType) && <p className="mt-4 border-t border-gray-100 pt-4 text-xs leading-relaxed text-gray-500">TechBridge does not provide loans or financing. These arrangements are offered directly by verified providers, subject to their own terms.</p>}
+    {canRequest && <Link to={`/resources/${listing._id}/request`} className="mt-5 inline-flex w-fit rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">Request this resource</Link>}
   </article>;
 };
 
-const Criteria = ({ criteria }: { criteria: string[] }) => <div><p className="text-gray-400">Eligibility:</p><ul className="mt-1 space-y-1 text-xs text-gray-300">{criteria.map((criterion) => <li key={criterion}>• {criterion}</li>)}</ul></div>;
+const Criteria = ({ criteria }: { criteria: string[] }) => <div><p className="text-gray-500">Eligibility:</p><ul className="mt-1 space-y-1 text-xs text-gray-600">{criteria.map((criterion) => <li key={criterion}>• {criterion}</li>)}</ul></div>;
 
 const ResourceHubPage = () => {
   const { user } = useAuth();
   const [resources, setResources] = useState<ResourceListing[]>([]);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'free' | 'subsidized' | 'marketplace'>('free');
+  const [category, setCategory] = useState<ResourceCategory | ''>('');
+  const [activeTab, setActiveTab] = useState<'all' | 'free' | 'subsidized' | 'marketplace'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -108,7 +132,7 @@ const ResourceHubPage = () => {
     const timer = window.setTimeout(() => {
       setLoading(true);
       setError('');
-      void getResources(search.trim() ? { item: search.trim() } : undefined)
+      void getResources({ ...(search.trim() ? { item: search.trim() } : {}), ...(category ? { category } : {}) })
         .then((result) => { if (!cancelled) setResources(result); })
         .catch(() => { if (!cancelled) setError('Unable to load resource listings right now.'); })
         .finally(() => { if (!cancelled) setLoading(false); });
@@ -118,26 +142,28 @@ const ResourceHubPage = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [search]);
+  }, [search, category]);
 
   const visibleListings = useMemo(() => {
+    if (activeTab === 'all') return resources;
     if (activeTab === 'free') return resources.filter(r => freeTypes.includes(r.accessType));
     if (activeTab === 'subsidized') return resources.filter(r => subsidizedTypes.includes(r.accessType));
     if (activeTab === 'marketplace') return resources.filter(r => marketplaceTypes.includes(r.accessType));
     return [];
   }, [activeTab, resources]);
 
-  return <div className="min-h-screen"><AppHeader /><main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
-    <section className="mb-7 flex flex-col md:flex-row md:items-end justify-between gap-5"><div><p className="text-primary-300 text-sm font-semibold mb-2">TECHNICAL RESOURCE ACCESS HUB</p><h1 className="text-3xl font-bold text-white">Get the tools to build your future</h1><p className="text-gray-400 mt-2 max-w-2xl">Explore structured, transparent ways to borrow, share, rent, receive sponsorship, or claim the equipment you need.</p></div><Link to="/resources/list" className="w-fit px-5 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-primary-500 to-accent-500">List a resource</Link></section>
-    <section className="glass-card p-4 mb-5"><input className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /></section>
-    <div className="mb-7 flex gap-1 border-b border-white/10">
-      <button onClick={() => setActiveTab('free')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'free' ? 'text-primary-300 border-primary-500' : 'text-gray-400 border-transparent hover:text-gray-300'}`}>Free Access <span className="opacity-70 text-xs ml-1">(Borrow, Donate)</span></button>
-      <button onClick={() => setActiveTab('subsidized')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'subsidized' ? 'text-emerald-300 border-emerald-500' : 'text-gray-400 border-transparent hover:text-gray-300'}`}>Subsidized <span className="opacity-70 text-xs ml-1">(Installment, 0% Interest)</span></button>
-      <button onClick={() => setActiveTab('marketplace')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'marketplace' ? 'text-amber-300 border-amber-500' : 'text-gray-400 border-transparent hover:text-gray-300'}`}>Marketplace <span className="opacity-70 text-xs ml-1">(Rent)</span></button>
+  return <div className="min-h-screen bg-surface-50"><main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
+    <section className="mb-7 flex flex-col md:flex-row md:items-end justify-between gap-5"><div><p className="text-primary-600 text-sm font-semibold mb-2">TECHNICAL RESOURCE ACCESS HUB</p><h1 className="text-3xl font-bold text-surface-900">Get the tools to build your future</h1><p className="text-gray-600 mt-2 max-w-2xl">Explore structured, transparent ways to borrow, share, rent, receive sponsorship, or claim the equipment you need.</p></div><Link to="/resources/list" className="w-fit px-5 py-3 rounded-xl font-semibold text-white bg-primary-600 hover:bg-primary-700">List a resource</Link></section>
+    <section className="glass-card mb-5 grid gap-3 p-4 md:grid-cols-[1fr_260px]"><input className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /><select value={category} onChange={(event) => setCategory(event.target.value as ResourceCategory | '')} className="feed-input w-full"><option value="">All resource categories</option>{categories.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></section>
+    <div className="mb-7 flex gap-1 border-b border-gray-200">
+      <button onClick={() => setActiveTab('all')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'all' ? 'text-primary-600 border-primary-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>All available <span className="opacity-70 text-xs ml-1">({resources.length})</span></button>
+      <button onClick={() => setActiveTab('free')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'free' ? 'text-primary-600 border-primary-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Free Access <span className="opacity-70 text-xs ml-1">(Borrow, Donate)</span></button>
+      <button onClick={() => setActiveTab('subsidized')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'subsidized' ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Subsidized <span className="opacity-70 text-xs ml-1">(Installment, 0% Interest)</span></button>
+      <button onClick={() => setActiveTab('marketplace')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'marketplace' ? 'text-amber-600 border-amber-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Marketplace <span className="opacity-70 text-xs ml-1">(Rent)</span></button>
     </div>
 
-    {error && <div className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-100">{error}</div>}
-    {loading ? <p className="py-14 text-center text-gray-400">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-white">No available listings found in this category.</p><p className="mt-2 text-sm text-gray-400">Try searching or checking other tabs.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div>}
+    {error && <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">{error}</div>}
+    {loading ? <p className="py-14 text-center text-gray-500">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-surface-900">No available resources match these filters.</p><p className="mt-2 text-sm text-gray-500">Clear a filter or choose another access option.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div>}
   </main></div>;
 };
 

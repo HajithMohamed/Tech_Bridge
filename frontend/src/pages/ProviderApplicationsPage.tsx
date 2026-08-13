@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
+
 import { getOpportunityApplicants, updateApplicationStatus } from '../api/applicationApi';
 import { getMyOpportunities } from '../api/opportunityApi';
 import { getProviderResourceRequests, updateResourceRequestStatus } from '../api/resourceRequestApi';
@@ -74,7 +74,7 @@ const ProviderApplicationsPage = () => {
     }
   };
 
-  return <div className="min-h-screen"><AppHeader /><main className="max-w-6xl mx-auto px-4 sm:px-6 py-9">
+  return <div className="min-h-screen"><main className="max-w-6xl mx-auto px-4 sm:px-6 py-9">
     <Link to="/provider" className="text-sm text-primary-300 hover:text-white">← Provider dashboard</Link>
     <section className="mt-5 mb-7"><p className="text-accent-400 text-sm font-semibold mb-2">APPLICATION MANAGEMENT</p><h1 className="text-3xl font-bold text-white">Review requests</h1><p className="text-gray-400 mt-2">Manage applications for your opportunities and resource access requests.</p></section>
     
@@ -97,3 +97,4 @@ const ProviderApplicationsPage = () => {
 };
 
 export default ProviderApplicationsPage;
+

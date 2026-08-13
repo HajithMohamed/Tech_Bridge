@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
+
 import { getOpportunities, getScholarships, getMatchedOpportunities } from '../api/opportunityApi';
 import { useAuth } from '../hooks/useAuth';
 import type { Opportunity, MatchedOpportunity, OpportunityType, WorkMode } from '../types';
@@ -57,7 +57,11 @@ const OpportunityFeedPage = () => {
       try {
         if (activeTab === 'matched' && isStudent) {
           const result = await getMatchedOpportunities();
-          setOpportunities(result.opportunities);
+          let matched = result.opportunities;
+          if (type) matched = matched.filter((opportunity) => opportunity.type === type);
+          if (skill.trim()) matched = matched.filter((opportunity) => opportunity.requiredSkills.some((requiredSkill) => requiredSkill.toLowerCase().includes(skill.trim().toLowerCase())));
+          if (workMode) matched = matched.filter((opportunity) => opportunity.workMode === workMode);
+          setOpportunities(matched);
         } else if (activeTab === 'financial' && !skill.trim() && !workMode) {
           setOpportunities(await getScholarships());
         } else {
@@ -104,7 +108,7 @@ const OpportunityFeedPage = () => {
 
   return (
     <div className="min-h-screen bg-surface-50">
-      <AppHeader />
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
         {/* Hero Section */}
         <section className="mb-8">
@@ -145,9 +149,8 @@ const OpportunityFeedPage = () => {
           </Link>
         </div>
 
-        {/* Filters (hidden in matched tab) */}
-        {activeTab !== 'matched' && (
-          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-7 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Filters */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-7 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="relative">
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <select
@@ -182,7 +185,6 @@ const OpportunityFeedPage = () => {
               <option value="hybrid">Hybrid</option>
             </select>
           </section>
-        )}
 
         {/* Matched tab info banner */}
         {activeTab === 'matched' && !loading && (
@@ -319,3 +321,4 @@ const OpportunityFeedPage = () => {
 };
 
 export default OpportunityFeedPage;
+

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import axios from 'axios';
-import AppHeader from '../components/AppHeader';
+
 import { updateStudentProfile } from '../api/authApi';
 import { useAuth } from '../hooks/useAuth';
 import type { StudentProfile } from '../types';
@@ -37,7 +37,7 @@ const StudentProfilePage = () => {
     } finally { setSaving(false); }
   };
 
-  return <div className="min-h-screen bg-surface-50"><AppHeader /><main className="max-w-4xl mx-auto px-4 sm:px-6 py-9">
+  return <div className="min-h-screen bg-surface-50"><main className="max-w-4xl mx-auto px-4 sm:px-6 py-9">
     <section className="mb-7"><p className="text-primary-600 text-sm font-semibold uppercase tracking-wider">Student profile</p><h1 className="text-3xl font-bold text-gray-900 mt-2">Build the profile that powers your matches</h1><p className="text-gray-500 mt-2">Keep your skills, goals, availability and portfolio current so providers can understand your strengths.</p></section>
     {error && <Message color="red" text={error} />}{notice && <Message color="green" text={notice} />}
     <form className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6" onSubmit={submit}>
@@ -48,7 +48,7 @@ const StudentProfilePage = () => {
       <Field label="Learning goals"><input className="profile-input" value={form.learningGoals} onChange={(e) => update('learningGoals', e.target.value)} placeholder="React, UI/UX, cloud computing" /><p className="help-text">Optional. Add goals separated by commas.</p></Field>
       <Field label="Certifications"><input className="profile-input" value={form.certifications} onChange={(e) => update('certifications', e.target.value)} placeholder="AWS Cloud Practitioner, Google UX Design" /></Field>
       <Field label="Portfolio URL"><input className="profile-input" type="url" value={form.portfolioUrl} onChange={(e) => update('portfolioUrl', e.target.value)} placeholder="https://github.com/your-name" /></Field>
-      <button disabled={saving} className="rounded-xl bg-primary-600 px-5 py-3 font-semibold text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 disabled:opacity-50">{saving ? 'Saving profile...' : 'Save profile'}</button>
+      <button disabled={saving} className="rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 px-5 py-3 font-semibold text-white shadow-lg shadow-primary-500/20 hover:opacity-90 transition-opacity disabled:opacity-50">{saving ? 'Saving profile...' : 'Save profile'}</button>
     </form>
   </main></div>;
 };
@@ -57,3 +57,4 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 const Message = ({ color, text }: { color: 'red' | 'green'; text: string }) => <div className={`mb-5 rounded-xl border p-4 text-sm ${color === 'red' ? 'border-red-100 bg-red-50 text-red-700' : 'border-emerald-100 bg-emerald-50 text-emerald-700'}`}>{text}</div>;
 
 export default StudentProfilePage;
+

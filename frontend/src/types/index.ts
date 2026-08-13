@@ -5,6 +5,7 @@ export interface User {
   role: 'student' | 'provider' | 'admin';
   studentProfile?: StudentProfile;
   providerProfile?: ProviderProfile;
+  providerVerificationStatus?: 'pending' | 'verified' | 'rejected';
   createdAt: string;
 }
 
