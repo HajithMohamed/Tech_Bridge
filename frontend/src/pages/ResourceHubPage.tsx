@@ -19,12 +19,26 @@ const ownerName = (listing: ResourceListing) => {
   return listing.listedBy.providerProfile?.organizationName || listing.listedBy.fullName;
 };
 
+const itemSpecifications = (listing: ResourceListing): string[] => {
+  const { laptop, arduino, raspberryPi, sensor, electronicComponent, devBoard, other } = listing.itemDetails || {};
+  if (laptop) return [`${laptop.brand} ${laptop.model}`.trim(), `${laptop.processor} (${laptop.processorGeneration})`, `${laptop.ramGb} GB RAM · ${laptop.storageGb} GB ${laptop.storageType.toUpperCase()}`];
+  if (arduino) return [`${arduino.model} · ${arduino.microcontroller}`, `${arduino.operatingVoltage} · ${arduino.digitalPins} digital / ${arduino.analogPins} analog pins`];
+  if (raspberryPi) return [`${raspberryPi.model} · ${raspberryPi.processor}`, `${raspberryPi.ramGb} GB RAM · ${raspberryPi.storageSupport}`];
+  if (sensor) return [`${sensor.sensorType} · ${sensor.measuredParameter}`, `${sensor.operatingVoltage} · ${sensor.interface}`];
+  if (electronicComponent) return [`${electronicComponent.componentType} · ${electronicComponent.valueOrRating}`, electronicComponent.packageType];
+  if (devBoard) return [`${devBoard.boardModel} · ${devBoard.microcontrollerOrProcessor}`, `${devBoard.memory} · ${devBoard.connectivity}`];
+  if (other) return [other.brand, other.model, other.description].filter((value): value is string => Boolean(value));
+  return [];
+};
+
 const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRequest: boolean }) => {
   const unverifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && !listing.providerOrgVerified;
   const verifiedProvider = typeof listing.listedBy !== 'string' && listing.listedBy.role === 'provider' && listing.providerOrgVerified;
   const details = listing.accessDetails;
+  const specifications = itemSpecifications(listing);
 
   return <article className="glass-card p-5 flex flex-col h-full">
+    {listing.imageDataUrl && <img src={listing.imageDataUrl} alt={listing.itemName} className="mb-4 h-44 w-full rounded-xl border border-white/10 object-cover" />}
     <div className="flex flex-wrap items-center justify-between gap-2">
       <span className="tag">{readable(listing.category)}</span>
       <span className="text-xs text-primary-200 font-semibold">{readable(listing.accessType)}</span>
@@ -34,6 +48,8 @@ const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRe
     {typeof listing.listedBy === 'string' ? <p className="mt-3 text-sm text-primary-200">Listed by {ownerName(listing)}</p> : <Link to={`/providers/${listing.listedBy._id}`} className="mt-3 w-fit text-sm text-primary-200 hover:text-white">Listed by {ownerName(listing)}</Link>}
     {verifiedProvider && <span className="mt-2 w-fit text-xs rounded-full bg-emerald-500/15 border border-emerald-400/30 px-2.5 py-1 text-emerald-200">Verified provider</span>}
     {unverifiedProvider && <span className="mt-2 w-fit text-xs rounded-full bg-amber-500/15 border border-amber-400/30 px-2.5 py-1 text-amber-100">Unverified — proceed with caution</span>}
+
+    {specifications.length > 0 && <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Specifications</p><ul className="mt-2 space-y-1 text-sm text-gray-200">{specifications.map((specification) => <li key={specification}>• {specification}</li>)}</ul></div>}
 
     <div className="mt-4 space-y-2 text-sm text-gray-200">
       {(listing.accessType === 'borrow' || listing.accessType === 'share') && details.borrowShare && <>

@@ -43,6 +43,57 @@ export interface IResourceAccessDetails {
         claimDeadline: Date;
     };
 }
+export interface IResourceItemDetails {
+    laptop?: {
+        brand: string;
+        model: string;
+        processor: string;
+        processorGeneration: string;
+        ramGb: number;
+        storageGb: number;
+        storageType: 'ssd' | 'hdd' | 'emmc' | 'other';
+        operatingSystem?: string;
+        screenSizeInches?: number;
+    };
+    arduino?: {
+        model: string;
+        microcontroller: string;
+        operatingVoltage: string;
+        digitalPins: number;
+        analogPins: number;
+        usbType?: string;
+    };
+    raspberryPi?: {
+        model: string;
+        processor: string;
+        ramGb: number;
+        storageSupport: string;
+        wireless?: string;
+    };
+    sensor?: {
+        sensorType: string;
+        measuredParameter: string;
+        operatingVoltage: string;
+        interface: string;
+    };
+    electronicComponent?: {
+        componentType: string;
+        valueOrRating: string;
+        packageType: string;
+        voltageRating?: string;
+    };
+    devBoard?: {
+        boardModel: string;
+        microcontrollerOrProcessor: string;
+        memory: string;
+        connectivity: string;
+    };
+    other?: {
+        brand?: string;
+        model?: string;
+        description: string;
+    };
+}
 export interface IResourceListing extends Document {
     _id: mongoose.Types.ObjectId;
     itemName: string;
@@ -53,6 +104,8 @@ export interface IResourceListing extends Document {
     providerOrgVerified: boolean;
     quantityAvailable: number;
     status: ResourceStatus;
+    imageDataUrl?: string;
+    itemDetails: IResourceItemDetails;
     accessDetails: IResourceAccessDetails;
     createdAt: Date;
     updatedAt: Date;

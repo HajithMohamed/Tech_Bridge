@@ -24,7 +24,7 @@ app.use((0, cors_1.default)({
     origin: ['http://localhost:5173', 'http://localhost:3000'],
     credentials: true,
 }));
-app.use(express_1.default.json());
+app.use(express_1.default.json({ limit: '5mb' }));
 app.use(express_1.default.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes_1.default);

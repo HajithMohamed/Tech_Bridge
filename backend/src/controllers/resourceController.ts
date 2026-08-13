@@ -4,6 +4,7 @@ import Resource, {
   ResourceAccessType,
   ResourceCategory,
   ResourceCondition,
+  IResourceItemDetails,
   ResourceStatus,
 } from '../models/Resource';
 import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
@@ -46,6 +47,86 @@ const requiredCriteria = (value: unknown): string[] => {
   if (!criteria.length) throw new Error('Add at least one eligibility criterion.');
   if (criteria.some((item) => item.length > 300)) throw new Error('Each eligibility criterion must be 300 characters or fewer.');
   return criteria;
+};
+
+const optionalText = (value: unknown, label: string, maxLength = 200): string | undefined => {
+  if (value === undefined || value === '') return undefined;
+  return requiredText(value, label, maxLength);
+};
+
+const optionalNumber = (value: unknown, label: string, minimum = 0): number | undefined => {
+  if (value === undefined || value === '') return undefined;
+  if (!validNumber(value, minimum)) throw new Error(`${label} must be a valid number.`);
+  return value;
+};
+
+const itemDetailsPayload = (body: Payload, category: ResourceCategory): IResourceItemDetails => {
+  if (!isRecord(body.itemDetails)) throw new Error('Item specifications are required.');
+  const details = body.itemDetails;
+
+  switch (category) {
+    case 'laptop': {
+      const laptop = details.laptop;
+      if (!isRecord(laptop)) throw new Error('Laptop specifications are required.');
+      const operatingSystem = optionalText(laptop.operatingSystem, 'Operating system', 100);
+      const screenSizeInches = optionalNumber(laptop.screenSizeInches, 'Screen size', 1);
+      if (!['ssd', 'hdd', 'emmc', 'other'].includes(laptop.storageType as string)) throw new Error('Select a valid storage type.');
+      return { laptop: {
+        brand: requiredText(laptop.brand, 'Laptop brand', 80), model: requiredText(laptop.model, 'Laptop model', 100),
+        processor: requiredText(laptop.processor, 'Processor', 120), processorGeneration: requiredText(laptop.processorGeneration, 'Processor generation', 80),
+        ramGb: requiredPositiveInteger(laptop.ramGb, 'RAM capacity'), storageGb: requiredPositiveInteger(laptop.storageGb, 'Storage capacity'),
+        storageType: laptop.storageType as 'ssd' | 'hdd' | 'emmc' | 'other', ...(operatingSystem ? { operatingSystem } : {}), ...(screenSizeInches ? { screenSizeInches } : {}),
+      } };
+    }
+    case 'arduino': {
+      const arduino = details.arduino;
+      if (!isRecord(arduino)) throw new Error('Arduino specifications are required.');
+      const usbType = optionalText(arduino.usbType, 'USB type', 50);
+      return { arduino: {
+        model: requiredText(arduino.model, 'Arduino model', 100), microcontroller: requiredText(arduino.microcontroller, 'Microcontroller', 100),
+        operatingVoltage: requiredText(arduino.operatingVoltage, 'Operating voltage', 50), digitalPins: validInteger(arduino.digitalPins, 0) ? arduino.digitalPins : (() => { throw new Error('Digital pins must be a whole number.'); })(),
+        analogPins: validInteger(arduino.analogPins, 0) ? arduino.analogPins : (() => { throw new Error('Analog pins must be a whole number.'); })(), ...(usbType ? { usbType } : {}),
+      } };
+    }
+    case 'raspberry_pi': {
+      const raspberryPi = details.raspberryPi;
+      if (!isRecord(raspberryPi)) throw new Error('Raspberry Pi specifications are required.');
+      const wireless = optionalText(raspberryPi.wireless, 'Wireless connectivity', 120);
+      return { raspberryPi: {
+        model: requiredText(raspberryPi.model, 'Raspberry Pi model', 100), processor: requiredText(raspberryPi.processor, 'Processor', 120), ramGb: requiredPositiveInteger(raspberryPi.ramGb, 'RAM capacity'), storageSupport: requiredText(raspberryPi.storageSupport, 'Storage support', 120), ...(wireless ? { wireless } : {}),
+      } };
+    }
+    case 'sensor': {
+      const sensor = details.sensor;
+      if (!isRecord(sensor)) throw new Error('Sensor specifications are required.');
+      return { sensor: { sensorType: requiredText(sensor.sensorType, 'Sensor type', 120), measuredParameter: requiredText(sensor.measuredParameter, 'Measured parameter', 120), operatingVoltage: requiredText(sensor.operatingVoltage, 'Operating voltage', 50), interface: requiredText(sensor.interface, 'Interface', 100) } };
+    }
+    case 'electronic_component': {
+      const electronicComponent = details.electronicComponent;
+      if (!isRecord(electronicComponent)) throw new Error('Electronic component specifications are required.');
+      const voltageRating = optionalText(electronicComponent.voltageRating, 'Voltage rating', 50);
+      return { electronicComponent: { componentType: requiredText(electronicComponent.componentType, 'Component type', 120), valueOrRating: requiredText(electronicComponent.valueOrRating, 'Value or rating', 120), packageType: requiredText(electronicComponent.packageType, 'Package type', 120), ...(voltageRating ? { voltageRating } : {}) } };
+    }
+    case 'dev_board': {
+      const devBoard = details.devBoard;
+      if (!isRecord(devBoard)) throw new Error('Development board specifications are required.');
+      return { devBoard: { boardModel: requiredText(devBoard.boardModel, 'Board model', 120), microcontrollerOrProcessor: requiredText(devBoard.microcontrollerOrProcessor, 'Microcontroller or processor', 120), memory: requiredText(devBoard.memory, 'Memory', 100), connectivity: requiredText(devBoard.connectivity, 'Connectivity', 160) } };
+    }
+    case 'other': {
+      const other = details.other;
+      if (!isRecord(other)) throw new Error('Resource description is required.');
+      const brand = optionalText(other.brand, 'Brand', 80);
+      const model = optionalText(other.model, 'Model', 100);
+      return { other: { description: requiredText(other.description, 'Resource description'), ...(brand ? { brand } : {}), ...(model ? { model } : {}) } };
+    }
+  }
+};
+
+const imageDataUrlPayload = (value: unknown): string | undefined => {
+  if (value === undefined || value === '') return undefined;
+  if (typeof value !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/i.test(value)) throw new Error('Upload a JPG, PNG, or WebP image.');
+  if (value.length > 3_500_000) throw new Error('Image must be 2.5 MB or smaller.');
+  return value;
 };
 
 const detailPayload = (body: Payload, accessType: ResourceAccessType): IResourceAccessDetails => {
@@ -144,6 +225,8 @@ const listingPayload = (body: Payload) => {
     accessType,
     quantityAvailable: body.quantityAvailable as number,
     status: (body.status || 'available') as ResourceStatus,
+    itemDetails: itemDetailsPayload(body, body.category as ResourceCategory),
+    ...(imageDataUrlPayload(body.imageDataUrl) ? { imageDataUrl: imageDataUrlPayload(body.imageDataUrl) } : {}),
     accessDetails: detailPayload(body, accessType),
   };
 };

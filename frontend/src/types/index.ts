@@ -188,6 +188,16 @@ export interface ResourceAccessDetails {
   };
 }
 
+export interface ResourceItemDetails {
+  laptop?: { brand: string; model: string; processor: string; processorGeneration: string; ramGb: number; storageGb: number; storageType: 'ssd' | 'hdd' | 'emmc' | 'other'; operatingSystem?: string; screenSizeInches?: number };
+  arduino?: { model: string; microcontroller: string; operatingVoltage: string; digitalPins: number; analogPins: number; usbType?: string };
+  raspberryPi?: { model: string; processor: string; ramGb: number; storageSupport: string; wireless?: string };
+  sensor?: { sensorType: string; measuredParameter: string; operatingVoltage: string; interface: string };
+  electronicComponent?: { componentType: string; valueOrRating: string; packageType: string; voltageRating?: string };
+  devBoard?: { boardModel: string; microcontrollerOrProcessor: string; memory: string; connectivity: string };
+  other?: { brand?: string; model?: string; description: string };
+}
+
 export interface ResourceListing {
   _id: string;
   itemName: string;
@@ -198,6 +208,8 @@ export interface ResourceListing {
   providerOrgVerified: boolean;
   quantityAvailable: number;
   status: ResourceStatus;
+  imageDataUrl?: string;
+  itemDetails: ResourceItemDetails;
   accessDetails: ResourceAccessDetails;
   createdAt: string;
   updatedAt: string;
@@ -209,6 +221,8 @@ export interface ResourceListingFormData {
   condition?: ResourceCondition;
   accessType: ResourceAccessType;
   quantityAvailable: number;
+  imageDataUrl?: string;
+  itemDetails: ResourceItemDetails;
   accessDetails: ResourceAccessDetails;
 }
 

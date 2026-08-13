@@ -53,6 +53,58 @@ const resourceSchema = new mongoose_1.Schema({
     providerOrgVerified: { type: Boolean, required: true, default: false, index: true },
     quantityAvailable: { type: Number, required: true, min: 0, default: 1 },
     status: { type: String, enum: ['available', 'claimed'], default: 'available', index: true },
+    imageDataUrl: { type: String, maxlength: 4000000 },
+    itemDetails: {
+        laptop: {
+            brand: { type: String, trim: true, maxlength: 80 },
+            model: { type: String, trim: true, maxlength: 100 },
+            processor: { type: String, trim: true, maxlength: 120 },
+            processorGeneration: { type: String, trim: true, maxlength: 80 },
+            ramGb: { type: Number, min: 1, max: 512 },
+            storageGb: { type: Number, min: 1, max: 20000 },
+            storageType: { type: String, enum: ['ssd', 'hdd', 'emmc', 'other'] },
+            operatingSystem: { type: String, trim: true, maxlength: 100 },
+            screenSizeInches: { type: Number, min: 1, max: 100 },
+        },
+        arduino: {
+            model: { type: String, trim: true, maxlength: 100 },
+            microcontroller: { type: String, trim: true, maxlength: 100 },
+            operatingVoltage: { type: String, trim: true, maxlength: 50 },
+            digitalPins: { type: Number, min: 0, max: 500 },
+            analogPins: { type: Number, min: 0, max: 500 },
+            usbType: { type: String, trim: true, maxlength: 50 },
+        },
+        raspberryPi: {
+            model: { type: String, trim: true, maxlength: 100 },
+            processor: { type: String, trim: true, maxlength: 120 },
+            ramGb: { type: Number, min: 1, max: 64 },
+            storageSupport: { type: String, trim: true, maxlength: 120 },
+            wireless: { type: String, trim: true, maxlength: 120 },
+        },
+        sensor: {
+            sensorType: { type: String, trim: true, maxlength: 120 },
+            measuredParameter: { type: String, trim: true, maxlength: 120 },
+            operatingVoltage: { type: String, trim: true, maxlength: 50 },
+            interface: { type: String, trim: true, maxlength: 100 },
+        },
+        electronicComponent: {
+            componentType: { type: String, trim: true, maxlength: 120 },
+            valueOrRating: { type: String, trim: true, maxlength: 120 },
+            packageType: { type: String, trim: true, maxlength: 120 },
+            voltageRating: { type: String, trim: true, maxlength: 50 },
+        },
+        devBoard: {
+            boardModel: { type: String, trim: true, maxlength: 120 },
+            microcontrollerOrProcessor: { type: String, trim: true, maxlength: 120 },
+            memory: { type: String, trim: true, maxlength: 100 },
+            connectivity: { type: String, trim: true, maxlength: 160 },
+        },
+        other: {
+            brand: { type: String, trim: true, maxlength: 80 },
+            model: { type: String, trim: true, maxlength: 100 },
+            description: { type: String, trim: true, maxlength: 1000 },
+        },
+    },
     accessDetails: {
         borrowShare: {
             borrowDurationDays: { type: Number, min: 1 },
