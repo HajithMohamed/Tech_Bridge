@@ -2,15 +2,15 @@ import { Briefcase, GraduationCap, Laptop, Coins, ArrowRight, ArrowLeft } from '
 
 const SolutionSection = () => {
   return (
-    <section className="py-24 bg-surface-50 relative border-t border-gray-100">
+    <section className="py-20 bg-surface-50 relative border-t border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-surface-900 tracking-tight mb-4">
+        <div className="text-center max-w-3xl mx-auto mb-14">
+          <h2 className="text-3xl md:text-4xl font-bold text-surface-900 tracking-tight mb-3">
             One bridge. Multiple opportunities.
           </h2>
-          <p className="text-xl text-gray-500 leading-relaxed">
-            TechBridge brings students, organizations, professionals and resource providers into one connected opportunity ecosystem.
+          <p className="text-lg text-gray-500 leading-relaxed">
+            TechBridge connects students from all technology departments with organizations, professionals, and resource providers in one ecosystem.
           </p>
         </div>
 
@@ -27,57 +27,57 @@ const SolutionSection = () => {
               </svg>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-24 relative z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-20 relative z-10">
               
               {/* EARN */}
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
-                <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6">
-                  <Coins className="w-7 h-7 text-emerald-500" />
+              <div className="bg-white p-7 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
+                <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mb-5">
+                  <Coins className="w-6 h-6 text-emerald-500" />
                 </div>
-                <h3 className="text-2xl font-bold text-surface-900 mb-4">EARN</h3>
-                <ul className="space-y-3 text-gray-600 font-medium">
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Jobs</li>
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Freelance</li>
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Part-time</li>
+                <h3 className="text-xl font-bold text-surface-900 mb-3">EARN</h3>
+                <ul className="space-y-2.5 text-sm text-gray-600 font-medium">
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Jobs (IT, Engineering, etc.)</li>
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Freelance Projects</li>
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Part-time roles</li>
                   <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Remote work</li>
                 </ul>
               </div>
 
               {/* LEARN */}
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group md:translate-y-0">
-                <div className="w-14 h-14 bg-primary-50 rounded-2xl flex items-center justify-center mb-6">
-                  <GraduationCap className="w-7 h-7 text-primary-500" />
+              <div className="bg-white p-7 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group md:translate-y-0">
+                <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center mb-5">
+                  <GraduationCap className="w-6 h-6 text-primary-500" />
                 </div>
-                <h3 className="text-2xl font-bold text-surface-900 mb-4">LEARN</h3>
-                <ul className="space-y-3 text-gray-600 font-medium">
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary-400"/> Courses</li>
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary-400"/> Training</li>
+                <h3 className="text-xl font-bold text-surface-900 mb-3">LEARN</h3>
+                <ul className="space-y-2.5 text-sm text-gray-600 font-medium">
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary-400"/> Technical Courses</li>
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary-400"/> Hands-on Training</li>
                   <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary-400"/> Workshops</li>
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary-400"/> Mentors</li>
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary-400"/> Expert Mentors</li>
                 </ul>
               </div>
 
               {/* EXPERIENCE */}
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
-                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
-                  <Briefcase className="w-7 h-7 text-indigo-500" />
+              <div className="bg-white p-7 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
+                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-5">
+                  <Briefcase className="w-6 h-6 text-indigo-500" />
                 </div>
-                <h3 className="text-2xl font-bold text-surface-900 mb-4">EXPERIENCE</h3>
-                <ul className="space-y-3 text-gray-600 font-medium">
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"/> Internships</li>
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"/> Projects</li>
+                <h3 className="text-xl font-bold text-surface-900 mb-3">EXPERIENCE</h3>
+                <ul className="space-y-2.5 text-sm text-gray-600 font-medium">
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"/> Industrial Internships</li>
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"/> Lab & Field Projects</li>
                   <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"/> Industry connections</li>
                 </ul>
               </div>
 
               {/* ACCESS */}
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
-                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-6">
-                  <Laptop className="w-7 h-7 text-amber-500" />
+              <div className="bg-white p-7 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
+                <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center mb-5">
+                  <Laptop className="w-6 h-6 text-amber-500" />
                 </div>
-                <h3 className="text-2xl font-bold text-surface-900 mb-4">ACCESS</h3>
-                <ul className="space-y-3 text-gray-600 font-medium">
-                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/> Resources</li>
+                <h3 className="text-xl font-bold text-surface-900 mb-3">ACCESS</h3>
+                <ul className="space-y-2.5 text-sm text-gray-600 font-medium">
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/> Devices & Equipment</li>
                   <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/> Borrow & Rent</li>
                   <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/> Installments</li>
                   <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/> Interest-free options</li>
@@ -88,17 +88,17 @@ const SolutionSection = () => {
             
             {/* Center TechBridge Logo for Desktop Flow */}
             <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 items-center justify-center">
-              <div className="bg-surface-900 text-white px-6 py-4 rounded-2xl shadow-xl font-bold text-lg border-4 border-surface-50 flex flex-col items-center gap-1">
+              <div className="bg-surface-900 text-white px-5 py-3 rounded-xl shadow-lg font-bold text-base border-4 border-surface-50 flex flex-col items-center gap-1">
                 <span>TECHBRIDGE</span>
               </div>
             </div>
             
             <div className="hidden md:block absolute top-[25%] left-1/2 -translate-x-1/2 z-20">
-               <ArrowRight className="w-6 h-6 text-gray-300 -ml-16" />
+               <ArrowRight className="w-5 h-5 text-gray-300 -ml-16" />
             </div>
             
             <div className="hidden md:block absolute bottom-[25%] left-1/2 -translate-x-1/2 z-20">
-               <ArrowLeft className="w-6 h-6 text-gray-300 ml-16" />
+               <ArrowLeft className="w-5 h-5 text-gray-300 ml-16" />
             </div>
 
           </div>
