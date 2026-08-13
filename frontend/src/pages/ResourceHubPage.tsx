@@ -3,11 +3,20 @@ import { Link } from 'react-router-dom';
 
 import { getResources } from '../api/resourceApi';
 import { useAuth } from '../hooks/useAuth';
-import type { ResourceAccessType, ResourceListing } from '../types';
+import type { ResourceAccessType, ResourceCategory, ResourceListing } from '../types';
 
 const freeTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const subsidizedTypes: ResourceAccessType[] = ['installment', 'interest_free', 'sponsorship'];
 const marketplaceTypes: ResourceAccessType[] = ['rent'];
+const categories: Array<{ value: ResourceCategory; label: string }> = [
+  { value: 'laptop', label: 'Laptops' },
+  { value: 'arduino', label: 'Arduino' },
+  { value: 'raspberry_pi', label: 'Raspberry Pi' },
+  { value: 'sensor', label: 'Sensors' },
+  { value: 'electronic_component', label: 'Electronic components' },
+  { value: 'dev_board', label: 'Development boards' },
+  { value: 'other', label: 'Other resources' },
+];
 
 
 const providerArrangedTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship'];
@@ -113,7 +122,8 @@ const ResourceHubPage = () => {
   const { user } = useAuth();
   const [resources, setResources] = useState<ResourceListing[]>([]);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'free' | 'subsidized' | 'marketplace'>('free');
+  const [category, setCategory] = useState<ResourceCategory | ''>('');
+  const [activeTab, setActiveTab] = useState<'all' | 'free' | 'subsidized' | 'marketplace'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -122,7 +132,7 @@ const ResourceHubPage = () => {
     const timer = window.setTimeout(() => {
       setLoading(true);
       setError('');
-      void getResources(search.trim() ? { item: search.trim() } : undefined)
+      void getResources({ ...(search.trim() ? { item: search.trim() } : {}), ...(category ? { category } : {}) })
         .then((result) => { if (!cancelled) setResources(result); })
         .catch(() => { if (!cancelled) setError('Unable to load resource listings right now.'); })
         .finally(() => { if (!cancelled) setLoading(false); });
@@ -132,9 +142,10 @@ const ResourceHubPage = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [search]);
+  }, [search, category]);
 
   const visibleListings = useMemo(() => {
+    if (activeTab === 'all') return resources;
     if (activeTab === 'free') return resources.filter(r => freeTypes.includes(r.accessType));
     if (activeTab === 'subsidized') return resources.filter(r => subsidizedTypes.includes(r.accessType));
     if (activeTab === 'marketplace') return resources.filter(r => marketplaceTypes.includes(r.accessType));
@@ -143,15 +154,16 @@ const ResourceHubPage = () => {
 
   return <div className="min-h-screen bg-surface-50"><main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
     <section className="mb-7 flex flex-col md:flex-row md:items-end justify-between gap-5"><div><p className="text-primary-600 text-sm font-semibold mb-2">TECHNICAL RESOURCE ACCESS HUB</p><h1 className="text-3xl font-bold text-surface-900">Get the tools to build your future</h1><p className="text-gray-600 mt-2 max-w-2xl">Explore structured, transparent ways to borrow, share, rent, receive sponsorship, or claim the equipment you need.</p></div><Link to="/resources/list" className="w-fit px-5 py-3 rounded-xl font-semibold text-white bg-primary-600 hover:bg-primary-700">List a resource</Link></section>
-    <section className="glass-card p-4 mb-5"><input className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /></section>
+    <section className="glass-card mb-5 grid gap-3 p-4 md:grid-cols-[1fr_260px]"><input className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /><select value={category} onChange={(event) => setCategory(event.target.value as ResourceCategory | '')} className="feed-input w-full"><option value="">All resource categories</option>{categories.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></section>
     <div className="mb-7 flex gap-1 border-b border-gray-200">
+      <button onClick={() => setActiveTab('all')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'all' ? 'text-primary-600 border-primary-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>All available <span className="opacity-70 text-xs ml-1">({resources.length})</span></button>
       <button onClick={() => setActiveTab('free')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'free' ? 'text-primary-600 border-primary-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Free Access <span className="opacity-70 text-xs ml-1">(Borrow, Donate)</span></button>
       <button onClick={() => setActiveTab('subsidized')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'subsidized' ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Subsidized <span className="opacity-70 text-xs ml-1">(Installment, 0% Interest)</span></button>
       <button onClick={() => setActiveTab('marketplace')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'marketplace' ? 'text-amber-600 border-amber-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Marketplace <span className="opacity-70 text-xs ml-1">(Rent)</span></button>
     </div>
 
     {error && <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">{error}</div>}
-    {loading ? <p className="py-14 text-center text-gray-500">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-surface-900">No available listings found in this category.</p><p className="mt-2 text-sm text-gray-500">Try searching or checking other tabs.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div>}
+    {loading ? <p className="py-14 text-center text-gray-500">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-surface-900">No available resources match these filters.</p><p className="mt-2 text-sm text-gray-500">Clear a filter or choose another access option.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div>}
   </main></div>;
 };
 

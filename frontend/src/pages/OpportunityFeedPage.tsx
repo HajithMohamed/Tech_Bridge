@@ -57,7 +57,11 @@ const OpportunityFeedPage = () => {
       try {
         if (activeTab === 'matched' && isStudent) {
           const result = await getMatchedOpportunities();
-          setOpportunities(result.opportunities);
+          let matched = result.opportunities;
+          if (type) matched = matched.filter((opportunity) => opportunity.type === type);
+          if (skill.trim()) matched = matched.filter((opportunity) => opportunity.requiredSkills.some((requiredSkill) => requiredSkill.toLowerCase().includes(skill.trim().toLowerCase())));
+          if (workMode) matched = matched.filter((opportunity) => opportunity.workMode === workMode);
+          setOpportunities(matched);
         } else if (activeTab === 'financial' && !skill.trim() && !workMode) {
           setOpportunities(await getScholarships());
         } else {
@@ -145,9 +149,8 @@ const OpportunityFeedPage = () => {
           </Link>
         </div>
 
-        {/* Filters (hidden in matched tab) */}
-        {activeTab !== 'matched' && (
-          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-7 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Filters */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-7 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="relative">
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <select
@@ -182,7 +185,6 @@ const OpportunityFeedPage = () => {
               <option value="hybrid">Hybrid</option>
             </select>
           </section>
-        )}
 
         {/* Matched tab info banner */}
         {activeTab === 'matched' && !loading && (
