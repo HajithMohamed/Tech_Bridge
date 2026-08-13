@@ -19,6 +19,7 @@ import LandingPage from './pages/LandingPage';
 import ResourceRequestPage from './pages/ResourceRequestPage';
 import StudentProfilePage from './pages/StudentProfilePage';
 import ProviderResourceRequestsPage from './pages/ProviderResourceRequestsPage';
+import FacultyConnectionsPage from './pages/FacultyConnectionsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
       <Route path="/impact" element={<ProtectedRoute><ImpactDashboardPage /></ProtectedRoute>} />
       <Route path="/student-profile" element={<ProtectedRoute allowedRoles={['student']}><StudentProfilePage /></ProtectedRoute>} />
       <Route path="/provider/resource-requests" element={<ProtectedRoute allowedRoles={['provider']}><ProviderResourceRequestsPage /></ProtectedRoute>} />
+      <Route path="/connections" element={<ProtectedRoute><FacultyConnectionsPage /></ProtectedRoute>} />
 
       {/* Redirects */}
       <Route path="/" element={<LandingPage />} />

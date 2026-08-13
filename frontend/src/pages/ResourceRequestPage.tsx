@@ -20,7 +20,7 @@ const ResourceRequestPage = () => {
   useEffect(() => { if (id) void getResource(id).then(setResource).catch(() => setError('This resource is no longer available.')); }, [id]);
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (!resource) return; setSaving(true); setError('');
-    try { await createResourceRequest({ resourceId: resource._id, requestedAccessType: resource.accessType, durationOrTerms, message }); navigate('/my-resource-requests'); }
+    try { await createResourceRequest(resource._id, resource.accessType, durationOrTerms, message); navigate('/my-resource-requests'); }
     catch (requestError) { setError(axios.isAxiosError(requestError) ? requestError.response?.data?.message || 'Unable to send the request.' : 'Unable to send the request.'); }
     finally { setSaving(false); }
   };

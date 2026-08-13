@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
 import { getResources } from '../api/resourceApi';
 import { useAuth } from '../hooks/useAuth';
 import type { ResourceAccessType, ResourceListing } from '../types';
-import { createResourceRequest } from '../api/resourceRequestApi';
 
 const freeTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const subsidizedTypes: ResourceAccessType[] = ['installment', 'interest_free', 'sponsorship'];
@@ -88,6 +87,22 @@ const ResourceHubPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError('');
+      void getResources(search.trim() ? { item: search.trim() } : undefined)
+        .then((result) => { if (!cancelled) setResources(result); })
+        .catch(() => { if (!cancelled) setError('Unable to load resource listings right now.'); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }, search ? 250 : 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [search]);
 
   const visibleListings = useMemo(() => {
     if (activeTab === 'free') return resources.filter(r => freeTypes.includes(r.accessType));
