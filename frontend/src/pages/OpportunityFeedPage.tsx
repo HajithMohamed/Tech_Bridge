@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
+
 import { getOpportunities, getScholarships, getMatchedOpportunities } from '../api/opportunityApi';
 import { useAuth } from '../hooks/useAuth';
 import type { Opportunity, MatchedOpportunity, OpportunityType, WorkMode } from '../types';
@@ -104,7 +104,7 @@ const OpportunityFeedPage = () => {
 
   return (
     <div className="min-h-screen bg-surface-50">
-      <AppHeader />
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
         {/* Hero Section */}
         <section className="mb-8">
@@ -319,3 +319,4 @@ const OpportunityFeedPage = () => {
 };
 
 export default OpportunityFeedPage;
+

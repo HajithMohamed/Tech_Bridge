@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
-import AppHeader from '../components/AppHeader';
+
 import { getOpportunity } from '../api/opportunityApi';
 import { applyToOpportunity, getMyApplications } from '../api/applicationApi';
 import { useAuth } from '../hooks/useAuth';
@@ -152,7 +152,7 @@ const OpportunityDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-surface-50">
-      <AppHeader />
+      
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-9">
         <Link to="/opportunities" className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-semibold transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to opportunities
@@ -170,7 +170,7 @@ const OpportunityDetailPage = () => {
           </div>
 
           {/* Title */}
-          <h1 className="text-3xl font-bold text-gray-900 mt-5">{opportunity.title}</h1>
+          <h1 className="text-3xl font-bold text-emerald-600 mt-5">{opportunity.title}</h1>
           <p className="text-primary-600 mt-2">Provided by {providerName(opportunity)}</p>
 
           {/* ── STUDENT SKILL MATCH SECTION ──────────────────── */}
@@ -318,7 +318,7 @@ const OpportunityDetailPage = () => {
                 </div>
               )}
               {opportunity.contactMethod && <div className="mt-6 rounded-xl border border-primary-100 bg-primary-50 p-4"><p className="text-sm font-semibold text-primary-800">Application instructions</p><p className="mt-1 text-sm text-primary-700">{opportunity.contactMethod}</p></div>}
-              <p className="text-sm text-gray-400 mt-7">Application deadline: {deadline}</p>
+              <p className="text-sm font-semibold text-red-500 mt-7 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Application deadline: {deadline}</p>
             </section>
           )}
 
@@ -337,7 +337,7 @@ const OpportunityDetailPage = () => {
               />
               <button
                 disabled={submitting || hasApplied}
-                className="mt-3 px-6 py-3 rounded-xl font-semibold text-sm text-white bg-primary-600 hover:bg-secondary-500 shadow-lg shadow-primary-600/20 disabled:opacity-50 cursor-pointer transition-all duration-300 flex items-center gap-2"
+                className="mt-3 px-6 py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-primary-500 to-accent-500 hover:opacity-90 shadow-lg shadow-primary-500/20 disabled:opacity-50 cursor-pointer transition-all duration-300 flex items-center gap-2"
               >
                 <Send className="w-4 h-4" />
                 {submitting ? 'Submitting...' : hasApplied ? 'Applied' : 'Apply / express interest'}
@@ -353,7 +353,7 @@ const OpportunityDetailPage = () => {
 
 const Page = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-surface-50">
-    <AppHeader />
+    
     <main className="max-w-3xl mx-auto px-4 py-12 text-center">{children}</main>
   </div>
 );
@@ -389,3 +389,4 @@ const Description = ({ title, value }: { title: string; value: string }) => (
 );
 
 export default OpportunityDetailPage;
+

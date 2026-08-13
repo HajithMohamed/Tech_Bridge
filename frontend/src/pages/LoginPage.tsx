@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Mail, Lock, Briefcase, Award, Wrench, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Briefcase, Award, Wrench, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ const LoginPage = () => {
   });
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -190,16 +191,23 @@ const LoginPage = () => {
                   </div>
                   <input
                     id="login-password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     placeholder="Enter your password"
-                    className={`w-full pl-11 pr-4 py-3 rounded-xl bg-surface-50 border text-gray-800 placeholder-gray-400 text-sm transition-all duration-200 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white ${
+                    className={`w-full pl-11 pr-11 py-3 rounded-xl bg-surface-50 border text-gray-800 placeholder-gray-400 text-sm transition-all duration-200 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white ${
                       getFieldError('password')
                         ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
                 {getFieldError('password') && (
                   <p className="mt-1.5 text-xs text-red-500 font-medium">{getFieldError('password')}</p>
@@ -220,7 +228,7 @@ const LoginPage = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 mt-2 rounded-xl font-semibold text-sm text-white transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed bg-primary-600 hover:bg-secondary-500 shadow-lg shadow-primary-600/25 hover:shadow-secondary-500/30 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group"
+                className="w-full py-3.5 px-6 mt-2 rounded-xl font-semibold text-sm text-white transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed bg-gradient-to-r from-primary-500 to-accent-500 hover:opacity-90 shadow-lg shadow-primary-500/25 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group"
               >
                 {isLoading ? (
                   <>
@@ -255,3 +263,4 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Building, GraduationCap, Briefcase, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Building, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import type { OrganizationType, RegisterData } from '../types';
 
 const RegisterPage = () => {
@@ -9,6 +9,7 @@ const RegisterPage = () => {
   const { register, isLoading, error, fieldErrors, clearError } = useAuth();
 
   const [step, setStep] = useState<1 | 2>(1);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -183,7 +184,7 @@ const RegisterPage = () => {
           <h1 className="mt-5 text-2xl font-bold text-surface-800">Provider verification pending</h1>
           <p className="mt-3 text-gray-600 leading-7">Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.</p>
           <p className="mt-3 text-sm text-gray-500">For this MVP, verification is completed manually before your provider account is activated.</p>
-          <Link to="/login" className="inline-flex mt-6 px-5 py-3 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700">Back to sign in</Link>
+          <Link to="/login" className="inline-flex mt-6 px-5 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 text-white font-semibold hover:opacity-90 transition-opacity">Back to sign in</Link>
         </div>
       </div>
     );
@@ -323,7 +324,7 @@ const RegisterPage = () => {
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="w-full py-4 mt-8 rounded-xl font-semibold text-white transition-all duration-300 cursor-pointer bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-600/20 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group"
+                  className="w-full py-4 mt-8 rounded-xl font-semibold text-white transition-all duration-300 cursor-pointer bg-gradient-to-r from-primary-500 to-accent-500 hover:opacity-90 shadow-lg shadow-primary-500/20 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group"
                 >
                   Continue to Profile Details
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -494,17 +495,26 @@ const RegisterPage = () => {
                     </div>
                   </>
                 )}
-
                 {/* --- PASSWORD FIELDS --- */}
                 <div className="pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-5 mt-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
-                    <input type="password" placeholder="At least 6 characters" value={formData.password} onChange={(e) => handleInputChange('password', e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                    <div className="relative">
+                      <input type={showPassword ? 'text' : 'password'} placeholder="At least 6 characters" value={formData.password} onChange={(e) => handleInputChange('password', e.target.value)} className="w-full px-4 pr-11 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     {getFieldError('password') && <p className="mt-1 text-xs text-red-500">{getFieldError('password')}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Confirm password</label>
-                    <input type="password" value={formData.confirmPassword} onChange={(e) => handleInputChange('confirmPassword', e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                    <div className="relative">
+                      <input type={showPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={(e) => handleInputChange('confirmPassword', e.target.value)} className="w-full px-4 pr-11 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     {getFieldError('confirmPassword') && <p className="mt-1 text-xs text-red-500">{getFieldError('confirmPassword')}</p>}
                   </div>
                 </div>
@@ -522,8 +532,8 @@ const RegisterPage = () => {
                     disabled={isLoading}
                     className={`flex-1 py-3.5 px-6 rounded-xl font-bold text-white transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 group ${
                       formData.role === 'student' 
-                        ? 'bg-primary-600 hover:bg-primary-700 shadow-primary-600/25 hover:shadow-primary-600/40' 
-                        : 'bg-secondary-600 hover:bg-secondary-700 shadow-secondary-600/25 hover:shadow-secondary-600/40'
+                        ? 'bg-gradient-to-r from-primary-500 to-accent-500 hover:opacity-90 shadow-primary-500/25 hover:shadow-primary-500/40' 
+                        : 'bg-gradient-to-r from-secondary-500 to-primary-500 hover:opacity-90 shadow-secondary-500/25 hover:shadow-secondary-500/40'
                     }`}
                   >
                     {isLoading ? (
@@ -560,3 +570,4 @@ const RegisterPage = () => {
 };
 
 export default RegisterPage;
+
