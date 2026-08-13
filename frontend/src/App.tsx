@@ -20,6 +20,7 @@ import ResourceRequestPage from './pages/ResourceRequestPage';
 import StudentProfilePage from './pages/StudentProfilePage';
 import ProviderResourceRequestsPage from './pages/ProviderResourceRequestsPage';
 import FacultyConnectionsPage from './pages/FacultyConnectionsPage';
+import MyActivityPage from './pages/MyActivityPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -63,7 +64,8 @@ function App() {
       <Route path="/impact" element={<ProtectedRoute><ImpactDashboardPage /></ProtectedRoute>} />
       <Route path="/student-profile" element={<ProtectedRoute allowedRoles={['student']}><StudentProfilePage /></ProtectedRoute>} />
       <Route path="/provider/resource-requests" element={<ProtectedRoute allowedRoles={['provider']}><ProviderResourceRequestsPage /></ProtectedRoute>} />
-      <Route path="/connections" element={<ProtectedRoute><FacultyConnectionsPage /></ProtectedRoute>} />
+      <Route path="/connections" element={<FacultyConnectionsPage />} />
+      <Route path="/my-activity" element={<ProtectedRoute allowedRoles={['student']}><MyActivityPage /></ProtectedRoute>} />
 
       {/* Redirects */}
       <Route path="/" element={<LandingPage />} />

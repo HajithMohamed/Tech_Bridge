@@ -22,6 +22,7 @@ const Navbar = () => {
           <div className="hidden md:flex items-center space-x-8">
             <a href="#how-it-works" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">How It Works</a>
             <a href="#opportunities" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">Opportunities</a>
+            <Link to="/connections" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">Academic & Alumni</Link>
             <a href="#providers" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">For Providers</a>
           </div>
 
@@ -52,6 +53,7 @@ const Navbar = () => {
           <div className="px-4 pt-2 pb-6 space-y-1 sm:px-3">
             <a href="#how-it-works" className="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-primary-600">How It Works</a>
             <a href="#opportunities" className="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-primary-600">Opportunities</a>
+            <Link to="/connections" onClick={() => setIsOpen(false)} className="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-primary-600">Academic & Alumni</Link>
             <a href="#providers" className="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-primary-600">For Providers</a>
             <div className="pt-4 flex flex-col space-y-3">
               <Link to="/login" className="w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-base font-semibold text-gray-700 hover:bg-gray-50">Sign In</Link>
