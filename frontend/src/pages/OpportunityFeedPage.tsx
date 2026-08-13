@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { getOpportunities, getScholarships, getMatchedOpportunities } from '../api/opportunityApi';
 import { useAuth } from '../hooks/useAuth';
 import type { Opportunity, MatchedOpportunity, OpportunityType, WorkMode } from '../types';
-import { Search, Filter, Briefcase, GraduationCap, BookOpen, Code, Wrench, Lightbulb, Target, ArrowRight, Sparkles, Users } from 'lucide-react';
+import { Search, Filter, Briefcase, GraduationCap, BookOpen, Code, Wrench, Lightbulb, Target, ArrowRight, Sparkles } from 'lucide-react';
 
 const typeLabels: Record<OpportunityType, string> = {
   job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance', workshop: 'Workshop', mentorship: 'Mentorship',

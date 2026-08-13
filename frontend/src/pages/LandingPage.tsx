@@ -3,6 +3,8 @@ import Hero from '../components/landing/Hero';
 import SolutionSection from '../components/landing/SolutionSection';
 import OpportunityCategories from '../components/landing/OpportunityCategories';
 import ResourceAccessSection from '../components/landing/ResourceAccessSection';
+import LiveProviderOfferings from '../components/landing/LiveProviderOfferings';
+import FacultyCommunityCTA from '../components/landing/FacultyCommunityCTA';
 import HowItWorks from '../components/landing/HowItWorks';
 import ComparisonSection from '../components/landing/ComparisonSection';
 import ProviderCTA from '../components/landing/ProviderCTA';
@@ -16,7 +18,9 @@ const LandingPage = () => {
       <Hero />
       <SolutionSection />
       <OpportunityCategories />
+      <LiveProviderOfferings />
       <ResourceAccessSection />
+      <FacultyCommunityCTA />
       <HowItWorks />
       <ComparisonSection />
       <ProviderCTA />

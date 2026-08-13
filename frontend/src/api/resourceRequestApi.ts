@@ -1,5 +1,5 @@
 import api from './axios';
-import type { ResourceAccessType, ResourceRequest, ResourceRequestStatus } from '../types';
+import type { ResourceRequest, ResourceRequestStatus } from '../types';
 
 interface ResourceRequestResponse {
   success: boolean;

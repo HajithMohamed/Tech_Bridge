@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { getResources } from '../api/resourceApi';
 import { useAuth } from '../hooks/useAuth';
 import type { ResourceAccessType, ResourceListing } from '../types';
-import { createResourceRequest } from '../api/resourceRequestApi';
 
 const freeTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const subsidizedTypes: ResourceAccessType[] = ['installment', 'interest_free', 'sponsorship'];
@@ -19,9 +18,23 @@ const ownerName = (listing: ResourceListing) => {
   if (typeof listing.listedBy === 'string') return 'TechBridge member';
   return listing.listedBy.providerProfile?.organizationName || listing.listedBy.fullName;
 };
+void ownerName;
+
+const itemSpecifications = (listing: ResourceListing): string[] => {
+  const { laptop, arduino, raspberryPi, sensor, electronicComponent, devBoard, other } = listing.itemDetails || {};
+  if (laptop) return [`${laptop.brand} ${laptop.model}`.trim(), `${laptop.processor} (${laptop.processorGeneration})`, `${laptop.ramGb} GB RAM · ${laptop.storageGb} GB ${laptop.storageType.toUpperCase()}`];
+  if (arduino) return [`${arduino.model} · ${arduino.microcontroller}`, `${arduino.operatingVoltage} · ${arduino.digitalPins} digital / ${arduino.analogPins} analog pins`];
+  if (raspberryPi) return [`${raspberryPi.model} · ${raspberryPi.processor}`, `${raspberryPi.ramGb} GB RAM · ${raspberryPi.storageSupport}`];
+  if (sensor) return [`${sensor.sensorType} · ${sensor.measuredParameter}`, `${sensor.operatingVoltage} · ${sensor.interface}`];
+  if (electronicComponent) return [`${electronicComponent.componentType} · ${electronicComponent.valueOrRating}`, electronicComponent.packageType];
+  if (devBoard) return [`${devBoard.boardModel} · ${devBoard.microcontrollerOrProcessor}`, `${devBoard.memory} · ${devBoard.connectivity}`];
+  if (other) return [other.brand, other.model, other.description].filter((value): value is string => Boolean(value));
+  return [];
+};
 
 const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRequest: boolean }) => {
   const details = listing.accessDetails;
+/* Legacy card layout:
   return <article className="glass-card p-5 flex flex-col h-full">
     <div className="flex items-start justify-between gap-3 mb-4">
       <div>
@@ -40,9 +53,19 @@ const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRe
         </span>
       )}
       {typeof listing.listedBy === 'string' ? <p className="text-sm text-gray-500">By {ownerName(listing)}</p> : <Link to={`/providers/${listing.listedBy._id}`} className="text-sm text-primary-600 hover:text-primary-700">By {ownerName(listing)}</Link>}
+*/
+  const specifications = itemSpecifications(listing);
+
+  return <article className="glass-card p-5 flex flex-col h-full">
+    {listing.imageDataUrl && <img src={listing.imageDataUrl} alt={listing.itemName} className="mb-4 h-44 w-full rounded-xl border border-white/10 object-cover" />}
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="tag">{readable(listing.category)}</span>
+      <span className="text-xs text-primary-200 font-semibold">{readable(listing.accessType)}</span>
     </div>
 
-    <div className="mt-4 space-y-2 text-sm text-gray-600">
+    {specifications.length > 0 && <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Specifications</p><ul className="mt-2 space-y-1 text-sm text-gray-200">{specifications.map((specification) => <li key={specification}>• {specification}</li>)}</ul></div>}
+
+    <div className="mt-4 space-y-2 text-sm text-gray-200">
       {(listing.accessType === 'borrow' || listing.accessType === 'share') && details.borrowShare && <>
         <p><span className="text-gray-500">Duration:</span> Up to {details.borrowShare.borrowDurationDays} days</p>
         <p><span className="text-gray-500">Pickup:</span> {details.borrowShare.pickupLocation}</p>
@@ -94,6 +117,22 @@ const ResourceHubPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError('');
+      void getResources(search.trim() ? { item: search.trim() } : undefined)
+        .then((result) => { if (!cancelled) setResources(result); })
+        .catch(() => { if (!cancelled) setError('Unable to load resource listings right now.'); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }, search ? 250 : 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [search]);
 
   const visibleListings = useMemo(() => {
     if (activeTab === 'free') return resources.filter(r => freeTypes.includes(r.accessType));

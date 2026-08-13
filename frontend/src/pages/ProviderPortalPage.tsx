@@ -9,7 +9,6 @@ import { enabledOpportunityTypes } from '../utils/providerCapabilities';
 
 const typeLabels: Record<OpportunityType, string> = { job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', workshop: 'Workshop', mentorship: 'Mentorship' };
 const coverageTypes: Array<{ value: CoverageType; label: string }> = [{ value: 'full', label: 'Full coverage' }, { value: 'partial', label: 'Partial coverage' }, { value: 'tuition_only', label: 'Tuition only' }, { value: 'equipment_only', label: 'Equipment only' }, { value: 'stipend', label: 'Stipend' }];
-const readable = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 const dateInput = (value?: string) => value ? new Date(value).toISOString().slice(0, 10) : '';
 const emptyForm = (type: OpportunityType): OpportunityFormData => ({ title: '', description: '', type, requiredSkills: [], location: '', workMode: 'remote', status: 'open', applicationDeadline: '', currency: 'LKR', isPaid: false, isFree: true });
 
@@ -47,6 +46,9 @@ const ProviderPortalPage = () => {
 };
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div><label className="field-label">{label}</label>{children}</div>;
+const Message = ({ color, text }: { color: 'red' | 'green'; text: string }) => <div className={`mb-5 rounded-xl border p-4 ${color === 'red' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{text}</div>;
+const TagEditor = ({ label, tags, entry, setEntry, add, remove, placeholder }: { label: string; tags: string[]; entry: string; setEntry: (value: string) => void; add: () => void; remove: (tag: string) => void; placeholder: string }) => <div><label className="field-label">{label}</label><div className="flex gap-2"><input className="feed-input" value={entry} onChange={(event) => setEntry(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} placeholder={placeholder} /><button type="button" onClick={add} className="rounded-lg bg-gray-100 px-3 text-sm font-semibold text-primary-700">Add</button></div><div className="mt-2 flex flex-wrap gap-2">{tags.map((tag) => <button key={tag} type="button" onClick={() => remove(tag)} className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">{tag} ×</button>)}</div></div>;
+const Status = ({ status }: { status: OpportunityStatus }) => <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{status}</span>;
 
 export default ProviderPortalPage;
 

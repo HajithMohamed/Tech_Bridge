@@ -1,12 +1,67 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Building, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import type { OrganizationType, RegisterData } from '../types';
+import { providerTypeConfigs, providerTypeOptions } from '../utils/providerCapabilities';
+
+const suggestedSkillsByDepartment = {
+  ICT: ['HTML', 'CSS', 'JavaScript', 'React', 'Node.js', 'Python', 'UI/UX', 'Git'],
+  ET: ['Arduino', 'Embedded systems', 'C/C++', 'IoT', 'Sensors', 'PCB design', 'PLC', 'AutoCAD'],
+  BST: ['Data analysis', 'GIS', 'Agriculture', 'Food technology', 'Biotechnology', 'Environmental monitoring', 'Excel', 'Project management'],
+  other: ['Communication', 'Problem solving', 'Teamwork', 'Digital literacy', 'Project management', 'Research'],
+} as const;
+
+const careerGoalOptions = [
+  'Software developer',
+  'Frontend developer',
+  'Backend developer',
+  'Full-stack developer',
+  'UI/UX designer',
+  'Data analyst',
+  'Cybersecurity specialist',
+  'IoT / embedded systems engineer',
+  'Network engineer',
+  'Entrepreneur',
+  'Further studies',
+] as const;
+
+const locationOptions = [
+  'Colombo',
+  'Gampaha',
+  'Kandy',
+  'Galle',
+  'Kurunegala',
+  'Matara',
+  'Jaffna',
+  'Anuradhapura',
+  'Badulla',
+  'Ratnapura',
+  'Remote / anywhere in Sri Lanka',
+] as const;
+
+const CUSTOM_VALUE = '__custom__';
+
+const toSkillArray = (value: string): string[] => {
+  const seen = new Set<string>();
+
+  return value
+    .split(',')
+    .map((skill) => skill.trim())
+    .filter((skill) => {
+      const key = skill.toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { register, isLoading, error, fieldErrors, clearError } = useAuth();
+
+  const requestedRole = searchParams.get('role') === 'provider' ? 'provider' : 'student';
 
   const [step, setStep] = useState<1 | 2>(1);
   const [showPassword, setShowPassword] = useState(false);
@@ -15,7 +70,7 @@ const RegisterPage = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student' as 'student' | 'provider',
+    role: requestedRole as 'student' | 'provider',
     studentProfile: {
       institution: 'Faculty of Technology',
       degree: 'ICT',
@@ -41,6 +96,8 @@ const RegisterPage = () => {
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [providerSubmitted, setProviderSubmitted] = useState(false);
+  const [isCustomCareerGoal, setIsCustomCareerGoal] = useState(false);
+  const [isCustomLocation, setIsCustomLocation] = useState(false);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -67,7 +124,7 @@ const RegisterPage = () => {
       if (formData.providerProfile.description.trim().length < 20) errors.description = 'Add at least 20 characters about your organization';
       if (!formData.providerProfile.opportunityCategories.length) errors.opportunityCategories = 'Select at least one offering';
       if (formData.providerProfile.opportunityCategories.includes('technical_resources') && !formData.providerProfile.resourceAccessMethods.length) errors.resourceAccessMethods = 'Select at least one resource access pathway';
-    } else if (!formData.studentProfile.skills.trim()) {
+    } else if (!toSkillArray(formData.studentProfile.skills).length) {
       errors.skills = 'Add at least one skill or interest';
     }
 
@@ -98,9 +155,9 @@ const RegisterPage = () => {
             institution: formData.studentProfile.institution,
             degree: formData.studentProfile.degree as 'ICT' | 'ET' | 'BST' | 'other',
             studyYear: formData.studentProfile.studyYear,
-            location: formData.studentProfile.location,
-            careerGoal: formData.studentProfile.careerGoal,
-            skills: formData.studentProfile.skills.split(',').map(s => s.trim()).filter(s => s),
+            location: formData.studentProfile.location.trim(),
+            careerGoal: formData.studentProfile.careerGoal.trim(),
+            skills: toSkillArray(formData.studentProfile.skills),
           }
         } : {
           providerProfile: {
@@ -163,12 +220,51 @@ const RegisterPage = () => {
     });
   };
 
+  const changeProviderType = (organizationType: OrganizationType) => {
+    setFormData((previous) => ({
+      ...previous,
+      providerProfile: { ...previous.providerProfile, organizationType, opportunityCategories: [], resourceAccessMethods: [] },
+    }));
+  };
+
   const toggleResourceAccess = (method: string) => {
     setFormData((prev) => {
       const current = prev.providerProfile.resourceAccessMethods;
       const updated = current.includes(method) ? current.filter((item) => item !== method) : [...current, method];
       return { ...prev, providerProfile: { ...prev.providerProfile, resourceAccessMethods: updated } };
     });
+  };
+
+  const toggleStudentSkill = (skill: string) => {
+    const selectedSkills = toSkillArray(formData.studentProfile.skills);
+    const alreadySelected = selectedSkills.some((selected) => selected.toLowerCase() === skill.toLowerCase());
+    const nextSkills = alreadySelected
+      ? selectedSkills.filter((selected) => selected.toLowerCase() !== skill.toLowerCase())
+      : [...selectedSkills, skill];
+
+    handleInputChange('skills', nextSkills.join(', '), 'studentProfile');
+  };
+
+  const selectCareerGoal = (value: string) => {
+    if (value === CUSTOM_VALUE) {
+      setIsCustomCareerGoal(true);
+      handleInputChange('careerGoal', '', 'studentProfile');
+      return;
+    }
+
+    setIsCustomCareerGoal(false);
+    handleInputChange('careerGoal', value, 'studentProfile');
+  };
+
+  const selectLocation = (value: string) => {
+    if (value === CUSTOM_VALUE) {
+      setIsCustomLocation(true);
+      handleInputChange('location', '', 'studentProfile');
+      return;
+    }
+
+    setIsCustomLocation(false);
+    handleInputChange('location', value, 'studentProfile');
   };
 
   const getFieldError = (field: string): string | undefined => {
@@ -264,6 +360,15 @@ const RegisterPage = () => {
                 </svg>
               </div>
               <p className="text-red-700 text-sm font-medium">{error}</p>
+            </div>
+          )}
+
+          {Object.keys(clientErrors).length > 0 && (
+            <div role="alert" className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 animate-fade-in">
+              <p className="text-sm font-semibold">Please correct the highlighted fields before creating your account.</p>
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                {Object.values(clientErrors).map((message) => <li key={message}>{message}</li>)}
+              </ul>
             </div>
           )}
 
@@ -366,7 +471,7 @@ const RegisterPage = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Programme</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department / programme</label>
                         <select value={formData.studentProfile.degree} onChange={(e) => handleInputChange('degree', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
                           <option value="ICT">ICT</option>
                           <option value="ET">Engineering Tech</option>
@@ -386,18 +491,51 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Skills or interests (comma separated)</label>
-                      <input type="text" placeholder="HTML, CSS, React..." value={formData.studentProfile.skills} onChange={(e) => handleInputChange('skills', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Skills or interests</label>
+                      <input type="text" placeholder="Type skills separated by commas, e.g. HTML, CSS, React" value={formData.studentProfile.skills} onChange={(e) => handleInputChange('skills', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      {getFieldError('skills') && <p className="mt-1 text-xs text-red-500">{getFieldError('skills')}</p>}
+
+                      <div className="mt-3 rounded-xl border border-primary-100 bg-primary-50/60 p-3">
+                        <p className="text-sm font-semibold text-primary-900">Suggested for {formData.studentProfile.degree === 'ET' ? 'Engineering Technology' : formData.studentProfile.degree === 'BST' ? 'Biosystems Technology' : formData.studentProfile.degree === 'ICT' ? 'ICT' : 'your department'}</p>
+                        <p className="mt-1 text-xs text-primary-700">Click a skill to mark or unmark it. You can still add your own skills above.</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {suggestedSkillsByDepartment[formData.studentProfile.degree as keyof typeof suggestedSkillsByDepartment].map((skill) => {
+                            const selected = toSkillArray(formData.studentProfile.skills).some((item) => item.toLowerCase() === skill.toLowerCase());
+                            return (
+                              <button
+                                key={skill}
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => toggleStudentSkill(skill)}
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${selected ? 'border-primary-600 bg-primary-600 text-white' : 'border-primary-200 bg-white text-primary-800 hover:border-primary-400 hover:bg-primary-100'}`}
+                              >
+                                {selected && <span aria-hidden="true">✓</span>}
+                                {skill}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Location <span className="font-normal text-gray-400">(optional)</span></label>
-                        <input type="text" value={formData.studentProfile.location} onChange={(e) => handleInputChange('location', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                        <select value={isCustomLocation ? CUSTOM_VALUE : formData.studentProfile.location} onChange={(e) => selectLocation(e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          <option value="">Select your preferred location</option>
+                          {locationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
+                          <option value={CUSTOM_VALUE}>Other — type my location</option>
+                        </select>
+                        {isCustomLocation && <input type="text" autoFocus placeholder="Enter your location" value={formData.studentProfile.location} onChange={(e) => handleInputChange('location', e.target.value, 'studentProfile')} className="mt-3 w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />}
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Career goal <span className="font-normal text-gray-400">(optional)</span></label>
-                        <input type="text" placeholder="Frontend developer" value={formData.studentProfile.careerGoal} onChange={(e) => handleInputChange('careerGoal', e.target.value, 'studentProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                        <select value={isCustomCareerGoal ? CUSTOM_VALUE : formData.studentProfile.careerGoal} onChange={(e) => selectCareerGoal(e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          <option value="">Select a career goal</option>
+                          {careerGoalOptions.map((goal) => <option key={goal} value={goal}>{goal}</option>)}
+                          <option value={CUSTOM_VALUE}>Other — type my own goal</option>
+                        </select>
+                        {isCustomCareerGoal && <input type="text" autoFocus placeholder="Type your career goal" value={formData.studentProfile.careerGoal} onChange={(e) => handleInputChange('careerGoal', e.target.value, 'studentProfile')} className="mt-3 w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />}
                       </div>
                     </div>
                   </>
@@ -409,12 +547,8 @@ const RegisterPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Provider type</label>
-                        <select value={formData.providerProfile.organizationType} onChange={(e) => handleInputChange('organizationType', e.target.value, 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
-                          <option value="company">Company</option>
-                          <option value="ngo">NGO</option>
-                          <option value="training_org">Training Organization</option>
-                          <option value="scholarship_org">Scholarship Organization</option>
-                          <option value="individual">Individual</option>
+                        <select value={formData.providerProfile.organizationType} onChange={(e) => changeProviderType(e.target.value as OrganizationType)} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all appearance-none cursor-pointer">
+                          {providerTypeOptions.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                         </select>
                       </div>
                       <div>
@@ -472,14 +606,9 @@ const RegisterPage = () => {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-3">What can you offer?</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {[
-                          { id: 'jobs', label: 'Jobs / freelance projects' },
-                          { id: 'internships', label: 'Internships / hiring' },
-                          { id: 'scholarships', label: 'Scholarships / financial assistance' },
-                          { id: 'training', label: 'Training / workshops' },
-                          { id: 'mentorship', label: 'Mentorship / guidance' },
-                          { id: 'technical_resources', label: 'Technical resources' },
-                        ].map(offer => (
+                        {providerTypeConfigs[formData.providerProfile.organizationType as OrganizationType].allowedOfferings.map((offerId) => {
+                          const offer = { id: offerId, label: offerId === 'jobs' ? 'Jobs / paid student projects' : offerId === 'internships' ? 'Internships / referrals' : offerId === 'scholarships' ? 'Scholarships / financial assistance' : offerId === 'training' ? 'Training / workshops / certifications' : offerId === 'mentorship' ? 'Mentorship / guidance' : 'Technical resources' };
+                          return (
                           <label key={offer.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-surface-50 cursor-pointer hover:bg-white hover:border-primary-300 transition-colors">
                             <input 
                               type="checkbox" 
@@ -489,7 +618,7 @@ const RegisterPage = () => {
                             />
                             <span className="text-sm font-medium text-gray-700">{offer.label}</span>
                           </label>
-                        ))}
+                        ); })}
                       </div>
                       {formData.providerProfile.opportunityCategories.includes('technical_resources') && <div className="mt-5 rounded-xl border border-primary-100 bg-primary-50/50 p-4"><label className="block text-sm font-semibold text-primary-800 mb-3">Technical resource access pathways</label><p className="text-xs text-primary-700 mb-3">Select the arrangements your organization can genuinely provide. TechBridge only connects students to your terms.</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{[{ id: 'rent', label: 'Rental' }, { id: 'installment', label: 'Installment payment' }, { id: 'interest_free', label: 'Interest-free payment' }, { id: 'sponsorship', label: 'Sponsorship' }, { id: 'donation', label: 'Donation' }].map((method) => <label key={method.id} className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={formData.providerProfile.resourceAccessMethods.includes(method.id)} onChange={() => toggleResourceAccess(method.id)} />{method.label}</label>)}</div>{getFieldError('resourceAccessMethods') && <p className="mt-2 text-xs text-red-500">{getFieldError('resourceAccessMethods')}</p>}</div>}
                     </div>

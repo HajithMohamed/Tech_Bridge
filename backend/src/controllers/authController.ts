@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
 import { generateToken } from '../utils/jwt';
+import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
 
 /**
  * @route   POST /api/auth/register
@@ -25,6 +26,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Only allow student and provider roles through registration
     const allowedRoles = ['student', 'provider'];
     const userRole = allowedRoles.includes(role) ? role : 'student';
+
+    if (userRole === 'provider') {
+      const organizationType = providerProfile?.organizationType;
+      const offerings = providerProfile?.opportunityCategories;
+      if (!organizationType || !Array.isArray(offerings) || offerings.some((offering: unknown) => typeof offering !== 'string' || !isProviderOfferingAllowed(organizationType, offering))) {
+        res.status(400).json({ success: false, message: 'Select only the services that are valid for your provider type.' });
+        return;
+      }
+    }
 
     // Create new user
     const user = await User.create({

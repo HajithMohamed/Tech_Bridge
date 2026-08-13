@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteOpportunity = exports.updateOpportunity = exports.getOpportunity = exports.listMyOpportunities = exports.listScholarships = exports.listOpportunities = exports.createOpportunity = void 0;
 const Opportunity_1 = __importDefault(require("../models/Opportunity"));
 const Application_1 = __importDefault(require("../models/Application"));
+const providerCapabilities_1 = require("../utils/providerCapabilities");
 const opportunityTypes = [
     'job',
     'internship',
@@ -65,7 +66,7 @@ const canOfferType = (req, type) => {
     const selectedOffers = profile?.opportunityCategories || [];
     if (!selectedOffers.includes(typeOffer[type]))
         return false;
-    return type !== 'scholarship' || profile?.organizationType === 'scholarship_org' || profile?.organizationType === 'ngo';
+    return Boolean(profile && (0, providerCapabilities_1.isProviderOfferingAllowed)(profile.organizationType, typeOffer[type]));
 };
 const hasValidDeadline = (deadline) => {
     const parsed = new Date(String(deadline));
