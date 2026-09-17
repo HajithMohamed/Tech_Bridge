@@ -15,6 +15,11 @@ const providerRoutes_1 = __importDefault(require("./routes/providerRoutes"));
 const publicProviderRoutes_1 = __importDefault(require("./routes/publicProviderRoutes"));
 const resourceRequestRoutes_1 = __importDefault(require("./routes/resourceRequestRoutes"));
 const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
+const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
+const reportRoutes_1 = __importDefault(require("./routes/reportRoutes"));
+const messageRoutes_1 = __importDefault(require("./routes/messageRoutes"));
+const creatorRoutes_1 = __importDefault(require("./routes/creatorRoutes"));
+const promotionRequestRoutes_1 = __importDefault(require("./routes/promotionRequestRoutes"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -35,6 +40,11 @@ app.use('/api/provider', providerRoutes_1.default);
 app.use('/api/providers', publicProviderRoutes_1.default);
 app.use('/api/resource-requests', resourceRequestRoutes_1.default);
 app.use('/api/dashboard', dashboardRoutes_1.default);
+app.use('/api/admin', adminRoutes_1.default);
+app.use('/api/reports', reportRoutes_1.default);
+app.use('/api/messages', messageRoutes_1.default);
+app.use('/api/creators', creatorRoutes_1.default);
+app.use('/api/promotion-requests', promotionRequestRoutes_1.default);
 // Health check
 app.get('/api/health', (_req, res) => {
     res.json({

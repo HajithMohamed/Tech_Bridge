@@ -21,6 +21,12 @@ import PublicProviderProfilePage from './pages/PublicProviderProfilePage';
 import ImpactDashboardPage from './pages/ImpactDashboardPage';
 import StudentProfilePage from './pages/StudentProfilePage';
 import ProviderResourceRequestsPage from './pages/ProviderResourceRequestsPage';
+import MessagesPage from './pages/MessagesPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import CreatorProfilePage from './pages/CreatorProfilePage';
+import CreatorDirectoryPage from './pages/CreatorDirectoryPage';
+import MyPromotionRequestsPage from './pages/MyPromotionRequestsPage';
+import ProviderPromotionRequestsPage from './pages/ProviderPromotionRequestsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import PortalLayout from './components/PortalLayout';
 
@@ -49,6 +55,12 @@ const App = () => (
       <Route path="/my-resource-requests" element={<ProtectedRoute allowedRoles={['student']}><MyResourceRequestsPage /></ProtectedRoute>} />
       <Route path="/my-activity" element={<ProtectedRoute allowedRoles={['student']}><MyActivityPage /></ProtectedRoute>} />
       <Route path="/student-profile" element={<ProtectedRoute allowedRoles={['student']}><StudentProfilePage /></ProtectedRoute>} />
+      <Route path="/creator-profile" element={<ProtectedRoute allowedRoles={['student']}><CreatorProfilePage /></ProtectedRoute>} />
+      <Route path="/my-promotion-requests" element={<ProtectedRoute allowedRoles={['student']}><MyPromotionRequestsPage /></ProtectedRoute>} />
+      <Route path="/creators" element={<ProtectedRoute allowedRoles={['provider']}><CreatorDirectoryPage /></ProtectedRoute>} />
+      <Route path="/provider/promotion-requests" element={<ProtectedRoute allowedRoles={['provider']}><ProviderPromotionRequestsPage /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboardPage /></ProtectedRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

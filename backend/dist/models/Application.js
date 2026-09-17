@@ -46,6 +46,8 @@ const applicationSchema = new mongoose_1.Schema({
     },
     appliedAt: { type: Date, default: Date.now, immutable: true, index: true },
     message: { type: String, trim: true, maxlength: 1000 },
+    justification: { type: String, required: true, trim: true, minlength: 30, maxlength: 800 },
+    selfDeclaredNeed: { type: String, required: true, enum: ['low', 'medium', 'high'] },
 }, { timestamps: { createdAt: false, updatedAt: true } });
 // A student may apply to each opportunity once only.
 applicationSchema.index({ studentId: 1, opportunityId: 1 }, { unique: true });

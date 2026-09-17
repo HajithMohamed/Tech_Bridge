@@ -7,10 +7,10 @@ import type { Opportunity, MatchedOpportunity, OpportunityType, WorkMode } from 
 import { Search, Filter, Briefcase, GraduationCap, BookOpen, Code, Wrench, Lightbulb, Target, ArrowRight, Sparkles } from 'lucide-react';
 
 const typeLabels: Record<OpportunityType, string> = {
-  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance', workshop: 'Workshop', mentorship: 'Mentorship',
+  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance', promotion: 'Creator promotion', workshop: 'Workshop', mentorship: 'Mentorship',
 };
 const typeIcons: Record<OpportunityType, typeof Briefcase> = {
-  job: Briefcase, internship: GraduationCap, scholarship: BookOpen, course: Lightbulb, freelance: Code, workshop: Wrench, mentorship: Target,
+  job: Briefcase, internship: GraduationCap, scholarship: BookOpen, course: Lightbulb, freelance: Code, promotion: Sparkles, workshop: Wrench, mentorship: Target,
 };
 const coverageLabels: Record<string, string> = {
   full: 'Full coverage', partial: 'Partial coverage', tuition_only: 'Tuition only', equipment_only: 'Equipment only', stipend: 'Stipend',
@@ -85,7 +85,7 @@ const OpportunityFeedPage = () => {
           let results = await getOpportunities(filters);
           
           if (!typeQuery) {
-            if (activeTab === 'earn') results = results.filter(o => ['job', 'freelance'].includes(o.type));
+            if (activeTab === 'earn') results = results.filter(o => ['job', 'freelance', 'promotion'].includes(o.type));
             if (activeTab === 'learn') results = results.filter(o => ['course', 'workshop', 'mentorship'].includes(o.type));
             if (activeTab === 'experience') results = results.filter(o => o.type === 'internship');
           }
@@ -125,7 +125,7 @@ const OpportunityFeedPage = () => {
             All opportunities
           </button>
           <button onClick={() => switchTab('earn')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'earn' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-            EARN <span className="text-xs font-normal opacity-70 ml-1">(Jobs)</span>
+            EARN <span className="text-xs font-normal opacity-70 ml-1">(Jobs, gigs & promotions)</span>
           </button>
           <button onClick={() => switchTab('experience')} className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${activeTab === 'experience' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
             EXPERIENCE <span className="text-xs font-normal opacity-70 ml-1">(Internships)</span>
@@ -321,4 +321,3 @@ const OpportunityFeedPage = () => {
 };
 
 export default OpportunityFeedPage;
-

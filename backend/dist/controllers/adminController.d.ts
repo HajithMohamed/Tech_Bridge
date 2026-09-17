@@ -1,0 +1,12 @@
+import { Request, Response } from 'express';
+export declare const listProvidersForVerification: (req: Request, res: Response) => Promise<void>;
+export declare const verifyProvider: (req: Request, res: Response) => Promise<void>;
+export declare const rejectProvider: (req: Request, res: Response) => Promise<void>;
+export declare const listUsers: (req: Request, res: Response) => Promise<void>;
+export declare const suspendUser: (req: Request, res: Response) => Promise<void>;
+export declare const reinstateUser: (req: Request, res: Response) => Promise<void>;
+export declare const listReports: (req: Request, res: Response) => Promise<void>;
+export declare const resolveReport: (req: Request, res: Response) => Promise<void>;
+export declare const removeOpportunity: (req: Request, res: Response) => Promise<void>;
+export declare const removeResource: (req: Request, res: Response) => Promise<void>;
+export declare const listAuditLog: (req: Request, res: Response) => Promise<void>;

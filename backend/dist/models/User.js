@@ -65,6 +65,7 @@ const userSchema = new mongoose_1.Schema({
         enum: ['student', 'provider', 'admin'],
         default: 'student',
     },
+    accountStatus: { type: String, enum: ['active', 'suspended'], default: 'active', index: true },
     studentProfile: {
         institution: { type: String, trim: true },
         degree: { type: String, enum: ['ICT', 'ET', 'BST', 'other'] },
@@ -74,9 +75,19 @@ const userSchema = new mongoose_1.Schema({
         careerGoal: { type: String, trim: true, maxlength: 150 },
         availabilityHours: { type: Number, min: 0, max: 168 },
         preferredWorkType: { type: String, enum: ['remote', 'on-site', 'hybrid', 'flexible'] },
-        learningGoals: [{ type: String, trim: true, maxlength: 100 }],
-        certifications: [{ type: String, trim: true, maxlength: 160 }],
-        portfolioUrl: { type: String, trim: true, maxlength: 500 },
+        creatorProfile: {
+            isDiscoverable: { type: Boolean, default: false },
+            platforms: [{
+                    platform: { type: String, enum: ['instagram', 'tiktok', 'youtube', 'facebook', 'other'] },
+                    handle: { type: String, trim: true, maxlength: 100 },
+                    profileUrl: { type: String, trim: true, maxlength: 500 },
+                    followerCount: { type: Number, min: 0, max: 1000000000 },
+                }],
+            niches: [{ type: String, trim: true, maxlength: 80 }],
+            contentTypes: [{ type: String, trim: true, maxlength: 80 }],
+            compensationPreference: [{ type: String, enum: ['paid', 'product_exchange', 'experience', 'affiliate'] }],
+            sampleWorkLinks: [{ type: String, trim: true, maxlength: 500 }],
+        },
     },
     providerProfile: {
         organizationName: { type: String, trim: true, maxlength: 150 },
@@ -85,7 +96,8 @@ const userSchema = new mongoose_1.Schema({
             enum: ['company', 'training_org', 'scholarship_org', 'resource_provider', 'local_business', 'alumni', 'faculty', 'ngo', 'individual'],
         },
         verified: { type: Boolean, default: false },
-        verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED'], default: 'PENDING' },
+        verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING' },
+        rejectionReason: { type: String, trim: true, maxlength: 1000 },
         contactEmail: {
             type: String,
             trim: true,

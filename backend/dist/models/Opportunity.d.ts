@@ -1,5 +1,5 @@
 import mongoose, { Document } from 'mongoose';
-export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'workshop' | 'mentorship';
+export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'promotion' | 'workshop' | 'mentorship';
 export interface IOpportunity extends Document {
     _id: mongoose.Types.ObjectId;
     title: string;

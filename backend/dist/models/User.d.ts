@@ -1,11 +1,28 @@
 import mongoose, { Document } from 'mongoose';
 export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'resource_provider' | 'local_business' | 'alumni' | 'faculty' | 'ngo' | 'individual';
+export type CreatorPlatform = 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'other';
+export type CreatorCompensationPreference = 'paid' | 'product_exchange' | 'experience' | 'affiliate';
+export interface ICreatorPlatformProfile {
+    platform: CreatorPlatform;
+    handle: string;
+    profileUrl: string;
+    followerCount?: number;
+}
+export interface ICreatorProfile {
+    isDiscoverable: boolean;
+    platforms: ICreatorPlatformProfile[];
+    niches: string[];
+    contentTypes: string[];
+    compensationPreference: CreatorCompensationPreference[];
+    sampleWorkLinks?: string[];
+}
 export interface IUser extends Document {
     _id: mongoose.Types.ObjectId;
     fullName: string;
     email: string;
     password: string;
     role: 'student' | 'provider' | 'admin';
+    accountStatus: 'active' | 'suspended';
     studentProfile?: {
         institution: string;
         degree: 'ICT' | 'ET' | 'BST' | 'other';
@@ -15,15 +32,14 @@ export interface IUser extends Document {
         careerGoal?: string;
         availabilityHours?: number;
         preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
-        learningGoals?: string[];
-        certifications?: string[];
-        portfolioUrl?: string;
+        creatorProfile?: ICreatorProfile;
     };
     providerProfile?: {
         organizationName: string;
         organizationType: OrganizationType;
         verified: boolean;
-        verificationStatus: 'PENDING' | 'VERIFIED';
+        verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+        rejectionReason?: string;
         contactEmail: string;
         contactPerson: string;
         phone: string;

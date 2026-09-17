@@ -6,13 +6,53 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateResourceRequestStatus = exports.listReceivedResourceRequests = exports.listProviderResourceRequests = exports.listMyResourceRequests = exports.createResourceRequest = void 0;
 const ResourceRequest_1 = __importDefault(require("../models/ResourceRequest"));
 const Resource_1 = __importDefault(require("../models/Resource"));
+const User_1 = __importDefault(require("../models/User"));
+const priorityEngine_1 = require("../utils/priorityEngine");
 const studentSelect = 'fullName email studentProfile.institution studentProfile.degree studentProfile.studyYear studentProfile.skills studentProfile.careerGoal';
 const resourceSelect = 'itemName category condition accessType quantityAvailable status';
 const providerSelect = 'fullName email providerProfile.organizationName providerProfile.organizationType providerProfile.verified providerProfile.contactEmail providerProfile.phone';
+const idString = (value) => {
+    if (value && typeof value === 'object' && '_id' in value)
+        return String(value._id);
+    return String(value);
+};
+const enrichRequests = async (requests) => {
+    if (!requests.length)
+        return [];
+    const studentIds = requests.map((request) => idString(request.studentId));
+    const resourceIds = requests.map((request) => idString(request.resourceId));
+    const [students, resources, existingBenefits] = await Promise.all([
+        User_1.default.find({ _id: { $in: studentIds } }),
+        Resource_1.default.find({ _id: { $in: resourceIds } }),
+        ResourceRequest_1.default.aggregate([
+            { $match: { status: 'accepted', studentId: { $in: studentIds } } },
+            { $group: { _id: { studentId: '$studentId', resourceCategory: '$resourceCategory' }, count: { $sum: 1 } } },
+        ]),
+    ]);
+    const studentMap = new Map(students.map((student) => [student._id.toString(), student]));
+    const resourceMap = new Map(resources.map((resource) => [resource._id.toString(), resource]));
+    const benefitMap = new Map(existingBenefits.map((item) => [`${item._id.studentId.toString()}:${item._id.resourceCategory}`, item.count]));
+    const byResource = new Map();
+    requests.forEach((request) => {
+        const key = idString(request.resourceId);
+        byResource.set(key, [...(byResource.get(key) || []), request]);
+    });
+    const enriched = [...byResource.values()].flatMap((group) => {
+        const dates = group.map((request) => request.createdAt.getTime());
+        const firstAt = new Date(Math.min(...dates));
+        const lastAt = new Date(Math.max(...dates));
+        const acceptedCount = group.filter((request) => request.status === 'accepted').length;
+        return group.map((request) => ({
+            ...request.toObject(),
+            ...(0, priorityEngine_1.resourceRequestPriority)(request, resourceMap.get(idString(request.resourceId)), studentMap.get(idString(request.studentId)), benefitMap.get(`${idString(request.studentId)}:${request.resourceCategory}`) || 0, firstAt, lastAt, acceptedCount),
+        }));
+    });
+    return enriched.sort((a, b) => b.priorityScore - a.priorityScore || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+};
 /** POST /api/resource-requests */
 const createResourceRequest = async (req, res) => {
     try {
-        const { resourceId, requestedAccessType, durationOrTerms, message } = req.body;
+        const { resourceId, requestedAccessType, durationOrTerms, message, justification, selfDeclaredNeed } = req.body;
         const resource = await Resource_1.default.findOne({ _id: resourceId, status: 'available' });
         if (!resource) {
             res.status(404).json({ success: false, message: 'Resource not found or no longer available.' });
@@ -28,11 +68,19 @@ const createResourceRequest = async (req, res) => {
         }
         const existing = await ResourceRequest_1.default.findOne({
             studentId: req.user._id,
-            resourceId: resource._id,
-            status: { $in: ['pending', 'accepted', 'completed'] },
+            resourceCategory: resource.category,
+            status: { $in: ['pending', 'accepted'] },
         });
         if (existing) {
-            res.status(409).json({ success: false, message: 'You already have an active or completed request for this resource.' });
+            res.status(409).json({ success: false, message: `You already have an active request or accepted ${resource.category.replace('_', ' ')} resource.` });
+            return;
+        }
+        if (typeof justification !== 'string' || justification.trim().length < 30 || justification.trim().length > 800) {
+            res.status(400).json({ success: false, message: 'Please provide a justification between 30 and 800 characters.' });
+            return;
+        }
+        if (!['low', 'medium', 'high'].includes(selfDeclaredNeed)) {
+            res.status(400).json({ success: false, message: 'Select your declared need level.' });
             return;
         }
         if (typeof message === 'string' && message.trim().length > 1000) {
@@ -48,8 +96,11 @@ const createResourceRequest = async (req, res) => {
             providerId: resource.listedBy,
             resourceId: resource._id,
             requestedAccessType,
+            resourceCategory: resource.category,
             durationOrTerms: typeof durationOrTerms === 'string' ? durationOrTerms.trim() : undefined,
             message: typeof message === 'string' ? message.trim() : undefined,
+            justification: justification.trim(),
+            selfDeclaredNeed,
         });
         await request.populate('resourceId', resourceSelect);
         res.status(201).json({
@@ -85,8 +136,9 @@ const listProviderResourceRequests = async (req, res) => {
         const requests = await ResourceRequest_1.default.find({ providerId: req.user._id })
             .populate('studentId', studentSelect)
             .populate('resourceId', resourceSelect)
-            .sort({ createdAt: -1 });
-        res.status(200).json({ success: true, data: { requests } });
+            .sort({ createdAt: 1 });
+        const enriched = await enrichRequests(requests);
+        res.status(200).json({ success: true, data: { requests: enriched } });
     }
     catch (error) {
         console.error('List provider resource requests error:', error);
@@ -128,6 +180,16 @@ const updateResourceRequestStatus = async (req, res) => {
                 return;
             }
             if (status === 'accepted') {
+                const activeSameCategory = await ResourceRequest_1.default.findOne({
+                    studentId: request.studentId,
+                    resourceCategory: request.resourceCategory,
+                    status: 'accepted',
+                    _id: { $ne: request._id },
+                });
+                if (activeSameCategory) {
+                    res.status(409).json({ success: false, message: 'This student already holds an accepted resource in this category.' });
+                    return;
+                }
                 const resource = await Resource_1.default.findOneAndUpdate({ _id: request.resourceId, status: 'available', quantityAvailable: { $gt: 0 } }, { $inc: { quantityAvailable: -1 } }, { new: true });
                 if (!resource) {
                     res.status(409).json({ success: false, message: 'This resource is no longer available to reserve.' });

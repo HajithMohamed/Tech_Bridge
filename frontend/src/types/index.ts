@@ -3,6 +3,7 @@ export interface User {
   fullName: string;
   email: string;
   role: 'student' | 'provider' | 'admin';
+  accountStatus?: 'active' | 'suspended';
   studentProfile?: StudentProfile;
   providerProfile?: ProviderProfile;
   providerVerificationStatus?: 'pending' | 'verified' | 'rejected';
@@ -44,9 +45,26 @@ export interface StudentProfile {
   careerGoal?: string;
   availabilityHours?: number;
   preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
-  learningGoals?: string[];
-  certifications?: string[];
-  portfolioUrl?: string;
+  creatorProfile?: CreatorProfile;
+}
+
+export type CreatorPlatform = 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'other';
+export type CreatorCompensationPreference = 'paid' | 'product_exchange' | 'experience' | 'affiliate';
+
+export interface CreatorPlatformProfile {
+  platform: CreatorPlatform;
+  handle: string;
+  profileUrl: string;
+  followerCount?: number;
+}
+
+export interface CreatorProfile {
+  isDiscoverable: boolean;
+  platforms: CreatorPlatformProfile[];
+  niches: string[];
+  contentTypes: string[];
+  compensationPreference: CreatorCompensationPreference[];
+  sampleWorkLinks?: string[];
 }
 
 export type OrganizationType = 'company' | 'training_org' | 'scholarship_org' | 'resource_provider' | 'local_business' | 'alumni' | 'faculty' | 'ngo' | 'individual';
@@ -55,7 +73,8 @@ export interface ProviderProfile {
   organizationName: string;
   organizationType: OrganizationType;
   verified?: boolean;
-  verificationStatus?: 'PENDING' | 'VERIFIED';
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  rejectionReason?: string;
   contactEmail: string;
   contactPerson: string;
   phone: string;
@@ -68,7 +87,7 @@ export interface ProviderProfile {
   resourceAccessMethods?: string[];
 }
 
-export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'workshop' | 'mentorship';
+export type OpportunityType = 'job' | 'internship' | 'scholarship' | 'course' | 'freelance' | 'promotion' | 'workshop' | 'mentorship';
 export type WorkMode = 'remote' | 'on-site' | 'hybrid';
 export type OpportunityStatus = 'draft' | 'open' | 'closed' | 'expired';
 export type CoverageType = 'full' | 'partial' | 'tuition_only' | 'equipment_only' | 'stipend';
@@ -251,6 +270,11 @@ export interface OpportunityApplication {
   opportunityId: string | ApplicationOpportunity;
   studentId: string | ApplicationApplicant;
   message?: string;
+  justification: string;
+  selfDeclaredNeed: 'low' | 'medium' | 'high';
+  priorityScore?: number;
+  priorityReasons?: string[];
+  isWaitlisted?: boolean;
   status: ApplicationStatus;
   appliedAt: string;
   updatedAt: string;
@@ -352,9 +376,37 @@ export interface ResourceRequest {
   providerId: string | User;
   resourceId: string | ResourceListing;
   requestedAccessType: ResourceAccessType;
+  resourceCategory?: ResourceCategory;
   durationOrTerms?: string;
   message?: string;
+  justification: string;
+  selfDeclaredNeed: 'low' | 'medium' | 'high';
+  priorityScore?: number;
+  priorityReasons?: string[];
+  isWaitlisted?: boolean;
   status: ResourceRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatorDirectoryStudent {
+  _id: string;
+  fullName: string;
+  studentProfile?: Pick<StudentProfile, 'institution' | 'degree' | 'studyYear' | 'location' | 'creatorProfile'>;
+}
+
+export type PromotionRequestStatus = 'pending' | 'accepted' | 'declined' | 'completed';
+
+export interface PromotionRequest {
+  _id: string;
+  studentId: string | CreatorDirectoryStudent;
+  providerId: string | Pick<User, '_id' | 'fullName' | 'providerProfile'>;
+  campaignBrief: string;
+  deliverables: string;
+  compensationType: CreatorCompensationPreference;
+  compensationDetails?: string;
+  deadline?: string;
+  status: PromotionRequestStatus;
   createdAt: string;
   updatedAt: string;
 }

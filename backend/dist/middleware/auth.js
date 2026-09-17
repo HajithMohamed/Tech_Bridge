@@ -35,6 +35,13 @@ const protect = async (req, res, next) => {
             });
             return;
         }
+        if (user.accountStatus === 'suspended') {
+            res.status(403).json({
+                success: false,
+                message: 'This account has been suspended. Contact TechBridge support if you believe this is a mistake.',
+            });
+            return;
+        }
         req.user = user;
         next();
     }

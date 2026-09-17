@@ -1,5 +1,5 @@
 import mongoose, { Document } from 'mongoose';
-import { ResourceAccessType } from './Resource';
+import { ResourceAccessType, ResourceCategory } from './Resource';
 export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
 export interface IResourceRequest extends Document {
     _id: mongoose.Types.ObjectId;
@@ -7,8 +7,11 @@ export interface IResourceRequest extends Document {
     providerId: mongoose.Types.ObjectId;
     resourceId: mongoose.Types.ObjectId;
     requestedAccessType: ResourceAccessType;
+    resourceCategory: ResourceCategory;
     durationOrTerms?: string;
     message?: string;
+    justification: string;
+    selfDeclaredNeed: 'low' | 'medium' | 'high';
     status: ResourceRequestStatus;
     createdAt: Date;
     updatedAt: Date;

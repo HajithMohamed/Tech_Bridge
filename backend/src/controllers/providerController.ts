@@ -40,7 +40,7 @@ export const getProviderDashboard = async (req: Request, res: Response): Promise
     const availableResources = await Resource.countDocuments({ listedBy: providerId, status: 'available' });
     const activeListings = opportunities.filter((opportunity) => opportunity.status === 'open').length + availableResources;
     const scholarships = opportunities.filter((opportunity) => opportunity.type === 'scholarship').length;
-    const paidProjects = opportunities.filter((opportunity) => opportunity.type === 'job' || opportunity.type === 'freelance').length;
+    const paidProjects = opportunities.filter((opportunity) => opportunity.type === 'job' || opportunity.type === 'freelance' || opportunity.type === 'promotion').length;
     const internships = opportunities.filter((opportunity) => opportunity.type === 'internship').length;
     const trainingPrograms = opportunities.filter((opportunity) => opportunity.type === 'course' || opportunity.type === 'workshop').length;
     const mentorshipListings = opportunities.filter((opportunity) => opportunity.type === 'mentorship').length;

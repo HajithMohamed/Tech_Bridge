@@ -35,6 +35,10 @@ const register = async (req, res) => {
                 return;
             }
         }
+        // Creator discovery is always an explicit, post-registration opt-in.
+        const safeStudentProfile = userRole === 'student' && studentProfile && typeof studentProfile === 'object'
+            ? Object.fromEntries(Object.entries(studentProfile).filter(([key]) => key !== 'creatorProfile'))
+            : studentProfile;
         // Create new user
         const user = await User_1.default.create({
             fullName,
@@ -42,7 +46,7 @@ const register = async (req, res) => {
             password,
             role: userRole,
             ...(userRole === 'student'
-                ? { studentProfile }
+                ? { studentProfile: safeStudentProfile }
                 : {
                     providerProfile: {
                         ...providerProfile,
@@ -65,6 +69,7 @@ const register = async (req, res) => {
                     fullName: user.fullName,
                     email: user.email,
                     role: user.role,
+                    accountStatus: user.accountStatus,
                     studentProfile: user.studentProfile,
                     providerProfile: user.providerProfile,
                     createdAt: user.createdAt,
@@ -108,6 +113,14 @@ const login = async (req, res) => {
             });
             return;
         }
+        if (user.accountStatus === 'suspended') {
+            res.status(403).json({ success: false, message: 'This account has been suspended. Contact TechBridge support if you believe this is a mistake.' });
+            return;
+        }
+        if (user.role === 'provider' && user.providerProfile?.verificationStatus === 'REJECTED') {
+            res.status(403).json({ success: false, message: user.providerProfile.rejectionReason || 'This provider account was not approved. Contact TechBridge support for details.' });
+            return;
+        }
         if (user.role === 'provider' && (user.providerProfile?.verified !== true ||
             user.providerProfile.verificationStatus !== 'VERIFIED')) {
             res.status(403).json({
@@ -127,6 +140,7 @@ const login = async (req, res) => {
                     fullName: user.fullName,
                     email: user.email,
                     role: user.role,
+                    accountStatus: user.accountStatus,
                     studentProfile: user.studentProfile,
                     providerProfile: user.providerProfile,
                     createdAt: user.createdAt,
@@ -167,6 +181,7 @@ const getMe = async (req, res) => {
                     fullName: user.fullName,
                     email: user.email,
                     role: user.role,
+                    accountStatus: user.accountStatus,
                     studentProfile: user.studentProfile,
                     providerProfile: user.providerProfile,
                     createdAt: user.createdAt,
@@ -200,10 +215,7 @@ const updateStudentProfile = async (req, res) => {
         const institution = text(profile.institution, 150);
         const location = text(profile.location, 100);
         const careerGoal = text(profile.careerGoal, 150);
-        const portfolioUrl = text(profile.portfolioUrl, 500);
         const skills = tags(profile.skills, 25, 50);
-        const learningGoals = tags(profile.learningGoals, 12, 100);
-        const certifications = tags(profile.certifications, 12, 160);
         if (!institution) {
             res.status(400).json({ success: false, message: 'Institution is required.' });
             return;
@@ -228,10 +240,6 @@ const updateStudentProfile = async (req, res) => {
             res.status(400).json({ success: false, message: 'Select a valid work preference.' });
             return;
         }
-        if (portfolioUrl && !/^https?:\/\//i.test(portfolioUrl)) {
-            res.status(400).json({ success: false, message: 'Portfolio URL must start with http:// or https://.' });
-            return;
-        }
         student.studentProfile = {
             institution,
             degree: profile.degree,
@@ -241,9 +249,7 @@ const updateStudentProfile = async (req, res) => {
             ...(careerGoal ? { careerGoal } : {}),
             ...(typeof profile.availabilityHours === 'number' ? { availabilityHours: profile.availabilityHours } : {}),
             ...(profile.preferredWorkType ? { preferredWorkType: profile.preferredWorkType } : {}),
-            ...(learningGoals ? { learningGoals } : {}),
-            ...(certifications ? { certifications } : {}),
-            ...(portfolioUrl ? { portfolioUrl } : {}),
+            ...(student.studentProfile.creatorProfile ? { creatorProfile: student.studentProfile.creatorProfile } : {}),
         };
         await student.save();
         res.status(200).json({ success: true, message: 'Student profile updated.', data: { user: student } });

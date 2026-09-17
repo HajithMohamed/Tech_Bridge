@@ -43,8 +43,11 @@ const resourceRequestSchema = new mongoose_1.Schema({
         required: true,
         enum: ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'],
     },
+    resourceCategory: { type: String, required: true, enum: ['laptop', 'arduino', 'raspberry_pi', 'sensor', 'electronic_component', 'dev_board', 'other'], index: true },
     durationOrTerms: { type: String, trim: true, maxlength: 200 },
     message: { type: String, trim: true, maxlength: 1000 },
+    justification: { type: String, required: true, trim: true, minlength: 30, maxlength: 800 },
+    selfDeclaredNeed: { type: String, required: true, enum: ['low', 'medium', 'high'] },
     status: {
         type: String,
         enum: ['pending', 'accepted', 'rejected', 'completed'],

@@ -13,6 +13,7 @@ const opportunityTypes = [
     'scholarship',
     'course',
     'freelance',
+    'promotion',
     'workshop',
     'mentorship',
 ];
@@ -55,6 +56,7 @@ const providerSelect = 'fullName email providerProfile.organizationName provider
 const typeOffer = {
     job: 'jobs',
     freelance: 'jobs',
+    promotion: 'jobs',
     internship: 'internships',
     scholarship: 'scholarships',
     course: 'training',
@@ -106,7 +108,7 @@ const validateOpportunity = (values) => {
         if (typeof values.renewable !== 'boolean')
             return 'Scholarships must state whether the award is renewable.';
     }
-    if (values.type === 'job' || values.type === 'freelance') {
+    if (values.type === 'job' || values.type === 'freelance' || values.type === 'promotion') {
         if (typeof values.paymentInfo !== 'string' || !values.paymentInfo.trim())
             return 'Add payment, budget, or salary information.';
     }

@@ -5,6 +5,7 @@ import axios from 'axios';
 import { getOpportunity } from '../api/opportunityApi';
 import { applyToOpportunity, getMyApplications } from '../api/applicationApi';
 import { useAuth } from '../hooks/useAuth';
+import { createReport } from '../api/reportApi';
 import type { Opportunity, SkillResource } from '../types';
 import { ArrowLeft, CheckCircle, XCircle, ExternalLink, Target, BookOpen, Send } from 'lucide-react';
 
@@ -12,7 +13,7 @@ const coverageLabels: Record<string, string> = {
   full: 'Full coverage', partial: 'Partial coverage', tuition_only: 'Tuition only', equipment_only: 'Equipment only', stipend: 'Stipend',
 };
 const typeLabels: Record<string, string> = {
-  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', workshop: 'Workshop', mentorship: 'Mentorship',
+  job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', promotion: 'Creator promotion', workshop: 'Workshop', mentorship: 'Mentorship',
 };
 
 const providerName = (opportunity: Opportunity) =>
@@ -77,6 +78,8 @@ const OpportunityDetailPage = () => {
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [justification, setJustification] = useState('');
+  const [selfDeclaredNeed, setSelfDeclaredNeed] = useState<'low' | 'medium' | 'high'>('medium');
   const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
@@ -136,18 +139,28 @@ const OpportunityDetailPage = () => {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!id) return;
+    if (justification.trim().length < 30) { setError('Please explain why you are applying in at least 30 characters.'); return; }
     setSubmitting(true);
     setError('');
     try {
-      await applyToOpportunity(id, message);
+      await applyToOpportunity(id, message, justification, selfDeclaredNeed);
       setNotice('Application submitted. The provider can now review it in their portal.');
       setHasApplied(true);
       setMessage('');
+      setJustification('');
     } catch (requestError) {
       setError(axios.isAxiosError(requestError) ? requestError.response?.data?.message || 'Unable to submit application.' : 'Unable to submit application.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const reportListing = async () => {
+    if (!id) return;
+    const reason = window.prompt('Why should this opportunity be reviewed?');
+    if (!reason) return;
+    try { await createReport('opportunity', id, reason); setNotice('Report submitted for admin review.'); }
+    catch { setError('Unable to submit report.'); }
   };
 
   return (
@@ -172,6 +185,7 @@ const OpportunityDetailPage = () => {
           {/* Title */}
           <h1 className="text-3xl font-bold text-emerald-600 mt-5">{opportunity.title}</h1>
           <p className="text-primary-600 mt-2">Provided by {providerName(opportunity)}</p>
+          {isStudent && <button type="button" onClick={() => void reportListing()} className="mt-3 text-xs font-semibold text-red-600 hover:underline">Report this listing</button>}
 
           {/* ── STUDENT SKILL MATCH SECTION ──────────────────── */}
           {isStudent && opportunity.requiredSkills.length > 0 && (
@@ -298,7 +312,7 @@ const OpportunityDetailPage = () => {
                 </div>
               )}
               
-              {(opportunity.type === 'job' || opportunity.type === 'freelance') && opportunity.paymentInfo && (
+              {(opportunity.type === 'job' || opportunity.type === 'freelance' || opportunity.type === 'promotion') && opportunity.paymentInfo && (
                 <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
                   <p className="text-sm text-gray-500 font-semibold mb-1">Payment Information</p>
                   <p className="text-gray-900">{opportunity.paymentInfo}</p>
@@ -325,6 +339,21 @@ const OpportunityDetailPage = () => {
           {/* Application Form */}
           {isStudent && (
             <form onSubmit={submit} className="mt-8 pt-6 border-t border-gray-200">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Why are you applying for this? <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                required minLength={30} maxLength={800}
+                className="w-full px-4 py-3 rounded-xl bg-surface-50 border border-gray-200 text-sm text-gray-700 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 min-h-28 resize-y"
+                value={justification}
+                onChange={(event) => setJustification(event.target.value)}
+                placeholder="Share how this opportunity supports your studies or career goals (30–800 characters)."
+              />
+              <fieldset className="mt-4">
+                <legend className="text-sm font-semibold text-gray-700 mb-2">Your current need <span className="text-red-500">*</span></legend>
+                <p className="text-xs text-gray-500 mb-2">Self-declared only — no income documents or proof required.</p>
+                <div className="flex flex-wrap gap-2">{(['low', 'medium', 'high'] as const).map((need) => <button key={need} type="button" onClick={() => setSelfDeclaredNeed(need)} className={`rounded-lg px-3 py-2 text-sm font-semibold capitalize ${selfDeclaredNeed === need ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-primary-50'}`}>{need}</button>)}</div>
+              </fieldset>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Message to provider <span className="text-gray-400 font-normal">(optional)</span>
               </label>
@@ -368,7 +397,7 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
 const ServiceDetails = ({ opportunity }: { opportunity: Opportunity }) => {
   const formatDate = (date?: string) => date ? new Date(date).toLocaleDateString('en-LK', { dateStyle: 'medium' }) : '';
   const fee = opportunity.fee !== undefined ? new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(opportunity.fee) : '';
-  if (opportunity.type === 'job' || opportunity.type === 'freelance') return opportunity.paymentInfo ? <Details title="Compensation" entries={[['Payment information', opportunity.paymentInfo]]} /> : null;
+  if (opportunity.type === 'job' || opportunity.type === 'freelance' || opportunity.type === 'promotion') return opportunity.paymentInfo ? <Details title="Compensation" entries={[['Payment information', opportunity.paymentInfo]]} /> : null;
   if (opportunity.type === 'internship') return <Details title="Internship details" entries={[["Duration", opportunity.duration], ["Start date", formatDate(opportunity.startDate)], ["Paid", opportunity.isPaid === undefined ? undefined : opportunity.isPaid ? 'Yes' : 'No'], ["Preferred background", opportunity.preferredAcademicBackground]]} />;
   if (opportunity.type === 'course' || opportunity.type === 'workshop') return <Details title={`${typeLabels[opportunity.type]} details`} entries={[["Duration", opportunity.duration], ["Start date", formatDate(opportunity.startDate)], ["End date", formatDate(opportunity.endDate)], ["Fee", opportunity.isFree === true ? 'Free for students' : fee]]} />;
   if (opportunity.type === 'mentorship') return <Details title="Mentorship details" entries={[["Mentor", opportunity.mentorName], ["Field", opportunity.professionalField], ["Experience", opportunity.experience], ["Focus", opportunity.mentorshipType], ["Availability", opportunity.availability]]} />;
@@ -389,4 +418,3 @@ const Description = ({ title, value }: { title: string; value: string }) => (
 );
 
 export default OpportunityDetailPage;
-

@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import { ResourceAccessType } from './Resource';
+import { ResourceAccessType, ResourceCategory } from './Resource';
 
 export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
 
@@ -9,8 +9,11 @@ export interface IResourceRequest extends Document {
   providerId: mongoose.Types.ObjectId;
   resourceId: mongoose.Types.ObjectId;
   requestedAccessType: ResourceAccessType;
+  resourceCategory: ResourceCategory;
   durationOrTerms?: string;
   message?: string;
+  justification: string;
+  selfDeclaredNeed: 'low' | 'medium' | 'high';
   status: ResourceRequestStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -26,8 +29,11 @@ const resourceRequestSchema = new Schema<IResourceRequest>(
       required: true,
       enum: ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'],
     },
+    resourceCategory: { type: String, required: true, enum: ['laptop', 'arduino', 'raspberry_pi', 'sensor', 'electronic_component', 'dev_board', 'other'], index: true },
     durationOrTerms: { type: String, trim: true, maxlength: 200 },
     message: { type: String, trim: true, maxlength: 1000 },
+    justification: { type: String, required: true, trim: true, minlength: 30, maxlength: 800 },
+    selfDeclaredNeed: { type: String, required: true, enum: ['low', 'medium', 'high'] },
     status: {
       type: String,
       enum: ['pending', 'accepted', 'rejected', 'completed'],

@@ -8,6 +8,8 @@ export interface IApplication extends Document {
     status: ApplicationStatus;
     appliedAt: Date;
     message?: string;
+    justification: string;
+    selfDeclaredNeed: 'low' | 'medium' | 'high';
     updatedAt: Date;
 }
 declare const Application: mongoose.Model<IApplication, {}, {}, {}, Document<unknown, {}, IApplication, {}, {}> & IApplication & Required<{

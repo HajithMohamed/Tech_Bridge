@@ -1,0 +1,25 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { getProviderPromotionRequests, updatePromotionRequestStatus } from '../api/promotionRequestApi';
+import type { PromotionRequest, PromotionRequestStatus } from '../types';
+
+const statusStyle: Record<PromotionRequestStatus, string> = { pending: 'bg-amber-100 text-amber-800', accepted: 'bg-emerald-100 text-emerald-700', declined: 'bg-red-100 text-red-700', completed: 'bg-primary-100 text-primary-700' };
+const labels = { paid: 'Paid', product_exchange: 'Product exchange', experience: 'Experience', affiliate: 'Affiliate' } as const;
+const creatorOf = (request: PromotionRequest) => typeof request.studentId === 'string' ? undefined : request.studentId;
+
+const ProviderPromotionRequestsPage = () => {
+  const [requests, setRequests] = useState<PromotionRequest[]>([]);
+  const [filter, setFilter] = useState<PromotionRequestStatus | 'all'>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const visible = useMemo(() => filter === 'all' ? requests : requests.filter((request) => request.status === filter), [requests, filter]);
+  useEffect(() => { void getProviderPromotionRequests().then(setRequests).catch(() => setError('Unable to load promotion requests.')).finally(() => setLoading(false)); }, []);
+  const complete = async (id: string) => { try { const updated = await updatePromotionRequestStatus(id, 'completed'); setRequests((items) => items.map((item) => item._id === id ? updated : item)); } catch { setError('Unable to mark this campaign complete.'); } };
+
+  return <main className="min-h-screen max-w-6xl mx-auto px-4 sm:px-6 py-9"><Link to="/provider" className="text-sm font-semibold text-primary-600">← Provider dashboard</Link><section className="mt-5"><p className="text-sm font-semibold tracking-wider text-primary-600">CREATOR MARKETPLACE</p><h1 className="mt-2 text-3xl font-bold text-surface-900">Promotion requests</h1><p className="mt-2 text-gray-600">Track campaign proposals sent to opted-in student creators. Messaging opens after a student accepts.</p></section>{error && <p className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-red-700">{error}</p>}<div className="mt-6 flex flex-wrap gap-2">{(['all', 'pending', 'accepted', 'declined', 'completed'] as const).map((status) => <button key={status} onClick={() => setFilter(status)} className={`rounded-lg px-3 py-2 text-sm font-semibold capitalize ${filter === status ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'}`}>{status}</button>)}</div>{loading ? <p className="py-12 text-center text-gray-500">Loading promotion requests...</p> : visible.length === 0 ? <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-8 text-gray-600">No promotion requests match this filter.</div> : <div className="mt-6 space-y-4">{visible.map((request) => { const creator = creatorOf(request); const profile = creator?.studentProfile?.creatorProfile; return <article key={request._id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"><div className="flex flex-col justify-between gap-4 md:flex-row"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-surface-900">{creator?.fullName || 'Student creator'}</h2><Status status={request.status} /></div><p className="mt-1 text-sm text-gray-500">{profile?.niches.join(', ') || 'Creator profile'} · {profile?.platforms.map((platform) => platform.platform).join(', ')}</p><p className="mt-4 text-sm font-semibold text-gray-700">Campaign brief</p><p className="mt-1 whitespace-pre-wrap text-sm text-gray-600">{request.campaignBrief}</p><p className="mt-3 text-sm font-semibold text-gray-700">Deliverables</p><p className="mt-1 whitespace-pre-wrap text-sm text-gray-600">{request.deliverables}</p><div className="mt-4 flex flex-wrap gap-3 text-sm"><span className="rounded-lg bg-gray-100 px-2.5 py-1.5"><strong>Compensation:</strong> {labels[request.compensationType]}</span>{request.compensationDetails && <span className="rounded-lg bg-gray-100 px-2.5 py-1.5">{request.compensationDetails}</span>}{request.deadline && <span className="rounded-lg bg-gray-100 px-2.5 py-1.5"><strong>Deadline:</strong> {new Date(request.deadline).toLocaleDateString('en-LK')}</span>}</div></div><div className="flex shrink-0 flex-wrap content-start gap-2">{request.status === 'accepted' && creator && <button onClick={() => navigate('/messages', { state: { recipientId: creator._id } })} className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white">Message creator</button>}{request.status === 'accepted' && <button onClick={() => void complete(request._id)} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white">Mark completed</button>}</div></div></article>; })}</div>}</main>;
+};
+
+const Status = ({ status }: { status: PromotionRequestStatus }) => <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${statusStyle[status]}`}>{status}</span>;
+
+export default ProviderPromotionRequestsPage;

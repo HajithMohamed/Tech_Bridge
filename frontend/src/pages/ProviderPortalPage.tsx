@@ -7,7 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import type { CoverageType, Opportunity, OpportunityFormData, OpportunityStatus, OpportunityType, WorkMode } from '../types';
 import { enabledOpportunityTypes } from '../utils/providerCapabilities';
 
-const typeLabels: Record<OpportunityType, string> = { job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', workshop: 'Workshop', mentorship: 'Mentorship' };
+const typeLabels: Record<OpportunityType, string> = { job: 'Job', internship: 'Internship', scholarship: 'Scholarship', course: 'Course', freelance: 'Freelance project', promotion: 'Creator promotion', workshop: 'Workshop', mentorship: 'Mentorship' };
 const coverageTypes: Array<{ value: CoverageType; label: string }> = [{ value: 'full', label: 'Full coverage' }, { value: 'partial', label: 'Partial coverage' }, { value: 'tuition_only', label: 'Tuition only' }, { value: 'equipment_only', label: 'Equipment only' }, { value: 'stipend', label: 'Stipend' }];
 const dateInput = (value?: string) => value ? new Date(value).toISOString().slice(0, 10) : '';
 const emptyForm = (type: OpportunityType): OpportunityFormData => ({ title: '', description: '', type, requiredSkills: [], location: '', workMode: 'remote', status: 'open', applicationDeadline: '', currency: 'LKR', isPaid: false, isFree: true });
@@ -20,7 +20,7 @@ const ProviderPortalPage = () => {
   const [skillEntry, setSkillEntry] = useState(''); const [criteriaEntry, setCriteriaEntry] = useState('');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]); const [editingId, setEditingId] = useState<string | null>(null); const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
-  const isScholarship = form.type === 'scholarship'; const isEmployment = form.type === 'job' || form.type === 'freelance'; const isInternship = form.type === 'internship'; const isTraining = form.type === 'course' || form.type === 'workshop'; const isMentorship = form.type === 'mentorship';
+  const isScholarship = form.type === 'scholarship'; const isEmployment = form.type === 'job' || form.type === 'freelance' || form.type === 'promotion'; const isInternship = form.type === 'internship'; const isTraining = form.type === 'course' || form.type === 'workshop'; const isMentorship = form.type === 'mentorship';
   const filtered = useMemo(() => opportunities.filter((item) => `${item.title} ${item.type}`.toLowerCase().includes(search.toLowerCase())), [opportunities, search]);
 
   const load = async () => { setLoading(true); try { setOpportunities(await getMyOpportunities()); } catch { setError('Unable to load your opportunities.'); } finally { setLoading(false); } };
@@ -51,4 +51,3 @@ const TagEditor = ({ label, tags, entry, setEntry, add, remove, placeholder }: {
 const Status = ({ status }: { status: OpportunityStatus }) => <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{status}</span>;
 
 export default ProviderPortalPage;
-

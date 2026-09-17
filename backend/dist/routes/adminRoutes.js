@@ -1,0 +1,20 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const adminController_1 = require("../controllers/adminController");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.protect, (0, auth_1.authorize)('admin'));
+router.get('/providers', adminController_1.listProvidersForVerification);
+router.patch('/providers/:id/verify', adminController_1.verifyProvider);
+router.patch('/providers/:id/reject', adminController_1.rejectProvider);
+router.get('/users', adminController_1.listUsers);
+router.patch('/users/:id/suspend', adminController_1.suspendUser);
+router.patch('/users/:id/reinstate', adminController_1.reinstateUser);
+router.get('/reports', adminController_1.listReports);
+router.patch('/reports/:id', adminController_1.resolveReport);
+router.delete('/opportunities/:id', adminController_1.removeOpportunity);
+router.delete('/resources/:id', adminController_1.removeResource);
+router.get('/audit-log', adminController_1.listAuditLog);
+exports.default = router;
+//# sourceMappingURL=adminRoutes.js.map
