@@ -1,0 +1,14 @@
+# Local credentials and environment overrides (examples contain placeholders only).
+.env
+.env.*
+!.env.example
+# Reproducible dependencies and generated output.
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db
