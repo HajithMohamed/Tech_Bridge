@@ -6,6 +6,7 @@ export type OpportunityType =
   | 'scholarship'
   | 'course'
   | 'freelance'
+  | 'promotion'
   | 'workshop'
   | 'mentorship';
 
@@ -58,7 +59,7 @@ const opportunitySchema = new Schema<IOpportunity>(
     type: {
       type: String,
       required: true,
-      enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'workshop', 'mentorship'],
+      enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'promotion', 'workshop', 'mentorship'],
     },
     requiredSkills: [{ type: String, trim: true, maxlength: 60 }],
     location: { type: String, required: true, trim: true, maxlength: 120 },

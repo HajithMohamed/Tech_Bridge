@@ -14,9 +14,11 @@ interface ApplicationsResponse {
 
 export const applyToOpportunity = async (
   opportunityId: string,
-  message?: string
+  message: string | undefined,
+  justification: string,
+  selfDeclaredNeed: 'low' | 'medium' | 'high',
 ): Promise<OpportunityApplication> => {
-  const response = await api.post<ApplicationResponse>('/applications', { opportunityId, message });
+  const response = await api.post<ApplicationResponse>('/applications', { opportunityId, message, justification, selfDeclaredNeed });
   return response.data.data.application;
 };
 

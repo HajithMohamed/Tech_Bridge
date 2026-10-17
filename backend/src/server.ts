@@ -10,6 +10,11 @@ import providerRoutes from './routes/providerRoutes';
 import publicProviderRoutes from './routes/publicProviderRoutes';
 import resourceRequestRoutes from './routes/resourceRequestRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import adminRoutes from './routes/adminRoutes';
+import reportRoutes from './routes/reportRoutes';
+import messageRoutes from './routes/messageRoutes';
+import creatorRoutes from './routes/creatorRoutes';
+import promotionRequestRoutes from './routes/promotionRequestRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -36,6 +41,11 @@ app.use('/api/provider', providerRoutes);
 app.use('/api/providers', publicProviderRoutes);
 app.use('/api/resource-requests', resourceRequestRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/creators', creatorRoutes);
+app.use('/api/promotion-requests', promotionRequestRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

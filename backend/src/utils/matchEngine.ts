@@ -33,6 +33,10 @@ const CAREER_TYPE_MAP: Record<string, string[]> = {
   engineer: ['job', 'internship', 'freelance'],
   programmer: ['job', 'internship', 'freelance'],
   designer: ['job', 'internship', 'freelance'],
+  creator: ['promotion', 'freelance'],
+  influencer: ['promotion', 'freelance'],
+  content: ['promotion', 'freelance'],
+  social: ['promotion', 'freelance'],
   researcher: ['scholarship', 'course', 'workshop'],
   scientist: ['scholarship', 'course', 'workshop'],
   analyst: ['job', 'internship', 'course'],
@@ -40,7 +44,7 @@ const CAREER_TYPE_MAP: Record<string, string[]> = {
   trainer: ['workshop', 'course'],
   teacher: ['workshop', 'course'],
   lecturer: ['workshop', 'course'],
-  entrepreneur: ['freelance', 'workshop'],
+  entrepreneur: ['freelance', 'promotion', 'workshop'],
 };
 
 /**

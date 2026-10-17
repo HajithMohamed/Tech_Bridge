@@ -1,0 +1,18 @@
+name: Repository security
+on:
+  pull_request:
+  push:
+    branches: [audit/security-reconciliation]
+permissions:
+  contents: read
+jobs:
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/repository-security.unit.test.mjs
+      - run: node --test tests/repository-security.integration.test.mjs
+      - run: node scripts/repository-security.mjs

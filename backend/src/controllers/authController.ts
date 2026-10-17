@@ -36,6 +36,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    // Creator discovery is always an explicit, post-registration opt-in.
+    const safeStudentProfile = userRole === 'student' && studentProfile && typeof studentProfile === 'object'
+      ? Object.fromEntries(Object.entries(studentProfile as Record<string, unknown>).filter(([key]) => key !== 'creatorProfile'))
+      : studentProfile;
+
     // Create new user
     const user = await User.create({
       fullName,
@@ -43,7 +48,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       password,
       role: userRole,
       ...(userRole === 'student'
-        ? { studentProfile }
+        ? { studentProfile: safeStudentProfile }
         : {
             providerProfile: {
               ...providerProfile,
@@ -68,6 +73,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           fullName: user.fullName,
           email: user.email,
           role: user.role,
+          accountStatus: user.accountStatus,
           studentProfile: user.studentProfile,
           providerProfile: user.providerProfile,
           createdAt: user.createdAt,
@@ -117,6 +123,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (user.accountStatus === 'suspended') {
+      res.status(403).json({ success: false, message: 'This account has been suspended. Contact TechBridge support if you believe this is a mistake.' });
+      return;
+    }
+
+    if (user.role === 'provider' && user.providerProfile?.verificationStatus === 'REJECTED') {
+      res.status(403).json({ success: false, message: user.providerProfile.rejectionReason || 'This provider account was not approved. Contact TechBridge support for details.' });
+      return;
+    }
+
     if (user.role === 'provider' && (
       user.providerProfile?.verified !== true ||
       user.providerProfile.verificationStatus !== 'VERIFIED'
@@ -140,6 +156,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           fullName: user.fullName,
           email: user.email,
           role: user.role,
+          accountStatus: user.accountStatus,
           studentProfile: user.studentProfile,
           providerProfile: user.providerProfile,
           createdAt: user.createdAt,
@@ -181,6 +198,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
           fullName: user.fullName,
           email: user.email,
           role: user.role,
+          accountStatus: user.accountStatus,
           studentProfile: user.studentProfile,
           providerProfile: user.providerProfile,
           createdAt: user.createdAt,
@@ -215,10 +233,7 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
     const institution = text(profile.institution, 150);
     const location = text(profile.location, 100);
     const careerGoal = text(profile.careerGoal, 150);
-    const portfolioUrl = text(profile.portfolioUrl, 500);
     const skills = tags(profile.skills, 25, 50);
-    const learningGoals = tags(profile.learningGoals, 12, 100);
-    const certifications = tags(profile.certifications, 12, 160);
 
     if (!institution) { res.status(400).json({ success: false, message: 'Institution is required.' }); return; }
     if (!['ICT', 'ET', 'BST', 'other'].includes(profile.degree as string)) { res.status(400).json({ success: false, message: 'Select a valid degree programme.' }); return; }
@@ -226,7 +241,6 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
     if (!skills?.length) { res.status(400).json({ success: false, message: 'Add at least one skill or interest.' }); return; }
     if (profile.availabilityHours !== undefined && (!Number.isInteger(profile.availabilityHours) || (profile.availabilityHours as number) < 0 || (profile.availabilityHours as number) > 168)) { res.status(400).json({ success: false, message: 'Availability must be between 0 and 168 hours.' }); return; }
     if (profile.preferredWorkType !== undefined && !['remote', 'on-site', 'hybrid', 'flexible'].includes(profile.preferredWorkType as string)) { res.status(400).json({ success: false, message: 'Select a valid work preference.' }); return; }
-    if (portfolioUrl && !/^https?:\/\//i.test(portfolioUrl)) { res.status(400).json({ success: false, message: 'Portfolio URL must start with http:// or https://.' }); return; }
 
     student.studentProfile = {
       institution,
@@ -237,9 +251,7 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
       ...(careerGoal ? { careerGoal } : {}),
       ...(typeof profile.availabilityHours === 'number' ? { availabilityHours: profile.availabilityHours } : {}),
       ...(profile.preferredWorkType ? { preferredWorkType: profile.preferredWorkType as 'remote' | 'on-site' | 'hybrid' | 'flexible' } : {}),
-      ...(learningGoals ? { learningGoals } : {}),
-      ...(certifications ? { certifications } : {}),
-      ...(portfolioUrl ? { portfolioUrl } : {}),
+      ...(student.studentProfile.creatorProfile ? { creatorProfile: student.studentProfile.creatorProfile } : {}),
     };
     await student.save();
     res.status(200).json({ success: true, message: 'Student profile updated.', data: { user: student } });

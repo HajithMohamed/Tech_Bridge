@@ -24,6 +24,7 @@
   - [4. Applications & Opportunity Lifecycle](#4-applications--opportunity-lifecycle)
   - [5. Faculty & Alumni Community Directory](#5-faculty--alumni-community-directory)
   - [6. Impact & Analytics Dashboard](#6-impact--analytics-dashboard)
+  - [7. Student Creator Marketplace](#7-student-creator-marketplace)
 - [Tech Stack](#-tech-stack)
 - [Project Architecture & Directory Structure](#-project-architecture--directory-structure)
 - [Database Schema Models](#-database-schema-models)
@@ -54,7 +55,7 @@ TechBridge organizes student growth around four key pillars:
 
 | Pillar | Focus | What TechBridge Delivers |
 | :--- | :--- | :--- |
-| **💼 EARN** | Employment & Freelance | Full-time/part-time jobs, freelance gigs, and remote software/hardware contracts. |
+| **💼 EARN** | Employment, Freelance & Creator Work | Full-time/part-time jobs, freelance gigs, creator promotion work, and remote software/hardware contracts. |
 | **🎓 LEARN** | Skill Development | Technical courses, workshops, hands-on training, and expert 1-on-1 mentorship. |
 | **🚀 EXPERIENCE** | Industry Exposure | Industrial internships, research lab projects, and field engineering placements. |
 | **💻 ACCESS** | Hardware & Tools | Laptops, Arduino boards, Raspberry Pi units, sensors, and dev kits via borrowing, rentals, installment schemes, 0% interest financing, sponsorships, and donations. |
@@ -101,6 +102,12 @@ TechBridge organizes student growth around four key pillars:
 - Live platform statistics displaying registered students, open opportunities, applications submitted, and hardware resources accessed.
 - Distribution breakdowns of application statuses and resource access methods.
 - Provider-specific views and metrics on listing performance.
+
+### 7. Student Creator Marketplace
+- **Explicit student opt-in**: A creator profile is hidden by default. Students can choose public social-platform handles, public profile URLs, self-reported follower counts, niches, content types, compensation preferences, and sample-work links.
+- **Verified-business-only discovery**: The creator directory and individual creator profiles are protected API routes. Only verified providers can browse or send a campaign request; hidden profiles are excluded from every directory result.
+- **Campaign workflow**: Providers propose a campaign brief, deliverables, required compensation type, optional details, and an optional deadline. Students accept or decline, providers mark accepted work complete, and accepted pairs can start a TechBridge conversation.
+- **Privacy boundaries**: TechBridge does not connect to social platforms, scrape accounts, or collect payment, bank, or tax details. Students can report an unfair campaign proposal for admin review.
 
 ---
 
@@ -256,7 +263,7 @@ erDiagram
         ObjectId providerId
         string title
         string description
-        string type "job | internship | scholarship | course | freelance | workshop | mentorship"
+        string type "job | internship | scholarship | course | freelance | promotion | workshop | mentorship"
         string[] requiredSkills
         string location
         string workMode "remote | on-site | hybrid"
@@ -299,6 +306,16 @@ erDiagram
         string message
         string status "pending | accepted | rejected | completed"
         date createdAt
+    }
+
+    PROMOTION_REQUEST {
+        ObjectId studentId
+        ObjectId providerId
+        string campaignBrief
+        string deliverables
+        string compensationType "paid | product_exchange | experience | affiliate"
+        string status "pending | accepted | declined | completed"
+        date deadline
     }
 ```
 
@@ -365,6 +382,43 @@ erDiagram
 
 ---
 
+### Trust, reporting, and messaging
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/admin/providers?status=PENDING` | Admin | Provider verification queue |
+| `PATCH` | `/api/admin/providers/:id/verify` | Admin | Verify a provider and record an audit entry |
+| `PATCH` | `/api/admin/providers/:id/reject` | Admin | Reject provider with a required reason |
+| `GET` | `/api/admin/users?role=&q=&page=` | Admin | Paginated user search |
+| `PATCH` | `/api/admin/users/:id/suspend` | Admin | Suspend an account and record an audit entry |
+| `PATCH` | `/api/admin/users/:id/reinstate` | Admin | Reinstate an account |
+| `GET` | `/api/admin/reports?status=open` | Admin | Review submitted reports |
+| `PATCH` | `/api/admin/reports/:id` | Admin | Resolve/dismiss a report; optionally remove a listing |
+| `DELETE` | `/api/admin/opportunities/:id` | Admin | Moderation removal of an opportunity |
+| `DELETE` | `/api/admin/resources/:id` | Admin | Moderation removal of a resource listing |
+| `GET` | `/api/admin/audit-log?targetType=&page=` | Admin | Accountability audit trail |
+| `POST` | `/api/reports` | Private | Report an opportunity, resource, user, or message |
+| `GET` | `/api/messages/directory` | Private | Verified faculty and alumni accounts |
+| `POST` | `/api/messages/conversations` | Private | Start a permitted one-to-one conversation |
+| `GET` | `/api/messages/conversations` | Private | Conversation inbox with unread counts |
+| `GET` | `/api/messages/conversations/:id/messages?page=` | Participant | Paginated messages |
+| `POST` | `/api/messages/conversations/:id/messages` | Participant | Send a message |
+| `PATCH` | `/api/messages/conversations/:id/read` | Participant | Mark messages as read |
+
+### Student Creator Marketplace (`/api/creators`, `/api/promotion-requests`)
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `PUT` | `/api/creators/profile` | Student | Create or update the student's opt-in creator profile |
+| `GET` | `/api/creators?niche=&platform=&contentType=&compensationPreference=` | Provider (Verified) | Browse discoverable creator profiles only |
+| `GET` | `/api/creators/:studentId` | Provider (Verified) | Get one discoverable creator profile |
+| `POST` | `/api/promotion-requests` | Provider (Verified) | Send a campaign proposal to a discoverable creator |
+| `GET` | `/api/promotion-requests/mine` | Student | Review received campaign proposals |
+| `GET` | `/api/promotion-requests/provider` | Provider (Verified) | List campaign proposals sent by the provider |
+| `PATCH` | `/api/promotion-requests/:id/status` | Request participant | Student accepts/declines; provider completes accepted work |
+
+Applications and resource requests now require a 30–800 character need justification plus a self-declared `low`, `medium`, or `high` need level. Provider queues return a transparent `priorityScore`, reasons, and capacity/waitlist indicator; they never auto-accept applicants.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -400,6 +454,11 @@ erDiagram
    npm run seed
    ```
 
+   If the database already contains pre-Phase-2 applications or resource requests, run this once before starting the API. It backfills only fields introduced in Phase 2 and does not alter current records:
+   ```bash
+   npm run migrate:phase2
+   ```
+
 5. **Start the backend development server**:
    ```bash
    npm run dev
@@ -410,7 +469,7 @@ erDiagram
 
 ### Database Seeding
 
-Running the seed script provisions an administrative account:
+Running the seed script provisions an administrative account and verified Faculty/Alumni directory accounts used by in-app messaging:
 ```bash
 npm run seed
 ```

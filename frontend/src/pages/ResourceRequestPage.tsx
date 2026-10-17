@@ -5,6 +5,7 @@ import { getResource } from '../api/resourceApi';
 import { createResourceRequest } from '../api/resourceRequestApi';
 import type { ResourceListing } from '../types';
 import { Box, ArrowLeft, Info } from 'lucide-react';
+import { createReport } from '../api/reportApi';
 
 const humanize = (value: string) => value ? value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) : '';
 
@@ -14,6 +15,8 @@ const ResourceRequestPage = () => {
   const [resource, setResource] = useState<ResourceListing | null>(null);
   const [durationOrTerms, setDurationOrTerms] = useState('');
   const [message, setMessage] = useState('');
+  const [justification, setJustification] = useState('');
+  const [selfDeclaredNeed, setSelfDeclaredNeed] = useState<'low' | 'medium' | 'high'>('medium');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,6 +29,7 @@ const ResourceRequestPage = () => {
   const submit = async (event: FormEvent) => {
     event.preventDefault(); 
     if (!resource) return; 
+    if (justification.trim().length < 30) { setError('Please explain why you need this resource in at least 30 characters.'); return; }
     setSaving(true); 
     setError('');
     
@@ -34,7 +38,9 @@ const ResourceRequestPage = () => {
         resource._id, 
         resource.accessType, 
         durationOrTerms, 
-        message 
+        message,
+        justification,
+        selfDeclaredNeed,
       ); 
       navigate('/my-resource-requests'); 
     }
@@ -44,6 +50,14 @@ const ResourceRequestPage = () => {
     finally { 
       setSaving(false); 
     }
+  };
+
+  const reportListing = async () => {
+    if (!resource) return;
+    const reason = window.prompt('Why should this resource listing be reviewed?');
+    if (!reason) return;
+    try { await createReport('resource', resource._id, reason); setError('Report submitted for admin review.'); }
+    catch { setError('Unable to submit report.'); }
   };
 
   return (
@@ -75,6 +89,7 @@ const ResourceRequestPage = () => {
             <p className="text-gray-500 mt-2 text-lg">
               You are requesting access to this resource through the <strong className="text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{humanize(resource.accessType)}</strong> pathway.
             </p>
+            <button type="button" onClick={() => void reportListing()} className="mt-3 text-sm font-semibold text-red-600 hover:underline">Report this listing</button>
           </section>
 
           <form onSubmit={submit} className="bg-primary-50/50 rounded-3xl border border-primary-100 shadow-xl shadow-primary-500/5 p-6 sm:p-8 space-y-6">
@@ -93,6 +108,17 @@ const ResourceRequestPage = () => {
             </div>
 
             <div className="space-y-6">
+              <label className="block">
+                <span className="text-sm font-bold text-gray-700 mb-2 block">Why are you requesting this resource? <span className="text-red-500">*</span></span>
+                <textarea required minLength={30} maxLength={800} value={justification} onChange={(e) => setJustification(e.target.value)} className="w-full border border-gray-200 rounded-xl bg-white p-3.5 text-surface-900 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none min-h-[120px] resize-y" placeholder="Explain how this resource will support your studies or projects (30–800 characters)." />
+              </label>
+
+              <fieldset>
+                <legend className="text-sm font-bold text-gray-700 mb-2">Your current need <span className="text-red-500">*</span></legend>
+                <p className="mb-2 text-xs text-gray-500">Self-declared only — no financial proof or documents are required.</p>
+                <div className="flex gap-2">{(['low', 'medium', 'high'] as const).map((need) => <button key={need} type="button" onClick={() => setSelfDeclaredNeed(need)} className={`rounded-lg px-3 py-2 text-sm font-semibold capitalize ${selfDeclaredNeed === need ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'}`}>{need}</button>)}</div>
+              </fieldset>
+
               <label className="block">
                 <span className="text-sm font-bold text-gray-700 mb-2 block">
                   Requested duration or preferred terms <span className="font-normal text-gray-400">(optional)</span>
@@ -139,4 +165,3 @@ const ResourceRequestPage = () => {
 };
 
 export default ResourceRequestPage;
-

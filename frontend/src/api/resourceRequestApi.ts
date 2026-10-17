@@ -16,13 +16,17 @@ export const createResourceRequest = async (
   resourceId: string,
   requestedAccessType: string,
   durationOrTerms?: string,
-  message?: string
+  message?: string,
+  justification?: string,
+  selfDeclaredNeed?: 'low' | 'medium' | 'high',
 ): Promise<ResourceRequest> => {
   const response = await api.post<ResourceRequestResponse>('/resource-requests', {
     resourceId,
     requestedAccessType,
     durationOrTerms,
     message,
+    justification,
+    selfDeclaredNeed,
   });
   return response.data.data.request;
 };

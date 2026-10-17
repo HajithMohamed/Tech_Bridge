@@ -39,17 +39,22 @@ const AppHeader = () => {
               <Link to="/opportunities" className={navClass('/opportunities')}>Opportunities</Link>
               <Link to="/resources" className={navClass('/resources')}>Resources</Link>
               <Link to="/my-activity" className={navClass('/my-activity')}>My activity</Link>
+              <Link to="/creator-profile" className={navClass('/creator-profile')}>Creator profile</Link>
+              <Link to="/my-promotion-requests" className={navClass('/my-promotion-requests')}>Campaign requests</Link>
             </>
-          ) : (
+          ) : user.role === 'provider' ? (
             <>
               <Link to="/provider" className={navClass('/provider', true)}>Dashboard</Link>
               <Link to="/provider/opportunities" className={navClass('/provider/opportunities')}>Listings</Link>
               <Link to="/provider/applications" className={navClass('/provider/applications')}>Applications</Link>
               <Link to="/provider/resources" className={navClass('/provider/resources')}>Resources</Link>
               <Link to="/provider/resource-requests" className={navClass('/provider/resource-requests')}>Requests</Link>
+              <Link to="/creators" className={navClass('/creators')}>Creators</Link>
+              <Link to="/provider/promotion-requests" className={navClass('/provider/promotion-requests')}>Campaigns</Link>
               <Link to="/provider/profile" className={navClass('/provider/profile')}>Profile</Link>
             </>
-          )}
+          ) : <Link to="/admin" className={navClass('/admin')}>Admin</Link>}
+          <Link to="/messages" className={navClass('/messages')}>Messages</Link>
           <Link to="/connections" className={navClass('/connections')}>Community</Link>
           <button onClick={signOut} className="rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white">Sign out</button>
         </div>
