@@ -49,7 +49,16 @@ PowerShell blocks the `npm.ps1` shim on this machine; checks use `npm.cmd`, with
 
 The first browser run passed all four assertions but stalled in Windows child-process teardown under the sandbox. Its owned API/preview/MongoDB process trees were explicitly identified and stopped; unrelated processes were left alone. A rerun with process-cleanup permission passed all four tests, exited normally with code 0 in 1.5 minutes, and closed the owned API and preview ports.
 
-Total: 74 tests on this branch, including 17 new privacy regression tests. This branch starts from the approved testing baseline, so these totals exclude the independent demo-seeding PR's tests. The public profile screenshot at `output/playwright/public-provider.png` was inspected: organization details, badges and published listing cards render correctly with the existing green theme. CI evidence will be recorded after the draft PR runs.
+Total: 74 tests on this branch, including 17 new privacy regression tests. This branch starts from the approved testing baseline, so these totals exclude the independent demo-seeding PR's tests. The public profile screenshot at `output/playwright/public-provider.png` was inspected: organization details, badges and published listing cards render correctly with the existing green theme.
+
+## Pull request and CI evidence
+
+[Draft PR #10](https://github.com/HajithMohamed/Tech_Bridge/pull/10) targets `integration/techbridge-v2`. Verified implementation/test commit: `d36abfefd82520064da3ab9956fbe691eb9d0aa7`.
+
+- [Application checks run 39125365758](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39125365758): all three jobs succeeded. Backend: clean install, type checks, build, unit and MongoDB integration tests. Frontend: clean install, lint, type checks, build, unit and component integration tests. E2E: clean installs, MongoDB/browser provisioning, frontend build and Chromium tests.
+- [Repository security run 39125365753](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39125365753): policy unit/integration tests and tracked-file audit succeeded.
+
+This CI evidence update changes documentation only. No branch was merged; no production data was changed. The working tree was clean after committing and pushing the review evidence.
 
 ## Remaining risks and rollback
 
