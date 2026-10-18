@@ -53,6 +53,15 @@ Total: 165 tests, including 57 added in this branch (32 lifecycle/input unit cas
 
 No tests use production records or a developer database. Browser traffic is restricted to the owned preview origin; the API and MongoDB are disposable local processes. No dependency additions or lockfile changes. The completed-request screenshot at `output/playwright/resource-reservation.png` was inspected: resource/applicant labels remain visible with the existing green styling. Both test-server ports (4173 and 4510) were closed after the browser run.
 
+## Pull request and CI evidence
+
+[Draft PR #12](https://github.com/HajithMohamed/Tech_Bridge/pull/12) targets `development`. Verified implementation/test commit: `8b357075f95b1c7996feea9cddac172732469be9`.
+
+- [Application checks run 39127155682](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39127155682): backend, frontend and E2E jobs all succeeded. This includes clean installations, backend/frontend type checks/builds, frontend lint, unit/integration suites, real MongoDB provisioning and all five Chromium journeys.
+- [Repository security run 39127155663](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39127155663): unit/integration repository-policy checks and the tracked-file audit succeeded. After staging the implementation, the local audit reported zero tracked environment, dependency or build-output violations across 188 files.
+
+The CI evidence follow-up changes documentation only. The branch was committed and pushed with a clean working tree. No feature branch was merged automatically; development remains at the recorded base until a separately authorized review/merge.
+
 ## Operational risks and rollback
 
 Transactions may retry after conflicts, so no external messages or side effects occur inside the callback. Approval uses majority writes and a five-second commit time limit; the database driver governs transient transaction retries. Serializing by student also serializes simultaneous approvals in different categories. Concurrent profile array updates may encounter a version conflict and need retrying. Future allocation code must participate in this coordination or introduce a separately reviewed database constraint.
