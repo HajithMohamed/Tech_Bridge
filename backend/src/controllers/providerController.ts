@@ -5,6 +5,7 @@ import Resource from '../models/Resource';
 import ResourceRequest from '../models/ResourceRequest';
 import User from '../models/User';
 import { isProviderOfferingAllowed, providerOfferings } from '../utils/providerCapabilities';
+import { publicProviderProfileSelect, toPublicProviderDetails } from '../utils/publicProvider';
 
 const providerServices = ['jobs', 'internships', 'scholarships', 'training', 'mentorship', 'technical_resources'];
 
@@ -154,7 +155,7 @@ export const updateProviderProfile = async (req: Request, res: Response): Promis
 export const getPublicProviderProfile = async (req: Request, res: Response): Promise<void> => {
   try {
     const provider = await User.findOne({ _id: req.params.id, role: 'provider' })
-      .select('fullName providerProfile createdAt');
+      .select(publicProviderProfileSelect);
     if (!provider?.providerProfile) {
       res.status(404).json({ success: false, message: 'Provider profile not found.' });
       return;
@@ -175,7 +176,7 @@ export const getPublicProviderProfile = async (req: Request, res: Response): Pro
         provider: {
           _id: provider._id,
           fullName: provider.fullName,
-          providerProfile: provider.providerProfile,
+          providerProfile: toPublicProviderDetails(provider.providerProfile),
           createdAt: provider.createdAt,
         },
         opportunities,

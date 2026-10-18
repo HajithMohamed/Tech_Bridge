@@ -1,3 +1,4 @@
+import { publicListingProviderSelect } from '../utils/publicProvider';
 import { Request, Response } from 'express';
 import Opportunity, { IOpportunity, OpportunityType } from '../models/Opportunity';
 import Application from '../models/Application';
@@ -49,7 +50,7 @@ const editableFields = [
 ] as const;
 const scholarshipFields = ['amount', 'currency', 'coverageType', 'eligibilityCriteria', 'numberOfAwards', 'renewable'] as const;
 
-const providerSelect = 'fullName email providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
+const providerSelect = publicListingProviderSelect;
 
 const typeOffer: Record<OpportunityType, string> = {
   job: 'jobs',
