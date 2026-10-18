@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/seed.ts",
+    "seed:demo": "tsx --env-file=.env.demo src/seed.ts",
     "migrate:phase2": "tsx src/migratePhase2.ts",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run tests/unit",
