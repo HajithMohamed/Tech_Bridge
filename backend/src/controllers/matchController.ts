@@ -1,10 +1,10 @@
+import { publicListingProviderSelect } from '../utils/publicProvider';
 import { Request, Response } from 'express';
 import Opportunity from '../models/Opportunity';
 import User from '../models/User';
 import { matchScore, getResourceForSkill, type MatchBreakdown } from '../utils/matchEngine';
 
-const providerSelect =
-  'fullName email providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
+const providerSelect = publicListingProviderSelect;
 
 /**
  * GET /api/opportunities/matched
