@@ -3,6 +3,7 @@ import ResourceRequest from '../models/ResourceRequest';
 import Resource from '../models/Resource';
 import User from '../models/User';
 import { resourceRequestPriority } from '../utils/priorityEngine';
+import { ResourceReservationError, transitionResourceRequest } from '../services/resourceReservation';
 
 const studentSelect = 'fullName email studentProfile.institution studentProfile.degree studentProfile.studyYear studentProfile.skills studentProfile.careerGoal';
 const resourceSelect = 'itemName category condition accessType quantityAvailable status';
@@ -165,61 +166,13 @@ export const listReceivedResourceRequests = async (req: Request, res: Response):
 /** PATCH /api/resource-requests/:id/status */
 export const updateResourceRequestStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { status } = req.body;
-    if (!['accepted', 'rejected', 'completed'].includes(status)) {
-      res.status(400).json({ success: false, message: 'Invalid status update.' });
-      return;
-    }
-
-    const request = await ResourceRequest.findOne({ _id: req.params.id, providerId: req.user!._id });
-
-    if (!request) {
-      res.status(404).json({ success: false, message: 'Request not found.' });
-      return;
-    }
-
-    if (request.status === 'pending') {
-      if (status === 'completed') {
-        res.status(400).json({ success: false, message: 'Accept a request before marking it completed.' });
-        return;
-      }
-      if (status === 'accepted') {
-        const activeSameCategory = await ResourceRequest.findOne({
-          studentId: request.studentId,
-          resourceCategory: request.resourceCategory,
-          status: 'accepted',
-          _id: { $ne: request._id },
-        });
-        if (activeSameCategory) {
-          res.status(409).json({ success: false, message: 'This student already holds an accepted resource in this category.' });
-          return;
-        }
-        const resource = await Resource.findOneAndUpdate(
-          { _id: request.resourceId, status: 'available', quantityAvailable: { $gt: 0 } },
-          { $inc: { quantityAvailable: -1 } },
-          { new: true }
-        );
-        if (!resource) {
-          res.status(409).json({ success: false, message: 'This resource is no longer available to reserve.' });
-          return;
-        }
-        if (resource.quantityAvailable === 0) {
-          resource.status = 'claimed';
-          await resource.save();
-        }
-      }
-      request.status = status;
-    } else if (request.status === 'accepted' && status === 'completed') {
-      request.status = 'completed';
-    } else {
-      res.status(400).json({ success: false, message: 'This request has already been processed and cannot be changed to that status.' });
-      return;
-    }
-    await request.save();
-
-    res.status(200).json({ success: true, message: `Request ${status}.`, data: { request } });
+    const request = await transitionResourceRequest(req.params.id, req.user!._id, req.body?.status);
+    res.status(200).json({ success: true, message: `Request ${request.status}.`, data: { request } });
   } catch (error) {
-    console.error('Update resource request status error:', error);
-    res.status(400).json({ success: false, message: 'Unable to update this request.' });
+    if (error instanceof ResourceReservationError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(503).json({ success: false, message: 'Unable to update this request. Please try again later.' });
   }
 };
