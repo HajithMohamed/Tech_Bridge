@@ -58,17 +58,17 @@ Executed local results (Node 22.14, Windows):
 | --- | --- |
 | Backend typecheck/build | PASS |
 | Backend unit | PASS, 45 tests (26 new seed-safety tests) |
-| Backend database/CLI integration | PASS, 19 tests (7 new seed tests) |
+| Backend database/CLI integration | PASS, 20 tests (8 new seed tests); final seed-only suite also passed all 8 |
 | Frontend typecheck/build | PASS; unchanged 592.06 kB bundle warning |
-| Frontend lint/unit/integration | Running at initial report publication |
+| Frontend lint/unit/integration | PASS, 7 unit and 7 integration tests |
 | Chromium regression | PASS, all 3 journeys, 28.5 seconds including startup |
 | Repository security | PASS, all 9 unit/integration checks |
 
-Final frontend and CI evidence will be recorded after completion. The suites include:
+All 91 local checks passed (45 backend unit, 20 backend integration, 7 frontend unit, 7 frontend integration, 3 browser journeys, 9 repository checks). This branch adds 26 unit and 8 integration tests. Initial implementation commit `d17edea444c005949d5127583fc037b7911afc3e` also passed [all application CI jobs](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39100735692) and [repository security CI](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39100735686). Final CI for the additional env-file command test will be recorded after publication. The suites include:
 
 - Unit: explicit mode/opt-in gates; connection not opened on invalid mode; URI host/scheme/database/credential/query restrictions; bcrypt byte limits and required password; isolated test namespace handling; no supplied values in configuration errors.
 - Database integration: one synthetic admin only; bcrypt hashing and actual API login; unrelated provider preservation; idempotency without password/status changes; role-collision rejection; concurrent attempts with different passwords preserve the winner's credential.
-- CLI integration: actual `node --import tsx src/seed.ts` subprocess succeeds against the owned test database, exits/cleans up, and prints neither password nor URI; production-mode subprocess exits nonzero with no user records changed and no sensitive output.
+- CLI integration: actual `node --import tsx src/seed.ts` subprocess succeeds against the owned test database, exits/cleans up, and prints neither password nor URI; production-mode subprocess exits nonzero with no user records changed and no sensitive output. The documented tsx env-file loader is also executed against the blank example and must refuse it before connection; all supplied connection targets in these tests point to the owned memory-server instance.
 - Regression: existing backend unit/API suites, frontend lint/typecheck/build/unit/integration, existing Chromium journeys and repository-security checks. The existing PR CI workflow discovers the new tests automatically; no new pipeline or dependencies are needed.
 
 The changed workflow is a CLI rather than a frontend journey. Its real CLI/database/login checks are the feature demonstration; existing browser journeys provide broader API/frontend regression coverage. A test pass does not certify complete identity verification, secure production admin setup, or production readiness.
@@ -83,4 +83,4 @@ Rollback: reverting this source change would restore the unsafe seed path and is
 
 ## Git Review and Approval
 
-Branch: `fix/demo-seed-safety`; base SHA recorded above. Commit/PR/CI evidence will be added after validation. Development, integration and main are preserved; no feature merge or next branch has been started. Review this scoped fix and its test evidence before approving another improvement. Merge approval remains separate.
+Branch: `fix/demo-seed-safety`; base SHA recorded above. Initial implementation commit: `d17edea444c005949d5127583fc037b7911afc3e`. [Draft PR #9](https://github.com/HajithMohamed/Tech_Bridge/pull/9) targets `integration/techbridge-v2`. Final CI evidence will be added after publication of the extra command test. The test preview/API ports were confirmed closed after browser teardown. Development, integration and main are preserved; no feature merge or next branch has been started. Review this scoped fix and its test evidence before approving another improvement. Merge approval remains separate.

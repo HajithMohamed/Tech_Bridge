@@ -90,4 +90,24 @@ describe('safe demo seeding against a real isolated database', () => {
     expect(rejected).toBe(true);
     expect(await User.countDocuments()).toBe(0);
   });
+  it('supports the documented env-file loader and refuses the unfilled example before connection', async () => {
+    const target = new URL(database.getUri());
+    target.pathname = '/techbridge_demo';
+    let rejected = false;
+    try {
+      await run(process.execPath, [resolve(__dirname, '../../node_modules/tsx/dist/cli.mjs'), '--env-file=demo-seed.env.example', 'src/seed.ts'], {
+        cwd: resolve(__dirname, '../..'),
+        env: { ...process.env, NODE_ENV: 'development', ENABLE_DEMO_SEED: 'true', MONGODB_URI: target.href, DEMO_ADMIN_PASSWORD: '' },
+        timeout: 10_000,
+      });
+    } catch (error) {
+      rejected = true;
+      const failure = error as { code: number; stdout: string; stderr: string };
+      expect(failure.code).toBe(1);
+      expect(failure.stderr).toContain('Provide DEMO_ADMIN_PASSWORD');
+      expect(failure.stdout + failure.stderr).not.toContain('mongodb://');
+    }
+    expect(rejected).toBe(true);
+    expect(await User.countDocuments()).toBe(0);
+  });
 });
