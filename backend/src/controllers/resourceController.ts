@@ -1,3 +1,4 @@
+import { publicResourceOwnerSelect } from '../utils/publicProvider';
 import { Request, Response } from 'express';
 import Resource, {
   IResourceAccessDetails,
@@ -15,7 +16,7 @@ const statuses: ResourceStatus[] = ['available', 'claimed'];
 const studentAccessTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const peerToPeerAccessTypes: ResourceAccessType[] = ['borrow', 'share'];
 const providerManagedAccessTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
-const listedBySelect = 'fullName email role providerProfile.organizationName providerProfile.organizationType providerProfile.verified providerProfile.verificationStatus providerProfile.contactEmail providerProfile.phone';
+const listedBySelect = publicResourceOwnerSelect;
 
 type Payload = Record<string, unknown>;
 
