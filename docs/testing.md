@@ -1,6 +1,6 @@
 # Testing TechBridge
 
-Requires Node 22.12+ on the 22.x line, Node 24, or Node 26+; CI uses Node 22. Test dependencies are pinned in the two package lockfiles. Run commands from the indicated package directory; do not run the production seed or migration scripts to prepare tests.
+Requires Node 22.12+ on the 22.x line, Node 24, or Node 26+; CI uses Node 22. Test dependencies are pinned in the two package lockfiles. Each package's `.npmrc` explicitly disables legacy peer resolution so developer-global npm settings cannot silently produce an incompatible lockfile. Run commands from the indicated package directory; do not run the production seed or migration scripts to prepare tests.
 
 ## Install and provision
 

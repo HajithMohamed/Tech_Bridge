@@ -27,6 +27,7 @@ Modified files:
 New files:
 
 - `.github/workflows/testing-foundation.yml`.
+- `backend/.npmrc`, `frontend/.npmrc`: explicitly use standard peer dependency resolution for repeatable installs.
 - `backend/vitest.config.mts`, `backend/tsconfig.test.json`.
 - `backend/tests/support/database.ts`, `backend/tests/support/fixtures.ts`.
 - `backend/tests/prepare-mongo.ts`, `backend/tests/e2e-server.ts`.
@@ -43,7 +44,7 @@ Database schema changes: none. API endpoint changes: none. Authorization changes
 
 Migration instructions: none. Install with `npm ci` in both packages, provision test binaries with the documented `test:prepare` commands, and run the checks in [testing.md](testing.md). Do not execute `seed` or `migrate:phase2` for tests. Normal production server bootstrap still loads its existing configuration; the testing entry points do not load it.
 
-Tooling requires Node 22.12+ on 22.x, Node 24 or Node 26+. jsdom 26 is intentionally selected because the latest release's minimum Node patch version exceeds this workstation's Node 22.14. Test-only Vite is installed explicitly in the backend because Vitest requires that peer dependency. Existing locked build-tool packages changed only for `@jridgewell/sourcemap-codec` (1.5.5 -> 1.6.0 in both packages) and `picomatch` (4.0.5 -> 4.0.7 in frontend); application dependency declarations and locked application package versions were retained.
+Tooling requires Node 22.12+ on 22.x, Node 24 or Node 26+. jsdom 26 is intentionally selected because the latest release's minimum Node patch version exceeds this workstation's Node 22.14. Test-only Vite is installed explicitly in the backend because Vitest requires that peer dependency. Existing locked build-tool packages changed only for `@jridgewell/sourcemap-codec` (1.5.5 -> 1.6.0 in both packages) and `picomatch` (4.0.5 -> 4.0.7 in frontend; backend hoists 4.0.7 while retaining 2.3.2 under legacy watcher dependencies). Application dependency declarations and locked application package versions were retained.
 
 ## Testing
 
@@ -75,7 +76,7 @@ Database isolation: a test-owned loopback replica set and random namespaced data
 
 E2E isolation: Playwright owns API port 4510 and preview port 4173 and refuses to reuse pre-existing servers. Each browser context is fresh; fixture data and the database belong only to this run. A browser fixture blocks non-preview origins. No public test-reset endpoint is added. Reports/screenshots use synthetic data; traces are disabled to avoid recording auth headers.
 
-CI: separate backend, frontend and E2E jobs run the same checks on PRs; no production secrets, migrations or deployment. MongoDB binary caching/provisioning is explicit. The previous repository-security workflow remains active on PRs. GitHub execution status will be added after publication; local passes are not a claim of CI success.
+CI: separate backend, frontend and E2E jobs run the same checks on PRs; no production secrets, migrations or deployment. MongoDB binary caching/provisioning is explicit. The previous repository-security workflow remains active on PRs. Initial PR CI passed frontend and repository checks but caught a backend lockfile/peer-resolution mismatch at `npm ci`: this workstation's global npm setting enabled legacy peers. The package settings now explicitly disable legacy peer resolution. The corrected backend lockfile passed a fresh `npm ci --ignore-scripts` using CI's npm 10.9.9 in an isolated directory (278 packages installed; existing local node_modules preserved). Final CI evidence will be recorded after verification; this install check alone does not prove CI test success.
 
 ## Security Issues and Limits
 
@@ -93,6 +94,6 @@ The generated screenshot was inspected. It confirms the synthetic application an
 
 ## Git Review
 
-Branch: `chore/testing-foundation`; base `2132b857ec8ca7bb55fdb9a25a14fbb460cee5eb`. Implementation commit/PR and final CI evidence will be recorded after verification. No merge, conflict resolution, history rewrite, production-data change, or subsequent feature branch has been performed. Dependencies: reviewed integration baseline, explicit test binaries and the existing application contracts. Future feature branches should use these fixtures/checks after approval and any separately approved merge.
+Branch: `chore/testing-foundation`; base `2132b857ec8ca7bb55fdb9a25a14fbb460cee5eb`. Initial implementation commit: `511def7ded0bfface4f1929df377cde21d56f1ab`. [Draft PR #6](https://github.com/HajithMohamed/Tech_Bridge/pull/6) targets `integration/techbridge-v2`. Final CI evidence will be recorded after verification. No merge, conflict resolution, history rewrite, production-data change, or subsequent feature branch has been performed. Dependencies: reviewed integration baseline, explicit test binaries and the existing application contracts. Future feature branches should use these fixtures/checks after approval and any separately approved merge.
 
 Approval gate: review this testing-foundation branch and its evidence before proceeding to another scope. Approval of this phase is not automatic permission to merge or perform production migrations.
