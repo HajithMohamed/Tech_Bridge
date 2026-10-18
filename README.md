@@ -536,3 +536,8 @@ For testing and administrative purposes:
 ## 📄 License
 
 This project is licensed under the [ISC License](LICENSE).
+
+
+## Automated testing
+
+See [the testing guide](docs/testing.md) for isolated fixtures, unit/integration checks, Playwright E2E setup, and pull-request CI. Automated tests never use the production seed script or database.

@@ -1,0 +1,82 @@
+name: Application checks
+on:
+  pull_request:
+  push:
+    branches: [integration/techbridge-v2, chore/testing-foundation]
+permissions:
+  contents: read
+concurrency:
+  group: application-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:unit
+      - uses: actions/cache@v4
+        with:
+          path: backend/.cache/mongodb-binaries
+          key: mongodb-${{ runner.os }}-7.0.24
+      - run: npm run test:prepare
+      - run: npm run test:integration
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:unit
+      - run: npm run test:integration
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix frontend
+      - uses: actions/cache@v4
+        with:
+          path: backend/.cache/mongodb-binaries
+          key: mongodb-${{ runner.os }}-7.0.24
+      - run: npm run test:prepare --prefix backend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run build --prefix frontend
+      - run: npm run test:e2e --prefix frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failure-report
+          path: output/playwright/
+          retention-days: 7
