@@ -1,3 +1,5 @@
+import { editOpportunityWithAwardGuard, ScholarshipAwardError } from '../services/scholarshipAwards';
+import { Types } from 'mongoose';
 import { publicListingProviderSelect } from '../utils/publicProvider';
 import { Request, Response } from 'express';
 import Opportunity, { IOpportunity, OpportunityType } from '../models/Opportunity';
@@ -235,6 +237,14 @@ export const getOpportunity = async (req: Request, res: Response): Promise<void>
 /** PUT /api/opportunities/:id */
 export const updateOpportunity = async (req: Request, res: Response): Promise<void> => {
   try {
+    if (typeof req.params.id !== 'string' || !Types.ObjectId.isValid(req.params.id)) {
+      res.status(400).json({ success: false, message: 'Invalid opportunity ID.' });
+      return;
+    }
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      res.status(400).json({ success: false, message: 'Provide an opportunity update object.' });
+      return;
+    }
     const opportunity = await Opportunity.findOne({ _id: req.params.id, providerId: req.user!._id });
     if (!opportunity) {
       res.status(404).json({ success: false, message: 'Opportunity not found or you do not own it' });
@@ -242,34 +252,25 @@ export const updateOpportunity = async (req: Request, res: Response): Promise<vo
     }
 
     const payload = opportunityPayload(req.body);
-    const values = { ...opportunity.toObject(), ...payload } as Record<string, unknown>;
-    const validationError = validateOpportunity(values);
-    if (validationError) {
-      res.status(400).json({ success: false, message: validationError });
-      return;
-    }
-    if (!canOfferType(req, values.type as OpportunityType)) {
-      res.status(403).json({
-        success: false,
-        message: 'This opportunity type is not enabled in your provider services.',
-      });
-      return;
-    }
-
-    if (payload.status === 'expired') {
-      res.status(400).json({ success: false, message: 'Expired status is assigned automatically when a deadline passes.' });
-      return;
-    }
-    opportunity.set(payload);
-    if (opportunity.type !== 'scholarship') {
-      scholarshipFields.forEach((field) => opportunity.set(field, undefined));
-    }
-    await opportunity.save();
-    await opportunity.populate('providerId', providerSelect);
-    res.status(200).json({ success: true, message: 'Opportunity updated', data: { opportunity } });
+    const updated = await editOpportunityWithAwardGuard(opportunity._id, req.user!._id, (current) => {
+      const values = { ...current.toObject(), ...payload } as Record<string, unknown>;
+      const validationError = validateOpportunity(values);
+      if (validationError) throw new ScholarshipAwardError(400, validationError);
+      if (!canOfferType(req, values.type as OpportunityType)) {
+        throw new ScholarshipAwardError(403, 'This opportunity type is not enabled in your provider services.');
+      }
+      if (payload.status === 'expired') throw new ScholarshipAwardError(400, 'Expired status is assigned automatically when a deadline passes.');
+      current.set(payload);
+      if (current.type !== 'scholarship') scholarshipFields.forEach((field) => current.set(field, undefined));
+    });
+    await updated.populate('providerId', providerSelect);
+    res.status(200).json({ success: true, message: 'Opportunity updated', data: { opportunity: updated } });
   } catch (error) {
-    console.error('Update opportunity error:', error);
-    res.status(400).json({ success: false, message: 'Unable to update this opportunity' });
+    if (error instanceof ScholarshipAwardError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(503).json({ success: false, message: 'Unable to update this opportunity. Please try again later.' });
   }
 };
 
