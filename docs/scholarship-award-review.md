@@ -2,6 +2,8 @@
 
 Branch: `fix/scholarship-award-atomicity`. Base: fetched development `8a93d070821663cd9000d8132c58531f5047757e`. Resource PR #12 remains independent and pending; this branch does not include or replace it.
 
+Review completed: 2026-10-19 (Asia/Colombo).
+
 ## Existing behavior and acceptance criteria
 
 Scholarship applications, provider review, status updates, priority explanations and award counts already exist. Approval previously counted accepted applications and then saved separately, allowing concurrent approvals to exceed capacity. The duplicate-benefit check also raced across providers. Editing capacity could invalidate the award limit.
@@ -34,7 +36,7 @@ Unit coverage includes positive/invalid/legacy capacity, existing statuses, inva
 | --- | --- |
 | Backend type checks | Passed |
 | Backend unit tests | 79 passed on rerun |
-| Backend integration tests | 55 passed in full run; final 25-case scholarship run passed, covering 56 distinct API/database cases in total |
+| Backend integration tests | 56 passed together in CI; locally 55 passed in full run plus the final 25-case scholarship run |
 | Backend production build | Passed |
 | Frontend type checks and lint | Passed |
 | Frontend unit/integration/build | 7 unit and 12 integration passed; build passed with existing 591.86 kB chunk warning |
@@ -46,7 +48,16 @@ Total: 168 distinct passing tests on this branch, including 60 added here (32 un
 
 One existing app-import unit test exceeded its 15-second limit in the first local run. The unchanged suite passed on rerun in 6.43 seconds, without changing timeouts. Successful transactions/write conflicts/rollback use isolated real MongoDB replica sets; transaction-unavailable errors are simulated. No standalone database was reconfigured. Both owned test-server ports (4173/4510) were closed after the browser run.
 
-The screenshot `output/playwright/scholarship-award.png` was inspected. Acceptance persisted, but the existing provider-review page has white/light text with poor contrast on its light background. No frontend product code or redesign was changed; this remains a visible limitation for the separate UI workflow. CI evidence will be recorded after the draft PR runs.
+The screenshot `output/playwright/scholarship-award.png` was inspected. Acceptance persisted, but the existing provider-review page has white/light text with poor contrast on its light background. No frontend product code or redesign was changed; this remains a visible limitation for the separate UI workflow.
+
+## Pull request and CI evidence
+
+[Draft PR #13](https://github.com/HajithMohamed/Tech_Bridge/pull/13) targets `development`. Verified implementation/test commit: `5b0ab486b5b1c54ece8bf9968c50f87f1bcd618d`.
+
+- [Application checks run 39198422055](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39198422055): all three jobs succeeded, including clean installations, backend/frontend type checks/builds, frontend lint and MongoDB/browser provisioning. Decoded job logs confirmed 79 backend unit and 56 backend integration tests, 7 frontend unit and 12 frontend integration tests, and all 5 Chromium journeys (12.9 seconds). The full CI suites had no skipped tests.
+- [Repository security run 39198422103](https://github.com/HajithMohamed/Tech_Bridge/actions/runs/39198422103): policy unit/integration tests and tracked-file audit succeeded. The staged local audit also passed all 9 checks with zero tracked environment, dependency or build-output violations across 188 files.
+
+Together these checks verified all 168 tests on the exact committed implementation. The evidence follow-up changes documentation only. The branch was committed and pushed with a clean working tree; no branch was merged and no production records were changed.
 
 ## Rollback and remaining risks
 
