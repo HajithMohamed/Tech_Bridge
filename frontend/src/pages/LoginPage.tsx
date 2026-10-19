@@ -39,8 +39,8 @@ const LoginPage = () => {
     if (!validateForm()) return;
 
     try {
-      await login(formData);
-      navigate('/dashboard');
+      const signedIn = await login(formData);
+      navigate(signedIn.role === 'admin' ? '/admin' : signedIn.role === 'provider' ? '/provider' : '/dashboard');
     } catch {
       // Error is handled by AuthContext
     }

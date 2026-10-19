@@ -3,6 +3,7 @@ export interface User {
   fullName: string;
   email: string;
   role: 'student' | 'provider' | 'admin';
+  adminBaseRole?: 'student' | 'provider';
   accountStatus?: 'active' | 'suspended';
   studentProfile?: StudentProfile;
   providerProfile?: ProviderProfile;

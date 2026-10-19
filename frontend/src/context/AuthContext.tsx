@@ -10,7 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   fieldErrors: Array<{ field: string; message: string }> | null;
-  login: (data: LoginData) => Promise<void>;
+  login: (data: LoginData) => Promise<User>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   updateStoredUser: (user: User) => void;
@@ -82,6 +82,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       setUser(userData);
       setToken(newToken);
+      return userData;
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data) {
         const errorData = err.response.data;
