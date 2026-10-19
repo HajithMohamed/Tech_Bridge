@@ -60,7 +60,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Providers must be reviewed before they can access the provider portal.
     const isPendingProvider = user.role === 'provider' && !user.providerProfile?.verified;
-    const token = isPendingProvider ? undefined : generateToken(user._id.toString(), user.role);
+    const token = isPendingProvider ? undefined : generateToken(user._id.toString(), user.role, user.tokenVersion || 0);
 
     res.status(201).json({
       success: true,
@@ -101,7 +101,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Find user and explicitly include password field
     const user = await User.findOne({ email: email.toLowerCase() }).select(
-      '+password'
+      '+password +tokenVersion'
     );
 
     if (!user) {
@@ -145,7 +145,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Generate token
-    const token = generateToken(user._id.toString(), user.role);
+    const token = generateToken(user._id.toString(), user.role, user.tokenVersion || 0);
 
     res.status(200).json({
       success: true,

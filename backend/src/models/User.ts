@@ -37,6 +37,8 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'student' | 'provider' | 'admin';
+  adminBaseRole?: 'student' | 'provider';
+  tokenVersion?: number;
   accountStatus: 'active' | 'suspended';
   studentProfile?: {
     institution: string;
@@ -99,6 +101,8 @@ const userSchema = new Schema<IUser>(
       enum: ['student', 'provider', 'admin'],
       default: 'student',
     },
+    adminBaseRole: { type: String, enum: ['student', 'provider'] },
+    tokenVersion: { type: Number, default: 0, min: 0, select: false },
     accountStatus: { type: String, enum: ['active', 'suspended'], default: 'active', index: true },
     studentProfile: {
       institution: { type: String, trim: true },

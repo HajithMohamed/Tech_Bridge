@@ -42,7 +42,7 @@ export const protect = async (
     const decoded = verifyToken(token);
 
     // Find user and attach to request
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).select('+tokenVersion');
 
     if (!user) {
       res.status(401).json({
@@ -51,6 +51,12 @@ export const protect = async (
       });
       return;
     }
+
+    if ((decoded.version ?? 0) !== (user.tokenVersion ?? 0)) {
+      res.status(401).json({ success: false, message: 'Your session changed. Please sign in again.' });
+      return;
+    }
+    user.set('tokenVersion', undefined);
 
     if (user.accountStatus === 'suspended') {
       res.status(403).json({

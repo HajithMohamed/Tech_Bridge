@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { listAuditLog, listProvidersForVerification, listReports, listUsers, rejectProvider, reinstateUser, removeOpportunity, removeResource, resolveReport, suspendUser, verifyProvider } from '../controllers/adminController';
+import { changeUserRole, listUserHistory, listAuditLog, listProvidersForVerification, listReports, listUsers, rejectProvider, reinstateUser, removeOpportunity, removeResource, resolveReport, suspendUser, verifyProvider } from '../controllers/adminController';
 import { authorize, protect } from '../middleware/auth';
 
 const router = Router();
@@ -8,6 +8,8 @@ router.get('/providers', listProvidersForVerification);
 router.patch('/providers/:id/verify', verifyProvider);
 router.patch('/providers/:id/reject', rejectProvider);
 router.get('/users', listUsers);
+router.get('/users/:id/history', listUserHistory);
+router.patch('/users/:id/role', changeUserRole);
 router.patch('/users/:id/suspend', suspendUser);
 router.patch('/users/:id/reinstate', reinstateUser);
 router.get('/reports', listReports);
