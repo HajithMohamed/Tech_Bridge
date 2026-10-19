@@ -1,14 +1,13 @@
 import { Request, Response } from 'express';
-import Application, { ApplicationStatus } from '../models/Application';
+import Application from '../models/Application';
 import Opportunity from '../models/Opportunity';
 import User from '../models/User';
 import { applicationPriority } from '../utils/priorityEngine';
+import { changeApplicationStatus, currentAcademicYearStart, ScholarshipAwardError } from '../services/scholarshipAwards';
 
-const applicationStatuses: ApplicationStatus[] = ['applied', 'reviewed', 'accepted', 'rejected'];
 const studentSelect = 'fullName email studentProfile.institution studentProfile.degree studentProfile.studyYear studentProfile.skills studentProfile.careerGoal';
 const opportunitySelect = 'title type location workMode applicationDeadline providerId status';
 
-const currentAcademicYearStart = () => new Date(new Date().getFullYear(), 0, 1);
 const idString = (value: unknown) => {
   if (value && typeof value === 'object' && '_id' in value) return String((value as { _id: unknown })._id);
   return String(value);
@@ -120,51 +119,14 @@ export const listOpportunityApplications = async (req: Request, res: Response): 
 /** PATCH /api/applications/:id/status */
 export const updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const status = req.body.status as ApplicationStatus;
-    if (!applicationStatuses.includes(status)) {
-      res.status(400).json({ success: false, message: 'Status must be applied, reviewed, accepted, or rejected.' });
-      return;
-    }
-
-    const application = await Application.findById(req.params.id);
-    if (!application) {
-      res.status(404).json({ success: false, message: 'Application not found.' });
-      return;
-    }
-
-    const opportunity = await Opportunity.findOne({ _id: application.opportunityId, providerId: req.user!._id });
-    if (!opportunity) {
-      res.status(403).json({ success: false, message: 'You cannot update this application.' });
-      return;
-    }
-
-    if (status === 'accepted' && opportunity.type === 'scholarship') {
-      const [acceptedForOpportunity, existingScholarships] = await Promise.all([
-        Application.countDocuments({ opportunityId: opportunity._id, status: 'accepted', _id: { $ne: application._id } }),
-        Application.find({ studentId: application.studentId, status: 'accepted', appliedAt: { $gte: currentAcademicYearStart() }, _id: { $ne: application._id } }).populate('opportunityId', 'type'),
-      ]);
-      if (acceptedForOpportunity >= (opportunity.numberOfAwards || 1)) {
-        res.status(409).json({ success: false, message: 'This scholarship has reached its number of awards.' });
-        return;
-      }
-      if (existingScholarships.some((item) => (item.opportunityId as unknown as { type?: string })?.type === 'scholarship')) {
-        res.status(409).json({ success: false, message: 'This student already holds an accepted scholarship for this academic year.' });
-        return;
-      }
-    }
-
-    application.status = status;
-    await application.save();
-    await application.populate('studentId', studentSelect);
-    await application.populate('opportunityId', opportunitySelect);
-
-    res.status(200).json({
-      success: true,
-      message: 'Application status updated',
-      data: { application },
-    });
+    const application = await changeApplicationStatus(req.params.id, req.user!._id, req.body?.status);
+    res.status(200).json({ success: true, message: 'Application status updated', data: { application } });
   } catch (error) {
-    res.status(400).json({ success: false, message: 'Unable to update this application.' });
+    if (error instanceof ScholarshipAwardError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(503).json({ success: false, message: 'Unable to update this application. Please try again later.' });
   }
 };
 /** GET /api/applications/provider */
