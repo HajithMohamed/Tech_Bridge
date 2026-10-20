@@ -6,8 +6,8 @@ export interface IAuditLog extends Document {
   targetType: 'user' | 'opportunity' | 'resource';
   targetId: mongoose.Types.ObjectId;
   reason?: string;
-  before?: { role: string; accountStatus: string };
-  after?: { role: string; accountStatus: string };
+  before?: { role: string; accountStatus: string; verificationStatus?: string };
+  after?: { role: string; accountStatus: string; verificationStatus?: string };
   createdAt: Date;
 }
 
@@ -17,8 +17,8 @@ const auditLogSchema = new Schema<IAuditLog>({
   targetType: { type: String, required: true, enum: ['user', 'opportunity', 'resource'], index: true },
   targetId: { type: Schema.Types.ObjectId, required: true, index: true },
   reason: { type: String, trim: true, maxlength: 1000 },
-  before: { role: String, accountStatus: String },
-  after: { role: String, accountStatus: String },
+  before: { role: String, accountStatus: String, verificationStatus: String },
+  after: { role: String, accountStatus: String, verificationStatus: String },
 }, { timestamps: { createdAt: true, updatedAt: false } });
 
 auditLogSchema.index({ targetType: 1, targetId: 1, createdAt: -1 });

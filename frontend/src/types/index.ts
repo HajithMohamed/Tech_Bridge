@@ -74,7 +74,8 @@ export interface ProviderProfile {
   organizationName: string;
   organizationType: OrganizationType;
   verified?: boolean;
-  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NEEDS_INFO';
+  verificationDocumentId?: string;
   rejectionReason?: string;
   contactEmail: string;
   contactPerson: string;

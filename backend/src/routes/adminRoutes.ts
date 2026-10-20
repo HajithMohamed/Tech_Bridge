@@ -1,12 +1,17 @@
 import { Router } from 'express';
-import { changeUserRole, listUserHistory, listAuditLog, listProvidersForVerification, listReports, listUsers, rejectProvider, reinstateUser, removeOpportunity, removeResource, resolveReport, suspendUser, verifyProvider } from '../controllers/adminController';
+import { changeUserRole, listUserHistory, listAuditLog, listReports, listUsers, reinstateUser, removeOpportunity, removeResource, resolveReport, suspendUser } from '../controllers/adminController';
+import { downloadAdminVerificationDocument, listVerificationProviders, providerDecision, verificationHistory } from '../controllers/providerVerificationController';
 import { authorize, protect } from '../middleware/auth';
 
 const router = Router();
 router.use(protect, authorize('admin'));
-router.get('/providers', listProvidersForVerification);
-router.patch('/providers/:id/verify', verifyProvider);
-router.patch('/providers/:id/reject', rejectProvider);
+router.use('/providers', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+router.get('/providers', listVerificationProviders);
+router.patch('/providers/:id/verify', providerDecision('verified'));
+router.patch('/providers/:id/reject', providerDecision('rejected'));
+router.patch('/providers/:id/request-info', providerDecision('more_info'));
+router.get('/providers/:id/history', verificationHistory(true));
+router.get('/providers/:id/documents/:documentId', downloadAdminVerificationDocument);
 router.get('/users', listUsers);
 router.get('/users/:id/history', listUserHistory);
 router.patch('/users/:id/role', changeUserRole);

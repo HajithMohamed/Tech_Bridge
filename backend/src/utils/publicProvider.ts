@@ -19,6 +19,12 @@ export const publicListingProviderSelect =
 
 export const publicResourceOwnerSelect = `role ${publicListingProviderSelect}`;
 
+export function currentResourceOwnerVerified(owner: unknown): boolean {
+  if (!owner || typeof owner !== 'object') return false;
+  const account = owner as { role?: unknown; providerProfile?: { verified?: unknown } };
+  return account.role === 'provider' && account.providerProfile?.verified === true;
+}
+
 export function toPublicProviderDetails(profile: PublicProviderDetails): PublicProviderDetails {
   return Object.fromEntries(publicProfileFields.map((field) => [field, profile[field]])) as PublicProviderDetails;
 }

@@ -88,7 +88,6 @@ const RegisterPage = () => {
       location: '',
       website: '',
       description: '',
-      verificationDocumentName: '',
       opportunityCategories: [] as string[],
       resourceAccessMethods: [] as string[],
     },
@@ -169,7 +168,6 @@ const RegisterPage = () => {
             location: formData.providerProfile.location,
             website: formData.providerProfile.website,
             description: formData.providerProfile.description,
-            verificationDocumentName: formData.providerProfile.verificationDocumentName || undefined,
             opportunityCategories: formData.providerProfile.opportunityCategories,
             resourceAccessMethods: formData.providerProfile.opportunityCategories.includes('technical_resources') ? formData.providerProfile.resourceAccessMethods : []
           }
@@ -279,8 +277,8 @@ const RegisterPage = () => {
           <div className="w-14 h-14 mx-auto rounded-full bg-amber-100 text-amber-700 grid place-items-center text-2xl">⌛</div>
           <h1 className="mt-5 text-2xl font-bold text-surface-800">Provider verification pending</h1>
           <p className="mt-3 text-gray-600 leading-7">Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.</p>
-          <p className="mt-3 text-sm text-gray-500">For this MVP, verification is completed manually before your provider account is activated.</p>
-          <Link to="/login" className="inline-flex mt-6 px-5 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 text-white font-semibold hover:opacity-90 transition-opacity">Back to sign in</Link>
+          <p className="mt-3 text-sm text-gray-500">Submit your supporting evidence and follow the review in provider verification.</p>
+          <Link to="/provider-verification" className="inline-flex mt-6 px-5 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 text-white font-semibold hover:opacity-90 transition-opacity">Submit verification documents</Link>
         </div>
       </div>
     );
@@ -598,9 +596,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Supporting document <span className="font-normal text-gray-400">(optional)</span></label>
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleInputChange('verificationDocumentName', e.target.files?.[0]?.name || '', 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 text-sm text-gray-600" />
-                      <p className="mt-1 text-xs text-gray-500">For the MVP, TechBridge records the filename for manual review; file storage can be added later.</p>
+                      <p className="text-sm text-gray-600">After registration, use provider verification to securely submit your supporting document and read review decisions.</p>
                     </div>
 
                     <div>

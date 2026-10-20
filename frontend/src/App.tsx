@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import ProviderVerificationPage from './pages/ProviderVerificationPage';
 import RegisterPage from './pages/RegisterPage';
 import LandingPage from './pages/LandingPage';
 import FacultyConnectionsPage from './pages/FacultyConnectionsPage';
@@ -36,6 +37,7 @@ const App = () => (
     <Route path="/connections" element={<FacultyConnectionsPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
+    <Route path="/provider-verification" element={<ProviderVerificationPage />} />
     <Route element={<PortalLayout />}>
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/opportunities" element={<OpportunityFeedPage />} />

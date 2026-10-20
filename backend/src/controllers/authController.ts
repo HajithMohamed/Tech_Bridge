@@ -54,6 +54,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
               ...providerProfile,
               verified: false,
               verificationStatus: 'PENDING',
+              verificationDocumentId: undefined,
+              verificationDocumentName: undefined,
+              rejectionReason: undefined,
             },
           }),
     });
