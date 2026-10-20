@@ -1,12 +1,13 @@
 import mongoose from 'mongoose';
+import { databaseErrorMessage } from '../utils/databaseError';
 
 const connectDB = async (): Promise<void> => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI as string);
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    if (!process.env.MONGODB_URI) throw new Error('Missing database configuration.');
+    await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
+    console.log('MongoDB connected.');
   } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error);
-    process.exit(1);
+    throw new Error(databaseErrorMessage(error));
   }
 };
 
