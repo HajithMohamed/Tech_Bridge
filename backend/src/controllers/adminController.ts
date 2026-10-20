@@ -12,37 +12,6 @@ const audit = (adminId: mongoose.Types.ObjectId, action: string, targetType: 'us
 
 const validId = (id: string | string[]) => mongoose.isValidObjectId(Array.isArray(id) ? id[0] : id);
 
-export const listProvidersForVerification = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const status = typeof req.query.status === 'string' && ['PENDING', 'VERIFIED', 'REJECTED'].includes(req.query.status) ? req.query.status : 'PENDING';
-    const providers = await User.find({ role: 'provider', 'providerProfile.verificationStatus': status })
-      .select('fullName email accountStatus providerProfile createdAt')
-      .sort({ createdAt: 1 });
-    res.json({ success: true, data: { providers } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load the verification queue.' }); }
-};
-
-export const verifyProvider = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!validId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid provider ID.' }); return; }
-    const provider = await User.findOneAndUpdate({ _id: req.params.id, role: 'provider' }, { $set: { 'providerProfile.verified': true, 'providerProfile.verificationStatus': 'VERIFIED', 'providerProfile.rejectionReason': undefined } }, { new: true });
-    if (!provider) { res.status(404).json({ success: false, message: 'Provider not found.' }); return; }
-    await audit(req.user!._id, 'provider_verified', 'user', provider._id);
-    res.json({ success: true, message: 'Provider verified. A notification can be sent by the notification service when enabled.', data: { provider } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to verify provider.' }); }
-};
-
-export const rejectProvider = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
-    if (!validId(req.params.id) || reason.length < 3 || reason.length > 1000) { res.status(400).json({ success: false, message: 'Provide a rejection reason between 3 and 1000 characters.' }); return; }
-    const provider = await User.findOneAndUpdate({ _id: req.params.id, role: 'provider' }, { $set: { 'providerProfile.verified': false, 'providerProfile.verificationStatus': 'REJECTED', 'providerProfile.rejectionReason': reason } }, { new: true });
-    if (!provider) { res.status(404).json({ success: false, message: 'Provider not found.' }); return; }
-    await audit(req.user!._id, 'provider_rejected', 'user', provider._id, reason);
-    res.json({ success: true, message: 'Provider rejected.', data: { provider } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to reject provider.' }); }
-};
-
 const adminFailure = (res: Response, error: unknown): void => {
   if (error instanceof AdminActionError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
   res.status(503).json({ success: false, message: 'Unable to complete this administrative action. Please try again later.' });

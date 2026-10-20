@@ -6,6 +6,9 @@ import ResourceRequest from '../models/ResourceRequest';
 import User from '../models/User';
 import { isProviderOfferingAllowed, providerOfferings } from '../utils/providerCapabilities';
 import { publicProviderProfileSelect, toPublicProviderDetails } from '../utils/publicProvider';
+import { saveVerifiedProviderProfile } from '../services/providerVerification';
+import { AdminActionError } from '../services/adminUsers';
+import mongoose from 'mongoose';
 
 const providerServices = ['jobs', 'internships', 'scholarships', 'training', 'mentorship', 'technical_resources'];
 
@@ -115,6 +118,7 @@ export const updateProviderProfile = async (req: Request, res: Response): Promis
     if (!provider?.providerProfile) { res.status(404).json({ success: false, message: 'Provider profile not found.' }); return; }
     const fields = ['organizationName', 'contactPerson', 'contactEmail', 'phone', 'location', 'website', 'logoUrl', 'description'] as const;
     for (const field of fields) {
+      if (req.body[field] !== undefined && typeof req.body[field] !== 'string') { res.status(400).json({ success: false, message: 'Provider text fields must be strings.' }); return; }
       if (req.body[field] !== undefined) provider.providerProfile[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
     }
     if (!provider.providerProfile.organizationName || !provider.providerProfile.contactPerson || !provider.providerProfile.contactEmail || !provider.providerProfile.phone || !provider.providerProfile.location) {
@@ -144,10 +148,14 @@ export const updateProviderProfile = async (req: Request, res: Response): Promis
       }
       provider.providerProfile.resourceAccessMethods = req.body.resourceAccessMethods;
     }
-    await provider.save();
-    res.status(200).json({ success: true, message: 'Provider profile updated', data: { user: provider } });
+    const changes: Record<string, unknown> = {};
+    for (const field of [...fields, 'opportunityCategories', 'resourceAccessMethods'] as const) if (req.body[field] !== undefined) changes[field] = provider.providerProfile[field];
+    const updated = await saveVerifiedProviderProfile(provider._id, Number(provider.get('__v') || 0), changes);
+    res.status(200).json({ success: true, message: updated?.providerProfile?.verified ? 'Provider profile updated' : 'Profile updated. Submit updated evidence for verification.', data: { user: updated } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Unable to update provider profile.' });
+    if (error instanceof AdminActionError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
+    if (error instanceof mongoose.Error.ValidationError) { res.status(400).json({ success: false, message: 'Check your provider profile fields.' }); return; }
+    res.status(503).json({ success: false, message: 'Unable to update provider profile.' });
   }
 };
 
@@ -180,7 +188,7 @@ export const getPublicProviderProfile = async (req: Request, res: Response): Pro
           createdAt: provider.createdAt,
         },
         opportunities,
-        resources,
+        resources: resources.map((resource) => ({ ...resource.toObject(), providerOrgVerified: provider.providerProfile?.verified === true })),
       },
     });
   } catch {

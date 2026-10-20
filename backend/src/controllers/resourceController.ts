@@ -1,4 +1,4 @@
-import { publicResourceOwnerSelect } from '../utils/publicProvider';
+import { currentResourceOwnerVerified, publicResourceOwnerSelect } from '../utils/publicProvider';
 import { Request, Response } from 'express';
 import Resource, {
   IResourceAccessDetails,
@@ -7,12 +7,17 @@ import Resource, {
   ResourceCondition,
   IResourceItemDetails,
   ResourceStatus,
+  IResourceListing,
 } from '../models/Resource';
 import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
 
 const categories: ResourceCategory[] = ['laptop', 'arduino', 'raspberry_pi', 'sensor', 'electronic_component', 'dev_board', 'other'];
 const accessTypes: ResourceAccessType[] = ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
 const statuses: ResourceStatus[] = ['available', 'claimed'];
+const publicResource = (resource: IResourceListing) => {
+  const data = resource.toObject();
+  return { ...data, providerOrgVerified: currentResourceOwnerVerified(data.listedBy) };
+};
 const studentAccessTypes: ResourceAccessType[] = ['borrow', 'share', 'donation'];
 const peerToPeerAccessTypes: ResourceAccessType[] = ['borrow', 'share'];
 const providerManagedAccessTypes: ResourceAccessType[] = ['rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
@@ -286,7 +291,7 @@ export const listResources = async (req: Request, res: Response): Promise<void> 
       filter.itemName = { $regex: escaped, $options: 'i' };
     }
     const resources = await Resource.find(filter).populate('listedBy', listedBySelect).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: { resources } });
+    res.status(200).json({ success: true, data: { resources: resources.map(publicResource) } });
   } catch {
     res.status(500).json({ success: false, message: 'Unable to fetch resource listings.' });
   }
@@ -307,7 +312,7 @@ export const getResource = async (req: Request, res: Response): Promise<void> =>
   try {
     const resource = await Resource.findById(req.params.id).populate('listedBy', listedBySelect);
     if (!resource) { res.status(404).json({ success: false, message: 'Resource listing not found.' }); return; }
-    res.status(200).json({ success: true, data: { resource } });
+    res.status(200).json({ success: true, data: { resource: publicResource(resource) } });
   } catch {
     res.status(400).json({ success: false, message: 'Invalid resource listing ID.' });
   }
