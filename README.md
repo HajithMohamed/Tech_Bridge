@@ -430,6 +430,12 @@ Applications and resource requests now require a 30–800 character need justifi
 
 ### Backend Setup
 
+For a persistent local Docker database and an administrator account, follow
+[the Docker local setup](docs/local-docker-admin.md). This uses a single-node replica
+set on `127.0.0.1:27018`, supports transactional workflows, and preserves existing
+Atlas configuration separately. The application continues to run through the usual
+backend and frontend `npm run dev` commands.
+
 1. **Navigate to the backend directory**:
    ```bash
    cd backend

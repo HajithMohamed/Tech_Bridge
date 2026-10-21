@@ -15,7 +15,7 @@ const startServer = async () => {
       console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error('API startup failed:', error instanceof Error ? error.message : 'Database startup failed.');
     process.exit(1);
   }
 };
