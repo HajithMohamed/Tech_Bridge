@@ -39,8 +39,8 @@ const LoginPage = () => {
     if (!validateForm()) return;
 
     try {
-      await login(formData);
-      navigate('/dashboard');
+      const signedIn = await login(formData);
+      navigate(signedIn.role === 'admin' ? '/admin' : signedIn.role === 'provider' ? '/provider' : '/dashboard');
     } catch {
       // Error is handled by AuthContext
     }
@@ -246,6 +246,7 @@ const LoginPage = () => {
           </div>
 
           <div className="mt-8 text-center">
+            <p className="mb-3 text-sm"><Link to="/provider-verification" className="font-semibold text-primary-700">Provider verification status and documents</Link></p>
             <p className="text-sm text-gray-500">
               Don't have an account?{' '}
               <Link

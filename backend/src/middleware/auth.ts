@@ -14,7 +14,7 @@ declare global {
 /**
  * Protect routes — verifies JWT Bearer token and attaches user to request
  */
-export const protect = async (
+const authenticate = (verificationOnly: boolean) => async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -40,9 +40,13 @@ export const protect = async (
 
     // Verify token
     const decoded = verifyToken(token);
+    if (decoded.scope !== undefined && (!verificationOnly || decoded.scope !== 'verification')) {
+      res.status(401).json({ success: false, message: 'This session is restricted to provider verification.' });
+      return;
+    }
 
     // Find user and attach to request
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).select('+tokenVersion');
 
     if (!user) {
       res.status(401).json({
@@ -52,11 +56,26 @@ export const protect = async (
       return;
     }
 
+    if ((decoded.version ?? 0) !== (user.tokenVersion ?? 0)) {
+      res.status(401).json({ success: false, message: 'Your session changed. Please sign in again.' });
+      return;
+    }
+    user.set('tokenVersion', undefined);
+
     if (user.accountStatus === 'suspended') {
       res.status(403).json({
         success: false,
         message: 'This account has been suspended. Contact TechBridge support if you believe this is a mistake.',
       });
+      return;
+    }
+
+    if (verificationOnly && user.role !== 'provider') {
+      res.status(403).json({ success: false, message: 'A provider account is required.' });
+      return;
+    }
+    if (!verificationOnly && user.role === 'provider' && (user.providerProfile?.verified !== true || user.providerProfile.verificationStatus !== 'VERIFIED')) {
+      res.status(403).json({ success: false, message: 'Complete provider verification before accessing the platform.' });
       return;
     }
 
@@ -69,6 +88,9 @@ export const protect = async (
     });
   }
 };
+
+export const protect = authenticate(false);
+export const protectVerification = authenticate(true);
 
 /**
  * Authorize by role — checks if the user's role is in the allowed list

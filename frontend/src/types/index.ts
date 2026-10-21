@@ -3,6 +3,7 @@ export interface User {
   fullName: string;
   email: string;
   role: 'student' | 'provider' | 'admin';
+  adminBaseRole?: 'student' | 'provider';
   accountStatus?: 'active' | 'suspended';
   studentProfile?: StudentProfile;
   providerProfile?: ProviderProfile;
@@ -73,7 +74,8 @@ export interface ProviderProfile {
   organizationName: string;
   organizationType: OrganizationType;
   verified?: boolean;
-  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NEEDS_INFO';
+  verificationDocumentId?: string;
   rejectionReason?: string;
   contactEmail: string;
   contactPerson: string;
@@ -95,8 +97,7 @@ export type CoverageType = 'full' | 'partial' | 'tuition_only' | 'equipment_only
 export interface OpportunityProvider {
   _id: string;
   fullName: string;
-  email: string;
-  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'verificationStatus'>;
+  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified'>;
 }
 
 export interface Opportunity {
@@ -162,9 +163,8 @@ export type ResourceStatus = 'available' | 'claimed';
 export interface ResourceListingOwner {
   _id: string;
   fullName: string;
-  email: string;
   role: User['role'];
-  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'verificationStatus' | 'contactEmail' | 'phone'>;
+  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified'>;
 }
 
 export interface ResourceAccessDetails {
@@ -411,10 +411,14 @@ export interface PromotionRequest {
   updatedAt: string;
 }
 
+export type PublicProviderDetails = Pick<ProviderProfile,
+  'organizationName' | 'organizationType' | 'verified' | 'location' | 'website' |
+  'logoUrl' | 'description' | 'opportunityCategories' | 'resourceAccessMethods'>;
+
 export interface PublicProviderProfile {
   _id: string;
   fullName: string;
-  providerProfile: ProviderProfile;
+  providerProfile: PublicProviderDetails;
   createdAt: string;
 }
 

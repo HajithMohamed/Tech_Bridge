@@ -1,3 +1,4 @@
+import { AdminActionError, adminId, adminPage, changeManagedUser, userListFilter } from '../services/adminUsers';
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import AuditLog from '../models/AuditLog';
@@ -11,66 +12,48 @@ const audit = (adminId: mongoose.Types.ObjectId, action: string, targetType: 'us
 
 const validId = (id: string | string[]) => mongoose.isValidObjectId(Array.isArray(id) ? id[0] : id);
 
-export const listProvidersForVerification = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const status = typeof req.query.status === 'string' && ['PENDING', 'VERIFIED', 'REJECTED'].includes(req.query.status) ? req.query.status : 'PENDING';
-    const providers = await User.find({ role: 'provider', 'providerProfile.verificationStatus': status })
-      .select('fullName email accountStatus providerProfile createdAt')
-      .sort({ createdAt: 1 });
-    res.json({ success: true, data: { providers } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load the verification queue.' }); }
+const adminFailure = (res: Response, error: unknown): void => {
+  if (error instanceof AdminActionError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
+  res.status(503).json({ success: false, message: 'Unable to complete this administrative action. Please try again later.' });
 };
-
-export const verifyProvider = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!validId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid provider ID.' }); return; }
-    const provider = await User.findOneAndUpdate({ _id: req.params.id, role: 'provider' }, { $set: { 'providerProfile.verified': true, 'providerProfile.verificationStatus': 'VERIFIED', 'providerProfile.rejectionReason': undefined } }, { new: true });
-    if (!provider) { res.status(404).json({ success: false, message: 'Provider not found.' }); return; }
-    await audit(req.user!._id, 'provider_verified', 'user', provider._id);
-    res.json({ success: true, message: 'Provider verified. A notification can be sent by the notification service when enabled.', data: { provider } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to verify provider.' }); }
-};
-
-export const rejectProvider = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
-    if (!validId(req.params.id) || reason.length < 3 || reason.length > 1000) { res.status(400).json({ success: false, message: 'Provide a rejection reason between 3 and 1000 characters.' }); return; }
-    const provider = await User.findOneAndUpdate({ _id: req.params.id, role: 'provider' }, { $set: { 'providerProfile.verified': false, 'providerProfile.verificationStatus': 'REJECTED', 'providerProfile.rejectionReason': reason } }, { new: true });
-    if (!provider) { res.status(404).json({ success: false, message: 'Provider not found.' }); return; }
-    await audit(req.user!._id, 'provider_rejected', 'user', provider._id, reason);
-    res.json({ success: true, message: 'Provider rejected.', data: { provider } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to reject provider.' }); }
-};
-
 export const listUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const role = typeof req.query.role === 'string' && ['student', 'provider', 'admin'].includes(req.query.role) ? req.query.role : undefined;
-    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-    const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
-    const filter: Record<string, unknown> = { ...(role ? { role } : {}) };
-    if (q) filter.$or = [{ fullName: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }, { email: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }];
+    const filter = userListFilter(req.query);
+    const page = adminPage(req.query.page);
     const [users, total] = await Promise.all([
-      User.find(filter).select('fullName email role accountStatus providerProfile.organizationName providerProfile.organizationType providerProfile.verificationStatus createdAt').sort({ createdAt: -1 }).skip((page - 1) * 20).limit(20),
+      User.find(filter).select('fullName email role accountStatus adminBaseRole providerProfile.organizationName providerProfile.organizationType providerProfile.verificationStatus createdAt').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * 20).limit(20),
       User.countDocuments(filter),
     ]);
     res.json({ success: true, data: { users, page, total, pages: Math.max(1, Math.ceil(total / 20)) } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load users.' }); }
+  } catch (error) { adminFailure(res, error); }
 };
-
-const changeAccountStatus = (status: 'active' | 'suspended', action: string) => async (req: Request, res: Response): Promise<void> => {
+const changeAccountStatus = (status: 'active' | 'suspended') => async (req: Request, res: Response): Promise<void> => {
   try {
-    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : undefined;
-    if (!validId(req.params.id) || (status === 'suspended' && (!reason || reason.length < 3))) { res.status(400).json({ success: false, message: status === 'suspended' ? 'Provide a suspension reason.' : 'Invalid user ID.' }); return; }
-    if (req.user!._id.toString() === req.params.id) { res.status(400).json({ success: false, message: 'You cannot change your own account status.' }); return; }
-    const user = await User.findByIdAndUpdate(req.params.id, { accountStatus: status }, { new: true });
-    if (!user) { res.status(404).json({ success: false, message: 'User not found.' }); return; }
-    await audit(req.user!._id, action, 'user', user._id, reason);
-    res.json({ success: true, message: `Account ${status === 'suspended' ? 'suspended' : 'reinstated'}.`, data: { user } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to update account status.' }); }
+    const user = await changeManagedUser(req.user!._id, req.params.id, { kind: 'status', value: status }, req.body?.reason);
+    res.json({ success: true, message: status === 'active' ? 'Account reinstated.' : 'Account suspended.', data: { user } });
+  } catch (error) { adminFailure(res, error); }
 };
-
-export const suspendUser = changeAccountStatus('suspended', 'user_suspended');
-export const reinstateUser = changeAccountStatus('active', 'user_reinstated');
+export const suspendUser = changeAccountStatus('suspended');
+export const reinstateUser = changeAccountStatus('active');
+export const changeUserRole = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = await changeManagedUser(req.user!._id, req.params.id, { kind: 'role', value: req.body?.role }, req.body?.reason);
+    res.json({ success: true, message: 'Account role updated. The user must sign in again.', data: { user } });
+  } catch (error) { adminFailure(res, error); }
+};
+export const listUserHistory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const targetId = adminId(req.params.id);
+    if (!await User.exists({ _id: targetId })) { res.status(404).json({ success: false, message: 'User not found.' }); return; }
+    const page = adminPage(req.query.page);
+    const filter = { targetType: 'user', targetId };
+    const [entries, total] = await Promise.all([
+      AuditLog.find(filter).populate('adminId', 'fullName email').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * 30).limit(30),
+      AuditLog.countDocuments(filter),
+    ]);
+    res.json({ success: true, data: { entries, page, total, pages: Math.max(1, Math.ceil(total / 30)) } });
+  } catch (error) { adminFailure(res, error); }
+};
 
 export const listReports = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -120,13 +103,17 @@ export const removeResource = removeListing('resource');
 
 export const listAuditLog = async (req: Request, res: Response): Promise<void> => {
   try {
-    const targetType = typeof req.query.targetType === 'string' && ['user', 'opportunity', 'resource'].includes(req.query.targetType) ? req.query.targetType : undefined;
-    const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
-    const filter = targetType ? { targetType } : {};
+    const filter: Record<string, unknown> = {};
+    if (req.query.targetType !== undefined) {
+      if (!['user', 'opportunity', 'resource'].includes(req.query.targetType as string)) throw new AdminActionError(400, 'Invalid audit target type.');
+      filter.targetType = req.query.targetType;
+    }
+    if (req.query.targetId !== undefined) filter.targetId = adminId(req.query.targetId);
+    const page = adminPage(req.query.page);
     const [entries, total] = await Promise.all([
-      AuditLog.find(filter).populate('adminId', 'fullName email').sort({ createdAt: -1 }).skip((page - 1) * 30).limit(30),
+      AuditLog.find(filter).populate('adminId', 'fullName email').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * 30).limit(30),
       AuditLog.countDocuments(filter),
     ]);
     res.json({ success: true, data: { entries, page, total, pages: Math.max(1, Math.ceil(total / 30)) } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load audit log.' }); }
+  } catch (error) { adminFailure(res, error); }
 };

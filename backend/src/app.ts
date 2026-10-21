@@ -13,6 +13,8 @@ import reportRoutes from './routes/reportRoutes';
 import messageRoutes from './routes/messageRoutes';
 import creatorRoutes from './routes/creatorRoutes';
 import promotionRequestRoutes from './routes/promotionRequestRoutes';
+import { providerVerificationRoutes } from './routes/providerVerificationRoutes';
+import { adminCommunityRoutes, communityRoutes } from './routes/communityRoutes';
 
 
 /** Build the API without connecting to MongoDB or opening a listener. */
@@ -30,6 +32,9 @@ export const createApp = () => {
 
   // Routes
   app.use('/api/auth', authRoutes);
+  app.use('/api/provider-verification', providerVerificationRoutes());
+  app.use('/api/community', communityRoutes());
+  app.use('/api/admin/community-claims', adminCommunityRoutes());
   app.use('/api/opportunities', opportunityRoutes);
   app.use('/api/resources', resourceRoutes);
   app.use('/api/applications', applicationRoutes);
@@ -61,5 +66,10 @@ export const createApp = () => {
   });
 
 
+  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
+    const code = status === 413 ? 413 : status === 400 ? 400 : 500;
+    res.status(code).json({ success: false, message: code === 413 ? 'Request body is too large.' : code === 400 ? 'Invalid request body.' : 'Unable to process the request.' });
+  });
   return app;
 };

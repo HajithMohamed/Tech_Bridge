@@ -37,6 +37,8 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'student' | 'provider' | 'admin';
+  adminBaseRole?: 'student' | 'provider';
+  tokenVersion?: number;
   accountStatus: 'active' | 'suspended';
   studentProfile?: {
     institution: string;
@@ -53,7 +55,8 @@ export interface IUser extends Document {
     organizationName: string;
     organizationType: OrganizationType;
     verified: boolean;
-    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NEEDS_INFO';
+    verificationDocumentId?: mongoose.Types.ObjectId;
     rejectionReason?: string;
     contactEmail: string;
     contactPerson: string;
@@ -99,6 +102,8 @@ const userSchema = new Schema<IUser>(
       enum: ['student', 'provider', 'admin'],
       default: 'student',
     },
+    adminBaseRole: { type: String, enum: ['student', 'provider'] },
+    tokenVersion: { type: Number, default: 0, min: 0, select: false },
     accountStatus: { type: String, enum: ['active', 'suspended'], default: 'active', index: true },
     studentProfile: {
       institution: { type: String, trim: true },
@@ -130,7 +135,8 @@ const userSchema = new Schema<IUser>(
         enum: ['company', 'training_org', 'scholarship_org', 'resource_provider', 'local_business', 'alumni', 'faculty', 'ngo', 'individual'],
       },
       verified: { type: Boolean, default: false },
-      verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING' },
+      verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED', 'NEEDS_INFO'], default: 'PENDING' },
+      verificationDocumentId: { type: Schema.Types.ObjectId, ref: 'VerificationDocument' },
       rejectionReason: { type: String, trim: true, maxlength: 1000 },
       contactEmail: {
         type: String,

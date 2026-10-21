@@ -36,7 +36,7 @@
   - [Frontend Setup](#frontend-setup)
   - [Running the Full Stack](#running-the-full-stack)
 - [Environment Variables](#-environment-variables)
-- [Default Credentials](#-default-credentials)
+- [Demo account access](#demo-account-access)
 - [Contributing & License](#-license)
 
 ---
@@ -94,9 +94,10 @@ TechBridge organizes student growth around four key pillars:
 - Auto-expiration of opportunities past their deadline.
 
 ### 5. Faculty & Alumni Community Directory
-- Direct access to verified Faculty of Technology academic staff (ICT, Engineering Technology, Biosystems Technology, Multidisciplinary Studies departments).
-- Official University of Ruhuna Alumni Association committee contacts and industry workplaces.
-- Instant search and filtering by department, expertise, and company.
+- Public institution contact snapshots are listed separately from verified platform members.
+- Faculty/alumni providers claim a stable directory identity using private evidence and independent administrator identity/affiliation review.
+- Approved members control visibility, expertise, availability and student-message consent. Messaging rechecks that consent for existing conversations too.
+- See [community verification, API contracts and review evidence](docs/community-verification-review.md). Existing directory entries do not establish account ownership.
 
 ### 6. Impact & Analytics Dashboard
 - Live platform statistics displaying registered students, open opportunities, applications submitted, and hardware resources accessed.
@@ -174,7 +175,7 @@ Tech_Bridge/
 │       │   ├── jwt.ts             # JWT token sign & verify
 │       │   ├── matchEngine.ts     # Opportunity matching & scoring engine
 │       │   └── providerCapabilities.ts # Capability matrix per organization type
-│       ├── seed.ts                # Database seeder (creates default admin)
+│       ├── seed.ts                # Explicit local-only synthetic demo seeder
 │       └── server.ts              # Express application bootstrap
 │
 ├── frontend/                      # React 19 + Vite Single Page Application
@@ -430,6 +431,12 @@ Applications and resource requests now require a 30–800 character need justifi
 
 ### Backend Setup
 
+For a persistent local Docker database and an administrator account, follow
+[the Docker local setup](docs/local-docker-admin.md). This uses a single-node replica
+set on `127.0.0.1:27018`, supports transactional workflows, and preserves existing
+Atlas configuration separately. The application continues to run through the usual
+backend and frontend `npm run dev` commands.
+
 1. **Navigate to the backend directory**:
    ```bash
    cd backend
@@ -449,15 +456,8 @@ Applications and resource requests now require a 30–800 character need justifi
    JWT_EXPIRES_IN=7d
    ```
 
-4. **Seed the database (Optional, recommended for initial run)**:
-   ```bash
-   npm run seed
-   ```
-
-   If the database already contains pre-Phase-2 applications or resource requests, run this once before starting the API. It backfills only fields introduced in Phase 2 and does not alter current records:
-   ```bash
-   npm run migrate:phase2
-   ```
+4. **Optional local demo setup**:
+   See [safe demo seeding](#database-seeding). Seeding requires explicit opt-in, a dedicated local demo database, and your own password. Do not seed shared or production data. Existing-data migrations require a separate backup, rehearsal, and approval.
 
 5. **Start the backend development server**:
    ```bash
@@ -469,14 +469,20 @@ Applications and resource requests now require a 30–800 character need justifi
 
 ### Database Seeding
 
-Running the seed script provisions an administrative account and verified Faculty/Alumni directory accounts used by in-app messaging:
+The seed tool creates one **synthetic demo administrator** (`admin@demo.techbridge.test`). It never creates faculty/alumni identities or automatically verifies people. There is no default password.
+
+1. Copy `backend/demo-seed.env.example` to the ignored `backend/.env.demo`.
+2. Set your own `DEMO_ADMIN_PASSWORD` (at least 16 characters, at most 72 UTF-8 bytes).
+3. Confirm the target is the dedicated local `techbridge_demo` database and `ENABLE_DEMO_SEED=true`.
+4. From `backend`, run:
+
 ```bash
-npm run seed
+npm run seed:demo
 ```
-Default seed account:
-- **Email**: `admin@techbridge.lk`
-- **Password**: `Admin@123`
-- **Role**: `admin`
+
+The normal `.env` is not loaded by the seed entry point. Production/staging modes, remote hosts, credential-bearing URIs, ordinary database names, and unsupported URI options are rejected before connection. Re-running preserves an existing demo administrator's password and status; a reserved-email role collision fails instead of escalating privileges. The script logs no passwords or connection strings.
+
+To use demo login, start the API against that same local demo database using a separately configured development environment. This command is **not a production administrator provisioning mechanism**. Existing accounts created by older seed versions are untouched and require a separate approved credential/identity review. See [the seed-safety review](docs/demo-seed-safety-review.md).
 
 ---
 
@@ -522,14 +528,9 @@ In development mode, keep two terminal sessions running:
 
 ---
 
-## 👤 Default Credentials
+## Demo account access
 
-For testing and administrative purposes:
-| Role | Email | Password |
-| :--- | :--- | :--- |
-| **Admin** | `admin@techbridge.lk` | `Admin@123` |
-
-*(Be sure to update or replace the default password in any live environment!)*
+There are no built-in credentials. Only an explicitly opted-in local demo seed can create `admin@demo.techbridge.test`, using the password supplied in your private `.env.demo`. Passwords and historical seeded identities must be reviewed separately before any shared deployment.
 
 ---
 
