@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import mongoose, { Types } from 'mongoose';
+import { invalidateCommunityClaim } from './communityVerification';
 import User, { IUser } from '../models/User';
 import AuditLog from '../models/AuditLog';
 import { VerificationDocument, VerificationEvent, type VerificationStatus } from '../models/ProviderVerification';
@@ -42,6 +43,7 @@ export async function decideProviderVerification(actorId: Types.ObjectId, provid
       if (!await VerificationEvent.exists({ providerId, actorId, documentId: currentId, action: 'document_reviewed' }).session(session)) throw new AdminActionError(409, 'Download and review the current document before approving.');
     }
     const changed = await User.findOneAndUpdate({ _id: providerId }, { $set: { 'providerProfile.verified': toStatus === 'VERIFIED', 'providerProfile.verificationStatus': toStatus, 'providerProfile.rejectionReason': reason }, $inc: { tokenVersion: 1, __v: 1 } }, { new: true, runValidators: true, session });
+    if (action !== 'verified') await invalidateCommunityClaim(provider._id, actorId, reason, 'verification_changed', session);
     const snapshot = (status: string) => ({ role: provider.role, accountStatus: provider.accountStatus || 'active', verificationStatus: status });
     await AuditLog.create([{ adminId: actorId, targetType: 'user', targetId: providerId, action: `provider_${action}`, reason, before: snapshot(fromStatus), after: snapshot(toStatus) }], { session });
     await VerificationEvent.create([{ providerId, actorId, ...(currentId ? { documentId: currentId } : {}), action, fromStatus, toStatus, reason }], { session });
@@ -79,6 +81,7 @@ export async function saveVerifiedProviderProfile(providerId: Types.ObjectId, ex
     if (identityChanged) Object.assign(fields, { 'providerProfile.verified': false, 'providerProfile.verificationStatus': 'NEEDS_INFO', 'providerProfile.rejectionReason': reason });
     const updated = await User.findByIdAndUpdate(providerId, { $set: fields, ...(identityChanged ? { $inc: { tokenVersion: 1 } } : {}) }, { new: true, runValidators: true, session });
     if (identityChanged) await VerificationEvent.create([{ providerId, actorId: providerId, ...(provider.providerProfile.verificationDocumentId ? { documentId: provider.providerProfile.verificationDocumentId } : {}), action: 'profile_changed', fromStatus: 'VERIFIED', toStatus: 'NEEDS_INFO', reason, readAt: new Date() }], { session });
+    if (identityChanged) await invalidateCommunityClaim(providerId, providerId, reason, 'identity_changed', session);
     return updated;
   }, transactionOptions);
 }

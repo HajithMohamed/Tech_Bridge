@@ -94,9 +94,10 @@ TechBridge organizes student growth around four key pillars:
 - Auto-expiration of opportunities past their deadline.
 
 ### 5. Faculty & Alumni Community Directory
-- Direct access to verified Faculty of Technology academic staff (ICT, Engineering Technology, Biosystems Technology, Multidisciplinary Studies departments).
-- Official University of Ruhuna Alumni Association committee contacts and industry workplaces.
-- Instant search and filtering by department, expertise, and company.
+- Public institution contact snapshots are listed separately from verified platform members.
+- Faculty/alumni providers claim a stable directory identity using private evidence and independent administrator identity/affiliation review.
+- Approved members control visibility, expertise, availability and student-message consent. Messaging rechecks that consent for existing conversations too.
+- See [community verification, API contracts and review evidence](docs/community-verification-review.md). Existing directory entries do not establish account ownership.
 
 ### 6. Impact & Analytics Dashboard
 - Live platform statistics displaying registered students, open opportunities, applications submitted, and hardware resources accessed.
