@@ -14,6 +14,7 @@ import messageRoutes from './routes/messageRoutes';
 import creatorRoutes from './routes/creatorRoutes';
 import promotionRequestRoutes from './routes/promotionRequestRoutes';
 import { providerVerificationRoutes } from './routes/providerVerificationRoutes';
+import { adminCommunityRoutes, communityRoutes } from './routes/communityRoutes';
 
 
 /** Build the API without connecting to MongoDB or opening a listener. */
@@ -32,6 +33,8 @@ export const createApp = () => {
   // Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/provider-verification', providerVerificationRoutes());
+  app.use('/api/community', communityRoutes());
+  app.use('/api/admin/community-claims', adminCommunityRoutes());
   app.use('/api/opportunities', opportunityRoutes);
   app.use('/api/resources', resourceRoutes);
   app.use('/api/applications', applicationRoutes);

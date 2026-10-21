@@ -43,6 +43,7 @@ export default function ProviderVerificationPage() {
   return <main className="min-h-screen bg-surface-50 px-4 py-10 text-surface-900"><div className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
     <Link to="/" className="font-bold text-primary-700">TECHBRIDGE</Link><h1 className="text-3xl font-bold">Provider verification</h1>
     <p className="text-gray-600">Submit supporting evidence, read decisions, and respond to information requests. Verification access lasts 15 minutes. Sign in again after an administrator changes your account.</p>
+    <p className="text-sm"><Link to="/community-verification" className="text-primary-700 underline">Faculty or alumni? Claim and manage your community profile</Link>.</p>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}{notice && <p role="status" className="text-primary-700">{notice}</p>}
     {!token || !data ? <form onSubmit={(event) => void signIn(event)} className="space-y-4">
       <label className="block">Provider email<input type="email" autoComplete="username" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 block w-full rounded-xl border border-gray-300 p-3" /></label>

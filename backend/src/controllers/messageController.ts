@@ -6,6 +6,9 @@ import Message from '../models/Message';
 import PromotionRequest from '../models/PromotionRequest';
 import ResourceRequest from '../models/ResourceRequest';
 import User from '../models/User';
+import { startCommunityConversation, sendCommunityMessage, communityPair } from '../services/communityMessaging';
+import { listCommunityPeople } from './communityController';
+import { AdminActionError } from '../services/adminUsers';
 
 const keyFor = (first: mongoose.Types.ObjectId, second: mongoose.Types.ObjectId) => [first.toString(), second.toString()].sort().join(':');
 const isParticipant = (conversation: { participantIds: mongoose.Types.ObjectId[] }, userId: mongoose.Types.ObjectId) => conversation.participantIds.some((id) => id.equals(userId));
@@ -13,10 +16,10 @@ const isParticipant = (conversation: { participantIds: mongoose.Types.ObjectId[]
 const mayStartConversation = async (senderId: mongoose.Types.ObjectId, recipientId: mongoose.Types.ObjectId): Promise<boolean> => {
   const [sender, recipient] = await Promise.all([User.findById(senderId), User.findById(recipientId)]);
   if (!sender || !recipient) return false;
+  if (communityPair(sender, recipient)) return false; // Handled by the transactional claim/consent path.
   if (sender.role === 'admin') return true;
   if (recipient.accountStatus !== 'active') return false;
   if (sender.role === 'student' && recipient.role === 'provider') {
-    if (recipient.providerProfile?.verified && ['alumni', 'faculty'].includes(recipient.providerProfile.organizationType)) return true;
     const [application, request, promotionRequest] = await Promise.all([
       Application.exists({ studentId: senderId, providerId: recipientId, status: { $ne: 'rejected' } }),
       ResourceRequest.exists({ studentId: senderId, providerId: recipientId, status: { $ne: 'rejected' } }),
@@ -39,6 +42,8 @@ export const startConversation = async (req: Request, res: Response): Promise<vo
   try {
     const { recipientId } = req.body;
     if (!mongoose.isValidObjectId(recipientId) || req.user!._id.toString() === recipientId) { res.status(400).json({ success: false, message: 'Choose another valid user.' }); return; }
+    const community = await startCommunityConversation(req.user!._id, new mongoose.Types.ObjectId(recipientId));
+    if (community) { res.status(201).json({ success: true, data: { conversation: community } }); return; }
     const allowed = await mayStartConversation(req.user!._id, new mongoose.Types.ObjectId(recipientId));
     if (!allowed) { res.status(403).json({ success: false, message: 'You can only message verified faculty/alumni or a provider/student connected through an application, resource request, or accepted promotion request.' }); return; }
     const participantIds = [req.user!._id, new mongoose.Types.ObjectId(recipientId)];
@@ -52,7 +57,7 @@ export const startConversation = async (req: Request, res: Response): Promise<vo
       }
     }
     res.status(201).json({ success: true, data: { conversation } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to start conversation.' }); }
+  } catch (error) { res.status(error instanceof AdminActionError ? error.statusCode : 500).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Unable to start conversation.' }); }
 };
 
 export const listConversations = async (req: Request, res: Response): Promise<void> => {
@@ -88,11 +93,15 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     if (!mongoose.isValidObjectId(req.params.id) || !content || content.length > 2000) { res.status(400).json({ success: false, message: 'Message content must be between 1 and 2000 characters.' }); return; }
     const conversation = await Conversation.findById(req.params.id);
     if (!conversation || !isParticipant(conversation, req.user!._id)) { res.status(404).json({ success: false, message: 'Conversation not found.' }); return; }
+    const otherId = conversation.participantIds.find((id) => !id.equals(req.user!._id));
+    if (!otherId || !await User.exists({ _id: otherId, accountStatus: { $ne: 'suspended' } })) { res.status(403).json({ success: false, message: 'This recipient is not available for messages.' }); return; }
+    const community = otherId && await sendCommunityMessage(conversation._id as mongoose.Types.ObjectId, req.user!._id, otherId, content);
+    if (community) { res.status(201).json({ success: true, data: { message: community } }); return; }
     const message = await Message.create({ conversationId: conversation._id, senderId: req.user!._id, content });
     conversation.lastMessageAt = message.createdAt;
     await conversation.save();
     res.status(201).json({ success: true, data: { message } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to send message.' }); }
+  } catch (error) { res.status(error instanceof AdminActionError ? error.statusCode : 500).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Unable to send message.' }); }
 };
 
 export const markConversationRead = async (req: Request, res: Response): Promise<void> => {
@@ -105,10 +114,4 @@ export const markConversationRead = async (req: Request, res: Response): Promise
   } catch { res.status(500).json({ success: false, message: 'Unable to mark messages as read.' }); }
 };
 
-export const listMentors = async (_req: Request, res: Response): Promise<void> => {
-  try {
-    const people = await User.find({ role: 'provider', accountStatus: 'active', 'providerProfile.verified': true, 'providerProfile.organizationType': { $in: ['faculty', 'alumni'] } })
-      .select('fullName providerProfile.organizationName providerProfile.organizationType providerProfile.description');
-    res.json({ success: true, data: { people } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load community directory.' }); }
-};
+export const listMentors = listCommunityPeople;
