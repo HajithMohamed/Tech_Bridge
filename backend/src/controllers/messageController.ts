@@ -1,117 +1,140 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import Application from '../models/Application';
 import Conversation from '../models/Conversation';
 import Message from '../models/Message';
-import PromotionRequest from '../models/PromotionRequest';
-import ResourceRequest from '../models/ResourceRequest';
+import MessagingSettings from '../models/MessagingSettings';
 import User from '../models/User';
-import { startCommunityConversation, sendCommunityMessage, communityPair } from '../services/communityMessaging';
 import { listCommunityPeople } from './communityController';
 import { AdminActionError } from '../services/adminUsers';
+import { beginConversation, writeMessage, participant, lockMessagingUser, messagingTransactionOptions, authorizeTyping } from '../services/messaging';
+import { messageId, messagePage, messagePreferences, messageText, escapedSearch } from '../services/messagingPolicy';
+import { openMessageStream, publishMessageSignal } from '../services/messageEvents';
 
-const keyFor = (first: mongoose.Types.ObjectId, second: mongoose.Types.ObjectId) => [first.toString(), second.toString()].sort().join(':');
-const isParticipant = (conversation: { participantIds: mongoose.Types.ObjectId[] }, userId: mongoose.Types.ObjectId) => conversation.participantIds.some((id) => id.equals(userId));
-
-const mayStartConversation = async (senderId: mongoose.Types.ObjectId, recipientId: mongoose.Types.ObjectId): Promise<boolean> => {
-  const [sender, recipient] = await Promise.all([User.findById(senderId), User.findById(recipientId)]);
-  if (!sender || !recipient) return false;
-  if (communityPair(sender, recipient)) return false; // Handled by the transactional claim/consent path.
-  if (sender.role === 'admin') return true;
-  if (recipient.accountStatus !== 'active') return false;
-  if (sender.role === 'student' && recipient.role === 'provider') {
-    const [application, request, promotionRequest] = await Promise.all([
-      Application.exists({ studentId: senderId, providerId: recipientId, status: { $ne: 'rejected' } }),
-      ResourceRequest.exists({ studentId: senderId, providerId: recipientId, status: { $ne: 'rejected' } }),
-      PromotionRequest.exists({ studentId: senderId, providerId: recipientId, status: { $in: ['accepted', 'completed'] } }),
-    ]);
-    return Boolean(application || request || promotionRequest);
-  }
-  if (sender.role === 'provider' && recipient.role === 'student') {
-    const [application, request, promotionRequest] = await Promise.all([
-      Application.exists({ studentId: recipientId, providerId: senderId, status: { $ne: 'rejected' } }),
-      ResourceRequest.exists({ studentId: recipientId, providerId: senderId, status: { $ne: 'rejected' } }),
-      PromotionRequest.exists({ studentId: recipientId, providerId: senderId, status: { $in: ['accepted', 'completed'] } }),
-    ]);
-    return Boolean(application || request || promotionRequest);
-  }
-  return false;
+export const messagingFailure = (res: Response, error: unknown) => {
+  const status = error instanceof AdminActionError ? error.statusCode : 503;
+  if (status === 429) res.set('Retry-After', '60');
+  res.status(status).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Messaging is temporarily unavailable. Please try again.' });
 };
-
-export const startConversation = async (req: Request, res: Response): Promise<void> => {
+export const startConversation = async (req: Request, res: Response) => {
   try {
-    const { recipientId } = req.body;
-    if (!mongoose.isValidObjectId(recipientId) || req.user!._id.toString() === recipientId) { res.status(400).json({ success: false, message: 'Choose another valid user.' }); return; }
-    const community = await startCommunityConversation(req.user!._id, new mongoose.Types.ObjectId(recipientId));
-    if (community) { res.status(201).json({ success: true, data: { conversation: community } }); return; }
-    const allowed = await mayStartConversation(req.user!._id, new mongoose.Types.ObjectId(recipientId));
-    if (!allowed) { res.status(403).json({ success: false, message: 'You can only message verified faculty/alumni or a provider/student connected through an application, resource request, or accepted promotion request.' }); return; }
-    const participantIds = [req.user!._id, new mongoose.Types.ObjectId(recipientId)];
-    const participantKey = keyFor(participantIds[0], participantIds[1]);
-    let conversation = await Conversation.findOne({ participantKey });
-    if (!conversation) {
-      try { conversation = await Conversation.create({ participantIds, participantKey }); }
-      catch (error: unknown) {
-        if ((error as { code?: number }).code === 11000) conversation = await Conversation.findOne({ participantKey });
-        else throw error;
-      }
-    }
+    const conversation = await beginConversation(req.user!._id, messageId(req.body?.recipientId));
+    await publishMessageSignal(conversation.participantIds.map(String));
     res.status(201).json({ success: true, data: { conversation } });
-  } catch (error) { res.status(error instanceof AdminActionError ? error.statusCode : 500).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Unable to start conversation.' }); }
+  } catch (error) { messagingFailure(res, error); }
 };
-
-export const listConversations = async (req: Request, res: Response): Promise<void> => {
+export const listConversations = async (req: Request, res: Response) => {
   try {
-    const conversations = await Conversation.find({ participantIds: req.user!._id }).sort({ lastMessageAt: -1, createdAt: -1 });
-    const rows = await Promise.all(conversations.map(async (conversation) => {
-      const otherId = conversation.participantIds.find((id) => !id.equals(req.user!._id));
-      const [otherParticipant, lastMessage, unreadCount] = await Promise.all([
-        otherId ? User.findById(otherId).select('fullName role providerProfile.organizationName providerProfile.organizationType') : null,
-        Message.findOne({ conversationId: conversation._id }).sort({ createdAt: -1 }),
-        Message.countDocuments({ conversationId: conversation._id, senderId: { $ne: req.user!._id }, readAt: { $exists: false } }),
-      ]);
-      return { ...conversation.toObject(), otherParticipant, lastMessagePreview: lastMessage?.content || '', unreadCount };
-    }));
-    res.json({ success: true, data: { conversations: rows } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load conversations.' }); }
+    const page = messagePage(req.query.page); const q = escapedSearch(req.query.q); const ownerId = req.user!._id;
+    const result = await Conversation.aggregate([
+      { $match: { participantIds: ownerId } },
+      { $sort: { lastMessageAt: -1, createdAt: -1, _id: -1 } },
+      { $lookup: { from: 'users', let: { others: '$participantIds' }, pipeline: [
+        { $match: { $expr: { $and: [{ $in: ['$_id', '$$others'] }, { $ne: ['$_id', ownerId] }] } } },
+        { $project: { fullName: 1, role: 1, 'providerProfile.organizationName': 1, 'providerProfile.organizationType': 1 } },
+      ], as: 'otherParticipant' } },
+      { $unwind: { path: '$otherParticipant', preserveNullAndEmptyArrays: true } },
+      ...(q ? [{ $match: { $or: [{ 'otherParticipant.fullName': { $regex: q, $options: 'i' } }, { 'otherParticipant.providerProfile.organizationName': { $regex: q, $options: 'i' } }] } }] : []),
+      { $facet: { rows: [{ $skip: (page - 1) * 20 }, { $limit: 20 }], total: [{ $count: 'count' }] } },
+    ]);
+    const rows = result[0].rows; const total = result[0].total[0]?.count || 0; const conversationIds = rows.map((row: { _id: mongoose.Types.ObjectId }) => row._id);
+    const [latest, unread, settings] = await Promise.all([
+      Message.aggregate([{ $match: { conversationId: { $in: conversationIds } } }, { $sort: { createdAt: -1, _id: -1 } }, { $group: { _id: '$conversationId', content: { $first: '$content' } } }]),
+      Message.aggregate([{ $match: { conversationId: { $in: conversationIds }, senderId: { $ne: ownerId }, readAt: { $exists: false } } }, { $group: { _id: '$conversationId', count: { $sum: 1 } } }]),
+      MessagingSettings.findOne({ ownerId }),
+    ]);
+    const previews = new Map(latest.map((row) => [String(row._id), row.content])); const counts = new Map(unread.map((row) => [String(row._id), row.count]));
+    res.json({ success: true, data: { conversations: rows.map((row: { _id: mongoose.Types.ObjectId; otherParticipant?: { _id: mongoose.Types.ObjectId } }) => ({ ...row, lastMessagePreview: previews.get(String(row._id)) || '', unreadCount: counts.get(String(row._id)) || 0, blockedByMe: Boolean(settings?.blockedIds.some((id) => id.equals(row.otherParticipant?._id))) })), page, total, pages: Math.max(1, Math.ceil(total / 20)) } });
+  } catch (error) { messagingFailure(res, error); }
 };
-
-export const listConversationMessages = async (req: Request, res: Response): Promise<void> => {
+export const listConversationMessages = async (req: Request, res: Response) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid conversation ID.' }); return; }
-    const conversation = await Conversation.findById(req.params.id);
-    if (!conversation || !isParticipant(conversation, req.user!._id)) { res.status(404).json({ success: false, message: 'Conversation not found.' }); return; }
-    const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
-    const messages = await Message.find({ conversationId: conversation._id }).sort({ createdAt: -1 }).skip((page - 1) * 40).limit(40);
-    res.json({ success: true, data: { messages: messages.reverse(), page } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load messages.' }); }
+    const id = messageId(req.params.id); const conversation = await Conversation.findOne({ _id: id, participantIds: req.user!._id });
+    if (!conversation) throw new AdminActionError(404, 'Conversation not found.');
+    const page = messagePage(req.query.page);
+    const filter: mongoose.FilterQuery<unknown> = { conversationId: id };
+    if (req.query.before !== undefined) {
+      if (req.query.page !== undefined) throw new AdminActionError(400, 'Choose a page or an older-message cursor.');
+      const before = await Message.findOne({ _id: messageId(req.query.before), conversationId: id });
+      if (!before) throw new AdminActionError(400, 'Invalid older-message cursor.');
+      filter.$or = [{ createdAt: { $lt: before.createdAt } }, { createdAt: before.createdAt, _id: { $lt: before._id } }];
+    }
+    const rows = await Message.find(filter).sort({ createdAt: -1, _id: -1 }).skip(req.query.before ? 0 : (page - 1) * 40).limit(41);
+    const hasMore = rows.length > 40; const messages = rows.slice(0, 40).reverse();
+    res.json({ success: true, data: { messages, page, hasMore, nextBefore: hasMore ? String(messages[0]._id) : null } });
+  } catch (error) { messagingFailure(res, error); }
 };
-
-export const sendMessage = async (req: Request, res: Response): Promise<void> => {
+export const sendMessage = async (req: Request, res: Response) => {
   try {
-    const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
-    if (!mongoose.isValidObjectId(req.params.id) || !content || content.length > 2000) { res.status(400).json({ success: false, message: 'Message content must be between 1 and 2000 characters.' }); return; }
-    const conversation = await Conversation.findById(req.params.id);
-    if (!conversation || !isParticipant(conversation, req.user!._id)) { res.status(404).json({ success: false, message: 'Conversation not found.' }); return; }
-    const otherId = conversation.participantIds.find((id) => !id.equals(req.user!._id));
-    if (!otherId || !await User.exists({ _id: otherId, accountStatus: { $ne: 'suspended' } })) { res.status(403).json({ success: false, message: 'This recipient is not available for messages.' }); return; }
-    const community = otherId && await sendCommunityMessage(conversation._id as mongoose.Types.ObjectId, req.user!._id, otherId, content);
-    if (community) { res.status(201).json({ success: true, data: { message: community } }); return; }
-    const message = await Message.create({ conversationId: conversation._id, senderId: req.user!._id, content });
-    conversation.lastMessageAt = message.createdAt;
-    await conversation.save();
-    res.status(201).json({ success: true, data: { message } });
-  } catch (error) { res.status(error instanceof AdminActionError ? error.statusCode : 500).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Unable to send message.' }); }
+    const result = await writeMessage(messageId(req.params.id), req.user!._id, messageText(req.body?.content));
+    await publishMessageSignal(result.participantIds.map(String));
+    res.status(201).json({ success: true, data: { message: result.message } });
+  } catch (error) { messagingFailure(res, error); }
 };
-
-export const markConversationRead = async (req: Request, res: Response): Promise<void> => {
+export const markConversationRead = async (req: Request, res: Response) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid conversation ID.' }); return; }
-    const conversation = await Conversation.findById(req.params.id);
-    if (!conversation || !isParticipant(conversation, req.user!._id)) { res.status(404).json({ success: false, message: 'Conversation not found.' }); return; }
-    await Message.updateMany({ conversationId: conversation._id, senderId: { $ne: req.user!._id }, readAt: { $exists: false } }, { readAt: new Date() });
+    const id = messageId(req.params.id); const conversation = await Conversation.findById(id);
+    if (!conversation || !participant(conversation, req.user!._id)) throw new AdminActionError(404, 'Conversation not found.');
+    const through = req.body?.throughId === undefined ? await Message.findOne({ conversationId: id }).sort({ createdAt: -1, _id: -1 }) : await Message.findOne({ _id: messageId(req.body.throughId), conversationId: id });
+    if (req.body?.throughId !== undefined && !through) throw new AdminActionError(400, 'Invalid read receipt.');
+    if (through) {
+      const update = await Message.updateMany({ conversationId: id, senderId: { $ne: req.user!._id }, readAt: { $exists: false }, $or: [{ createdAt: { $lt: through.createdAt } }, { createdAt: through.createdAt, _id: { $lte: through._id } }] }, { $set: { readAt: new Date() } });
+      if (update.modifiedCount) await publishMessageSignal(conversation.participantIds.map(String));
+    }
     res.json({ success: true });
-  } catch { res.status(500).json({ success: false, message: 'Unable to mark messages as read.' }); }
+  } catch (error) { messagingFailure(res, error); }
 };
-
+export const getMessagingSettings = async (req: Request, res: Response) => {
+  try {
+    const row = await MessagingSettings.findOne({ ownerId: req.user!._id });
+    const blockedUsers = await User.find({ _id: { $in: row?.blockedIds || [] } }).select('_id fullName').lean();
+    res.json({ success: true, data: { acceptsMessages: row?.acceptsMessages ?? true, notifications: row?.notifications ?? true, blockedUsers } });
+  } catch (error) { messagingFailure(res, error); }
+};
+export const messagingSummary = async (req: Request, res: Response) => {
+  try {
+    const ownerId = req.user!._id;
+    const [row, counts] = await Promise.all([MessagingSettings.findOne({ ownerId }), Conversation.aggregate([
+      { $match: { participantIds: ownerId } },
+      { $lookup: { from: 'messages', let: { conversation: '$_id' }, pipeline: [
+        { $match: { readAt: { $exists: false }, senderId: { $ne: ownerId }, $expr: { $eq: ['$conversationId', '$$conversation'] } } }, { $count: 'count' },
+      ], as: 'unread' } },
+      { $group: { _id: null, count: { $sum: { $ifNull: [{ $arrayElemAt: ['$unread.count', 0] }, 0] } } } },
+    ])]);
+    const unread = counts[0]?.count || 0;
+    res.json({ success: true, data: { unread, notifications: row?.notifications ?? true } });
+  } catch (error) { messagingFailure(res, error); }
+};
+export const updateMessagingSettings = async (req: Request, res: Response) => {
+  try {
+    const values = messagePreferences(req.body);
+    await mongoose.connection.transaction(async (session) => {
+      await lockMessagingUser(req.user!._id, session);
+      await MessagingSettings.updateOne({ ownerId: req.user!._id }, { $set: values }, { upsert: true, session, runValidators: true });
+    }, messagingTransactionOptions);
+    await publishMessageSignal([String(req.user!._id)]);
+    res.json({ success: true });
+  } catch (error) { messagingFailure(res, error); }
+};
+export const blockMember = (block: boolean) => async (req: Request, res: Response) => {
+  try {
+    const otherId = messageId(req.params.id); if (otherId.equals(req.user!._id)) throw new AdminActionError(400, 'Choose another member.');
+    await mongoose.connection.transaction(async (session) => {
+      await lockMessagingUser(req.user!._id, session);
+      if (block && !await User.exists({ _id: otherId }).session(session)) throw new AdminActionError(404, 'Member not found.');
+      const row = await MessagingSettings.findOne({ ownerId: req.user!._id }).session(session);
+      if (block && row && !row.blockedIds.some((id) => id.equals(otherId)) && row.blockedIds.length >= 200) throw new AdminActionError(409, 'You can block up to 200 members.');
+      await MessagingSettings.updateOne({ ownerId: req.user!._id }, block ? { $addToSet: { blockedIds: otherId } } : { $pull: { blockedIds: otherId } }, { upsert: true, session });
+    }, messagingTransactionOptions);
+    await publishMessageSignal([String(req.user!._id)]);
+    res.json({ success: true });
+  } catch (error) { messagingFailure(res, error); }
+};
+export const typing = async (req: Request, res: Response) => {
+  try {
+    const conversationId = messageId(req.params.id); const otherId = await authorizeTyping(conversationId, req.user!._id);
+    await publishMessageSignal([String(otherId)], { type: 'typing', conversationId: String(conversationId), expiresAt: Date.now() + 4000 });
+    res.json({ success: true });
+  } catch (error) { messagingFailure(res, error); }
+};
+export const messageStream = (req: Request, res: Response) => { try { openMessageStream(req, res); } catch (error) { messagingFailure(res, error); } };
 export const listMentors = listCommunityPeople;

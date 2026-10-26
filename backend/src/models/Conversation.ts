@@ -20,4 +20,6 @@ const conversationSchema = new Schema<IConversation>({
 }, { timestamps: true });
 
 conversationSchema.index({ participantIds: 1 });
+conversationSchema.index({ participantIds: 1, lastMessageAt: -1, createdAt: -1, _id: -1 });
+conversationSchema.index({ initiatedBy: 1, createdAt: -1 });
 export default mongoose.model<IConversation>('Conversation', conversationSchema);

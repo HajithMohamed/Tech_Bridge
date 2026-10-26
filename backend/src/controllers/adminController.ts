@@ -6,6 +6,8 @@ import Opportunity from '../models/Opportunity';
 import Report from '../models/Report';
 import Resource from '../models/Resource';
 import User from '../models/User';
+import { reviewReportedMessage, resolveMessageReport } from '../services/messageReports';
+import { messageId, messageText } from '../services/messagingPolicy';
 
 const audit = (adminId: mongoose.Types.ObjectId, action: string, targetType: 'user' | 'opportunity' | 'resource', targetId: mongoose.Types.ObjectId, reason?: string) =>
   AuditLog.create({ adminId, action, targetType, targetId, ...(reason ? { reason } : {}) });
@@ -69,6 +71,11 @@ export const resolveReport = async (req: Request, res: Response): Promise<void> 
     if (!validId(req.params.id) || !['reviewed', 'dismissed'].includes(status || '')) { res.status(400).json({ success: false, message: 'Select reviewed or dismissed.' }); return; }
     const report = await Report.findById(req.params.id);
     if (!report) { res.status(404).json({ success: false, message: 'Report not found.' }); return; }
+    if (report.targetType === 'message') {
+      if (removeTarget) throw new AdminActionError(400, 'Private message deletion is not supported by this review workflow.');
+      const resolved = await resolveMessageReport(req.user!._id, messageId(req.params.id), status as 'reviewed' | 'dismissed', messageText(resolutionNote, 10, 500));
+      res.json({ success: true, message: 'Report resolved.', data: { report: resolved } }); return;
+    }
     report.status = status as 'reviewed' | 'dismissed';
     report.resolutionNote = typeof resolutionNote === 'string' ? resolutionNote.trim().slice(0, 1000) : undefined;
     await report.save();
@@ -82,7 +89,14 @@ export const resolveReport = async (req: Request, res: Response): Promise<void> 
       await audit(req.user!._id, 'report_resolved', 'user', report.reporterId, report.resolutionNote);
     }
     res.json({ success: true, message: 'Report resolved.', data: { report } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to resolve report.' }); }
+  } catch (error) { adminFailure(res, error); }
+};
+
+export const readReportedMessage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const message = await reviewReportedMessage(req.user!._id, messageId(req.params.id), messageText(req.body?.reason, 10, 500));
+    res.set('Cache-Control', 'no-store').json({ success: true, data: { message } });
+  } catch (error) { adminFailure(res, error); }
 };
 
 const removeListing = (targetType: 'opportunity' | 'resource') => async (req: Request, res: Response): Promise<void> => {

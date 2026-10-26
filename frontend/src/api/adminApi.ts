@@ -12,5 +12,6 @@ export const getAdminUsers = async (q = '') => (await api.get<{ data: { users: U
 export const suspendUser = async (id: string, reason: string) => { await api.patch(`/admin/users/${id}/suspend`, { reason }); };
 export const reinstateUser = async (id: string, reason: string) => { await api.patch(`/admin/users/${id}/reinstate`, { reason }); };
 export const getReports = async () => (await api.get<{ data: { reports: Report[] } }>('/admin/reports?status=open')).data.data.reports;
+export const readMessageEvidence = async (id: string, reason: string) => (await api.post<{ data: { message: { _id: string; senderId: string; content: string; createdAt: string } } }>(`/admin/reports/${id}/message-evidence`, { reason })).data.data.message;
 export const resolveReport = async (id: string, status: 'reviewed' | 'dismissed', resolutionNote: string, removeTarget = false) => { await api.patch(`/admin/reports/${id}`, { status, resolutionNote, removeTarget }); };
 export const getAuditLog = async () => (await api.get<{ data: { entries: AuditEntry[] } }>('/admin/audit-log')).data.data.entries;

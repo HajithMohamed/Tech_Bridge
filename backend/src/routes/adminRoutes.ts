@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { changeUserRole, listUserHistory, listAuditLog, listReports, listUsers, reinstateUser, removeOpportunity, removeResource, resolveReport, suspendUser } from '../controllers/adminController';
+import { readReportedMessage, changeUserRole, listUserHistory, listAuditLog, listReports, listUsers, reinstateUser, removeOpportunity, removeResource, resolveReport, suspendUser } from '../controllers/adminController';
 import { downloadAdminVerificationDocument, listVerificationProviders, providerDecision, verificationHistory } from '../controllers/providerVerificationController';
 import { authorize, protect } from '../middleware/auth';
 
@@ -19,6 +19,7 @@ router.patch('/users/:id/suspend', suspendUser);
 router.patch('/users/:id/reinstate', reinstateUser);
 router.get('/reports', listReports);
 router.patch('/reports/:id', resolveReport);
+router.post('/reports/:id/message-evidence', readReportedMessage);
 router.delete('/opportunities/:id', removeOpportunity);
 router.delete('/resources/:id', removeResource);
 router.get('/audit-log', listAuditLog);

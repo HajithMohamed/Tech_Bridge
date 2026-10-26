@@ -31,9 +31,10 @@ import MyPromotionRequestsPage from './pages/MyPromotionRequestsPage';
 import ProviderPromotionRequestsPage from './pages/ProviderPromotionRequestsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import PortalLayout from './components/PortalLayout';
+import MessageUpdates from './components/MessageUpdates';
 
 const App = () => (
-  <Routes>
+  <><MessageUpdates /><Routes>
     <Route path="/" element={<LandingPage />} />
     <Route path="/connections" element={<FacultyConnectionsPage />} />
     <Route path="/login" element={<LoginPage />} />
@@ -67,7 +68,7 @@ const App = () => (
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboardPage /></ProtectedRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
+  </Routes></>
 );
 
 export default App;

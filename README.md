@@ -542,3 +542,10 @@ This project is licensed under the [ISC License](LICENSE).
 ## Automated testing
 
 See [the testing guide](docs/testing.md) for isolated fixtures, unit/integration checks, Playwright E2E setup, and pull-request CI. Automated tests never use the production seed script or database.
+
+## Internal messaging
+
+The messaging phase adds live updates, typing, search/older-history pagination,
+read receipts, owner communication preferences, blocking and narrowly audited
+complaint evidence review. See [the phase review](docs/internal-messaging-review.md)
+for API contracts, database indexes, execution evidence and deployment limits.
