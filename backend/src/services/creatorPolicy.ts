@@ -104,11 +104,24 @@ export function creatorPage(value: unknown, fallback = 1, max = 10_000): number 
   return Number(value);
 }
 export function campaignProposalInput(body: Record<string, unknown>) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new AdminActionError(400, 'Provide campaign requirements.');
   const compensationType = body.compensationType as PromotionCompensationType;
   if (!creatorCompensation.includes(compensationType)) throw new AdminActionError(400, 'Choose a valid compensation type.');
-  const deadline = body.deadline ? new Date(String(body.deadline)) : undefined;
+  const deadline = campaignDeadline(body.deadline);
   if (deadline && (!Number.isFinite(deadline.getTime()) || deadline.getTime() <= Date.now())) throw new AdminActionError(400, 'Campaign deadline must be in the future.');
-  return { studentId: creatorId(body.studentId), campaignBrief: creatorText(body.campaignBrief, 'Campaign brief', 1, 1000), deliverables: creatorText(body.deliverables, 'Deliverables', 1, 2000), compensationType, ...(body.compensationDetails ? { compensationDetails: creatorText(body.compensationDetails, 'Compensation details', 1, 1000) } : {}), ...(deadline ? { deadline } : {}) };
+  return { studentId: creatorId(body.studentId), campaignBrief: campaignText(body.campaignBrief, 'Campaign brief', 1, 1000), deliverables: campaignText(body.deliverables, 'Deliverables', 1, 2000), compensationType, ...(body.compensationDetails !== undefined && body.compensationDetails !== '' ? { compensationDetails: campaignText(body.compensationDetails, 'Compensation details', 1, 1000) } : {}), ...(deadline ? { deadline } : {}) };
+}
+export function campaignText(value: unknown, name: string, min: number, max: number) {
+  const text = creatorText(value, name, min, max);
+  if (/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) throw new AdminActionError(400, `${name} must be plain text.`);
+  return text;
+}
+export function campaignDeadline(value: unknown): Date | undefined {
+  if (value === undefined || value === '') return undefined;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d))?$/.test(value)) throw new AdminActionError(400, 'Use an ISO campaign deadline with a timezone, or a calendar date.');
+  const day = new Date(`${value.slice(0, 10)}T00:00:00.000Z`); const date = new Date(value);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== value.slice(0, 10)) throw new AdminActionError(400, 'Use a valid campaign deadline.');
+  return date;
 }
 export function campaignRevision(value: unknown): number | undefined {
   if (value === undefined) return undefined;
@@ -116,7 +129,7 @@ export function campaignRevision(value: unknown): number | undefined {
   return Number(value);
 }
 export function campaignSubmissionInput(body: Record<string, unknown>) {
-  const text = body.text === undefined || body.text === '' ? '' : creatorText(body.text, 'Submission notes', 1, 2000);
+  const text = body.text === undefined || body.text === '' ? '' : campaignText(body.text, 'Submission notes', 1, 2000);
   const urls = textList(body.urls ?? [], 'deliverable links', 6, 500).map(publicWorkUrl);
   if (!text && !urls.length) throw new AdminActionError(400, 'Add submission notes or at least one public deliverable link.');
   return { text, urls };

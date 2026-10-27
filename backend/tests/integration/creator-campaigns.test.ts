@@ -15,9 +15,9 @@ const status = (id: string, value: string, revision: number, actor = student) =>
 beforeAll(() => database.start()); beforeEach(async () => {
   await database.clear(); await User.create([studentFixture({ studentProfile: { ...studentFixture().studentProfile, creatorProfile: { isDiscoverable: true, platforms: [], niches: [], contentTypes: [], compensationPreference: [], availability: 'available' } } }), providerFixture(), studentFixture({ _id: ids.outsider, email: 'outsider@example.test' })]);
 }); afterAll(() => database.stop());
-describe('draft campaign API and pending notices', () => {
+describe('campaign API and pending notices', () => {
   it('creates a pending invitation/history and an undelivered outbox notice', async () => {
-    const row = await create(); expect(row).toMatchObject({ status: 'pending', workflowVersion: 1, revision: 0, deliveryStatus: 'not_submitted' }); expect(row.history[0].action).toBe('created'); expect(await NotificationOutbox.countDocuments({ ownerId: ids.student, status: 'pending' })).toBe(1);
+    const row = await create(); expect(row).toMatchObject({ status: 'pending', stage: 'pending', workflowVersion: 2, revision: 0, deliveryStatus: 'not_submitted' }); expect(row.history[0].action).toBe('created'); expect(await NotificationOutbox.countDocuments({ ownerId: ids.student, status: 'pending' })).toBe(1);
   });
   it('requires creator availability and current provider verification', async () => {
     await User.updateOne({ _id: ids.student }, { 'studentProfile.creatorProfile.isDiscoverable': false }); expect((await request(app).post('/api/promotion-requests').auth(provider, { type: 'bearer' }).send(proposal)).status).toBe(404);
@@ -25,14 +25,16 @@ describe('draft campaign API and pending notices', () => {
   });
   it('accepts, submits and approves work with participant-only revision checks', async () => {
     const row = await create(); expect((await status(row._id, 'accepted', 0, outsider)).status).toBe(403); expect((await status(row._id, 'accepted', 0)).status).toBe(200); expect((await status(row._id, 'completed', 1, provider)).status).toBe(409);
-    const submit = await request(app).post(`/api/promotion-requests/${row._id}/submissions`).auth(student, { type: 'bearer' }).send({ revision: 1, text: 'Synthetic completed work', urls: ['https://portfolio.example.test/work'] }); expect(submit.status).toBe(200);
+    expect((await status(row._id, 'in_progress', 1)).status).toBe(200);
+    const submit = await request(app).post(`/api/promotion-requests/${row._id}/submissions`).auth(student, { type: 'bearer' }).send({ revision: 2, text: 'Synthetic completed work', urls: ['https://portfolio.example.test/work'] }); expect(submit.status).toBe(200);
     expect((await request(app).post(`/api/promotion-requests/${row._id}/review`).auth(provider, { type: 'bearer' }).send({ revision: 1, decision: 'approved' })).status).toBe(409);
-    const reviewed = await request(app).post(`/api/promotion-requests/${row._id}/review`).auth(provider, { type: 'bearer' }).send({ revision: 2, decision: 'approved' }); expect(reviewed.status).toBe(200); expect(reviewed.body.data.request.status).toBe('completed'); expect(reviewed.body.data.request.history.map((entry: { action: string }) => entry.action)).toEqual(['created', 'accepted', 'submitted', 'approved']);
+    const reviewed = await request(app).post(`/api/promotion-requests/${row._id}/review`).auth(provider, { type: 'bearer' }).send({ revision: 3, submissionId: submit.body.data.request.submissions[0]._id, decision: 'approved' }); expect(reviewed.status).toBe(200); expect(reviewed.body.data.request.stage).toBe('reviewed'); expect(reviewed.body.data.request.status).toBe('accepted');
+    const complete = await status(row._id, 'completed', 4, provider); expect(complete.status).toBe(200); expect(complete.body.data.request.status).toBe('completed'); expect(complete.body.data.request.history.map((entry: { action: string }) => entry.action)).toEqual(['created', 'accepted', 'started', 'submitted', 'approved', 'completed']);
   });
   it('supports a reasoned change request and resubmission', async () => {
-    const row = await create(); await status(row._id, 'accepted', 0); await request(app).post(`/api/promotion-requests/${row._id}/submissions`).auth(student, { type: 'bearer' }).send({ revision: 1, text: 'First draft' });
-    const review = await request(app).post(`/api/promotion-requests/${row._id}/review`).auth(provider, { type: 'bearer' }).send({ revision: 2, decision: 'changes_requested', note: 'Please revise the synthetic deliverable.' }); expect(review.status).toBe(200);
-    const resubmit = await request(app).post(`/api/promotion-requests/${row._id}/submissions`).auth(student, { type: 'bearer' }).send({ revision: 3, text: 'Revised draft' }); expect(resubmit.status).toBe(200); expect(resubmit.body.data.request.submissions).toHaveLength(2);
+    const row = await create(); await status(row._id, 'accepted', 0); await status(row._id, 'in_progress', 1); const submission = await request(app).post(`/api/promotion-requests/${row._id}/submissions`).auth(student, { type: 'bearer' }).send({ revision: 2, text: 'First draft' });
+    const review = await request(app).post(`/api/promotion-requests/${row._id}/review`).auth(provider, { type: 'bearer' }).send({ revision: 3, submissionId: submission.body.data.request.submissions[0]._id, decision: 'changes_requested', note: 'Please revise the synthetic deliverable.' }); expect(review.status).toBe(200);
+    const resubmit = await request(app).post(`/api/promotion-requests/${row._id}/submissions`).auth(student, { type: 'bearer' }).send({ revision: 4, text: 'Revised draft' }); expect(resubmit.status).toBe(200); expect(resubmit.body.data.request.submissions).toHaveLength(2);
   });
   it('supports decline/cancel and prevents actions after cancellation', async () => {
     const row = await create(); expect((await status(row._id, 'cancelled', 0, provider)).status).toBe(200); expect((await status(row._id, 'accepted', 1)).status).toBe(409);

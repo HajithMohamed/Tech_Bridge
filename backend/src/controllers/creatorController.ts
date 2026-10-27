@@ -1,10 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import PromotionRequest from '../models/PromotionRequest';
-import User, { type CreatorPlatform, type ICreatorProfile } from '../models/User';
+import User, { type CreatorPlatform, type ICreatorProfile, type IUser } from '../models/User';
 import { AdminActionError } from '../services/adminUsers';
 import { creatorAvailability, creatorCompensation, creatorId, creatorPage, creatorPlatforms, creatorProfileInput, creatorQueryText, creatorRevision, literalCreatorSearch, publicCreator } from '../services/creatorPolicy';
 import { changeCampaign, createCampaign, type CampaignMutation } from '../services/creatorCampaigns';
+import { campaignStage } from '../services/campaignLifecycle';
 
 const providerFields = 'fullName providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
 const creatorFields = 'fullName studentProfile.institution studentProfile.creatorProfile';
@@ -34,10 +35,18 @@ async function mutateOwnedProfile(req: Request, profile?: ICreatorProfile, visib
     return updated;
   });
 }
-async function campaignResponse(id: mongoose.Types.ObjectId) {
-  const row = await PromotionRequest.findById(id).populate('studentId', 'fullName studentProfile.creatorProfile.displayName').populate('providerId', providerFields);
+const visibleCampaigns = { $or: [{ workflowVersion: { $ne: 2 } }, { publishedAt: { $exists: true, $ne: null } }] };
+function campaignView(row: InstanceType<typeof PromotionRequest>) {
+  const value = row.toObject(); const creator = value.studentId as unknown as IUser | null;
+  const profile = creator?.studentProfile?.creatorProfile;
+  const creatorView = creator ? (profile?.isDiscoverable ? publicCreator(creator) : { _id: creator._id, fullName: profile?.displayName || creator.fullName, studentProfile: { creatorProfile: { isDiscoverable: false, niches: [], platforms: [] } } }) : null;
+  return { ...value, stage: campaignStage(row), studentId: creatorView };
+}
+async function campaignResponse(id: mongoose.Types.ObjectId, user: IUser) {
+  const owner = user.role === 'student' ? { studentId: user._id, ...visibleCampaigns } : { providerId: user._id };
+  const row = await PromotionRequest.findOne({ _id: id, ...owner }).populate('studentId', creatorFields).populate('providerId', providerFields);
   if (!row) throw new AdminActionError(404, 'Campaign request not found.');
-  return row;
+  return campaignView(row);
 }
 export const updateCreatorProfile = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -89,28 +98,32 @@ export const getCreator = async (req: Request, res: Response): Promise<void> => 
 export const createPromotionRequest = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = await createCampaign(req.user!._id, req.body);
-    res.status(201).json({ success: true, message: 'Promotion request sent.', data: { request: await campaignResponse(id) } });
+    res.status(201).json({ success: true, message: req.body.saveAsDraft ? 'Campaign draft saved.' : 'Promotion request sent.', data: { request: await campaignResponse(id, req.user!) } });
   } catch (error) { failure(res, error); }
 };
-export const listMyPromotionRequests = async (req: Request, res: Response): Promise<void> => {
+const listCampaigns = (forProvider: boolean) => async (req: Request, res: Response): Promise<void> => {
   try {
-    const requests = await PromotionRequest.find({ studentId: req.user!._id }).sort({ createdAt: -1, _id: -1 }).populate('studentId', 'fullName studentProfile.creatorProfile.displayName').populate('providerId', providerFields);
-    res.json({ success: true, data: { requests } });
+    const page = creatorPage(req.query.page); const limit = creatorPage(req.query.limit, 20, 50); const status = creatorQueryText(req.query.status);
+    if (status && !['pending', 'accepted', 'declined', 'completed', 'cancelled'].includes(status)) throw new AdminActionError(400, 'Choose a valid campaign status.');
+    const filter = { ...(forProvider ? { providerId: req.user!._id } : { studentId: req.user!._id, ...visibleCampaigns }), ...(status ? { status } : {}) };
+    const [requests, total] = await Promise.all([PromotionRequest.find(filter).select('-history -submissions').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).populate('studentId', creatorFields).populate('providerId', providerFields), PromotionRequest.countDocuments(filter)]);
+    res.json({ success: true, data: { requests: requests.map(campaignView), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
   } catch (error) { failure(res, error); }
 };
-export const listProviderPromotionRequests = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const requests = await PromotionRequest.find({ providerId: req.user!._id }).sort({ createdAt: -1, _id: -1 }).populate('studentId', 'fullName studentProfile.creatorProfile.displayName').populate('providerId', providerFields);
-    res.json({ success: true, data: { requests } });
-  } catch (error) { failure(res, error); }
+export const listMyPromotionRequests = listCampaigns(false);
+export const listProviderPromotionRequests = listCampaigns(true);
+export const getPromotionRequest = async (req: Request, res: Response): Promise<void> => {
+  try { res.json({ success: true, data: { request: await campaignResponse(creatorId(req.params.id), req.user!) } }); }
+  catch (error) { failure(res, error); }
 };
 const campaignChange = (mutation: CampaignMutation) => async (req: Request, res: Response): Promise<void> => {
   try {
     const id = await changeCampaign(creatorId(req.params.id), req.user!._id, mutation, req.body);
-    res.json({ success: true, message: 'Campaign updated.', data: { request: await campaignResponse(id) } });
+    res.json({ success: true, message: 'Campaign updated.', data: { request: await campaignResponse(id, req.user!) } });
   } catch (error) { failure(res, error); }
 };
 export const updatePromotionRequestStatus = campaignChange('status');
 export const submitPromotionDeliverables = campaignChange('submission');
 export const reviewPromotionDeliverables = campaignChange('review');
+export const updatePromotionTerms = campaignChange('terms');
 export const verifiedCreatorProviderOnly = verifyProvider;
