@@ -1,9 +1,10 @@
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
-import PromotionRequest, { type PromotionCompensationType, type PromotionRequestStatus } from '../models/PromotionRequest';
+import PromotionRequest from '../models/PromotionRequest';
 import User, { type CreatorPlatform, type IUser } from '../models/User';
 import { AdminActionError } from '../services/adminUsers';
 import { creatorAvailability, creatorCompensation, creatorId, creatorPage, creatorPlatforms, creatorProfileInput, creatorQueryText, literalCreatorSearch } from '../services/creatorPolicy';
+import { changeCampaign, createCampaign, type CampaignMutation } from '../services/creatorCampaigns';
 
 const providerFields = 'fullName providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
 const creatorFields = 'fullName studentProfile.creatorProfile';
@@ -19,6 +20,11 @@ const verifyProvider = (req: Request, res: Response, next: NextFunction): void =
 function creatorSummary(student: IUser) {
   const profile = student.studentProfile?.creatorProfile;
   return { _id: student._id, fullName: profile?.displayName || student.fullName, studentProfile: { creatorProfile: profile } };
+}
+async function campaignResponse(id: mongoose.Types.ObjectId) {
+  const row = await PromotionRequest.findById(id).populate('studentId', 'fullName studentProfile.creatorProfile.displayName').populate('providerId', providerFields);
+  if (!row) throw new AdminActionError(404, 'Campaign request not found.');
+  return row;
 }
 export const updateCreatorProfile = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -67,75 +73,31 @@ export const getCreator = async (req: Request, res: Response): Promise<void> => 
     res.json({ success: true, data: { creator: creatorSummary(creator) } });
   } catch (error) { failure(res, error); }
 };
-const compensationTypes: PromotionCompensationType[] = ['paid', 'product_exchange', 'experience', 'affiliate'];
-const requestStudentFields = 'fullName';
-
-/** POST /api/promotion-requests */
 export const createPromotionRequest = async (req: Request, res: Response): Promise<void> => {
   try {
-    const body = req.body as Record<string, unknown>;
-    const studentId = body.studentId;
-    const campaignBrief = typeof body.campaignBrief === 'string' ? body.campaignBrief.trim() : '';
-    const deliverables = typeof body.deliverables === 'string' ? body.deliverables.trim() : '';
-    const compensationType = body.compensationType as PromotionCompensationType;
-    const compensationDetails = typeof body.compensationDetails === 'string' ? body.compensationDetails.trim() : '';
-    const deadline = body.deadline ? new Date(String(body.deadline)) : undefined;
-    if (!mongoose.isValidObjectId(studentId) || !campaignBrief || campaignBrief.length > 1000 || !deliverables || deliverables.length > 2000 || !compensationTypes.includes(compensationType) || compensationDetails.length > 1000 || (deadline && Number.isNaN(deadline.getTime()))) {
-      res.status(400).json({ success: false, message: 'Provide a discoverable creator, campaign brief, deliverables, and compensation type.' }); return;
-    }
-    if (deadline && deadline.getTime() <= Date.now()) { res.status(400).json({ success: false, message: 'Campaign deadline must be in the future.' }); return; }
-    const creator = await User.exists({ _id: studentId, role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true });
-    if (!creator) { res.status(404).json({ success: false, message: 'This creator profile is not available.' }); return; }
-    const request = await PromotionRequest.create({ studentId, providerId: req.user!._id, campaignBrief, deliverables, compensationType, ...(compensationDetails ? { compensationDetails } : {}), ...(deadline ? { deadline } : {}) });
-    const populatedRequest = await PromotionRequest.findById(request._id)
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
-    res.status(201).json({ success: true, message: 'Promotion request sent.', data: { request: populatedRequest || request } });
-  } catch (error) {
-    console.error('Create promotion request error:', error);
-    res.status(500).json({ success: false, message: 'Unable to send this promotion request.' });
-  }
+    const id = await createCampaign(req.user!._id, req.body);
+    res.status(201).json({ success: true, message: 'Promotion request sent.', data: { request: await campaignResponse(id) } });
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/promotion-requests/mine */
 export const listMyPromotionRequests = async (req: Request, res: Response): Promise<void> => {
   try {
-    const requests = await PromotionRequest.find({ studentId: req.user!._id }).sort({ createdAt: -1 })
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
+    const requests = await PromotionRequest.find({ studentId: req.user!._id }).sort({ createdAt: -1, _id: -1 }).populate('studentId', 'fullName studentProfile.creatorProfile.displayName').populate('providerId', providerFields);
     res.json({ success: true, data: { requests } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load promotion requests.' }); }
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/promotion-requests/provider */
 export const listProviderPromotionRequests = async (req: Request, res: Response): Promise<void> => {
   try {
-    const requests = await PromotionRequest.find({ providerId: req.user!._id }).sort({ createdAt: -1 })
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
+    const requests = await PromotionRequest.find({ providerId: req.user!._id }).sort({ createdAt: -1, _id: -1 }).populate('studentId', 'fullName studentProfile.creatorProfile.displayName').populate('providerId', providerFields);
     res.json({ success: true, data: { requests } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load promotion requests.' }); }
+  } catch (error) { failure(res, error); }
 };
-
-/** PATCH /api/promotion-requests/:id/status */
-export const updatePromotionRequestStatus = async (req: Request, res: Response): Promise<void> => {
+const campaignChange = (mutation: CampaignMutation) => async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid promotion request ID.' }); return; }
-    const status = req.body.status as PromotionRequestStatus;
-    const request = await PromotionRequest.findById(req.params.id);
-    if (!request) { res.status(404).json({ success: false, message: 'Promotion request not found.' }); return; }
-    const isStudent = req.user!.role === 'student' && request.studentId.equals(req.user!._id);
-    const isProvider = req.user!.role === 'provider' && request.providerId.equals(req.user!._id) && req.user!.providerProfile?.verified;
-    if (!isStudent && !isProvider) { res.status(403).json({ success: false, message: 'You cannot update this promotion request.' }); return; }
-    if (isStudent && request.status === 'pending' && ['accepted', 'declined'].includes(status)) request.status = status;
-    else if (isProvider && request.status === 'accepted' && status === 'completed') request.status = 'completed';
-    else { res.status(400).json({ success: false, message: 'This status change is not allowed.' }); return; }
-    await request.save();
-    const populatedRequest = await PromotionRequest.findById(request._id)
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
-    res.json({ success: true, message: 'Promotion request updated.', data: { request: populatedRequest || request } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to update this promotion request.' }); }
+    const id = await changeCampaign(creatorId(req.params.id), req.user!._id, mutation, req.body);
+    res.json({ success: true, message: 'Campaign updated.', data: { request: await campaignResponse(id) } });
+  } catch (error) { failure(res, error); }
 };
-
+export const updatePromotionRequestStatus = campaignChange('status');
+export const submitPromotionDeliverables = campaignChange('submission');
+export const reviewPromotionDeliverables = campaignChange('review');
 export const verifiedCreatorProviderOnly = verifyProvider;
