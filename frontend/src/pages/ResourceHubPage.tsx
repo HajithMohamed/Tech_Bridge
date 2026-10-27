@@ -24,10 +24,10 @@ const readable = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, 
 const formatMoney = (amount: number, currency = 'LKR') => new Intl.NumberFormat('en-LK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
 const formatDate = (value: string) => new Intl.DateTimeFormat('en-LK', { dateStyle: 'medium' }).format(new Date(value));
 const ownerName = (listing: ResourceListing) => {
+  if (!listing.listedBy) return 'Member unavailable';
   if (typeof listing.listedBy === 'string') return 'TechBridge member';
   return listing.listedBy.providerProfile?.organizationName || listing.listedBy.fullName;
 };
-void ownerName;
 
 const itemSpecifications = (listing: ResourceListing): string[] => {
   const { laptop, arduino, raspberryPi, sensor, electronicComponent, devBoard, other } = listing.itemDetails || {};
@@ -43,38 +43,26 @@ const itemSpecifications = (listing: ResourceListing): string[] => {
 
 const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRequest: boolean }) => {
   const details = listing.accessDetails;
-/* Legacy card layout:
-  return <article className="glass-card p-5 flex flex-col h-full">
-    <div className="flex items-start justify-between gap-3 mb-4">
-      <div>
-        <h3 className="font-bold text-surface-900 text-lg leading-tight">{listing.itemName}</h3>
-        <span className="inline-block mt-2 tag">{readable(listing.category)}</span>
-      </div>
-      <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-semibold whitespace-nowrap text-right">
-        {readable(listing.accessType)}
-      </span>
-    </div>
-    
-    <div className="flex gap-2 items-center">
-      {typeof listing.listedBy !== 'string' && (
-        <span className={`text-xs px-2 py-1 rounded-md ${listing.providerOrgVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
-          {listing.providerOrgVerified ? 'Verified Provider' : 'Community'}
-        </span>
-      )}
-      {typeof listing.listedBy === 'string' ? <p className="text-sm text-gray-500">By {ownerName(listing)}</p> : <Link to={`/providers/${listing.listedBy._id}`} className="text-sm text-primary-600 hover:text-primary-700">By {ownerName(listing)}</Link>}
-*/
   const specifications = itemSpecifications(listing);
+  const owner = typeof listing.listedBy === 'object' ? listing.listedBy : null;
 
-  return <article className="glass-card p-5 flex flex-col h-full">
-    {listing.imageDataUrl && <img src={listing.imageDataUrl} alt={listing.itemName} className="mb-4 h-44 w-full rounded-xl border border-white/10 object-cover" />}
-    <div className="flex flex-wrap items-center justify-between gap-2">
+  return <article aria-labelledby={`resource-${listing._id}`} className="glass-card p-5 flex flex-col h-full min-w-0">
+    {listing.imageDataUrl && <img src={listing.imageDataUrl} alt="" className="mb-4 h-44 w-full rounded-xl border border-gray-100 object-cover" />}
+    <h2 id={`resource-${listing._id}`} className="text-lg font-bold leading-snug text-gray-900 break-words">{listing.itemName}</h2>
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+      {owner?.role === 'provider' ? <Link to={`/providers/${owner._id}`} className="font-semibold text-primary-700 hover:underline">By {ownerName(listing)}</Link> : <p className="text-gray-600">By {ownerName(listing)}</p>}
+      {owner?.role === 'provider' && listing.providerOrgVerified && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">Verified provider</span>}
+      {owner?.role === 'student' && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700">Student shared</span>}
+    </div>
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
       <span className="tag">{readable(listing.category)}</span>
-      <span className="text-xs text-primary-200 font-semibold">{readable(listing.accessType)}</span>
+      <span className="text-sm text-primary-700 font-semibold">{readable(listing.accessType)}</span>
     </div>
 
-    {specifications.length > 0 && <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Specifications</p><ul className="mt-2 space-y-1 text-sm text-gray-200">{specifications.map((specification) => <li key={specification}>• {specification}</li>)}</ul></div>}
+    {specifications.length > 0 && <div className="mt-4 rounded-xl bg-gray-50 p-3"><h3 className="text-sm font-semibold text-gray-900">Specifications</h3><ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-gray-700">{specifications.map((specification) => <li key={specification}>{specification}</li>)}</ul></div>}
 
-    <div className="mt-4 space-y-2 text-sm text-gray-200">
+    <div className="mt-4 space-y-2 text-sm text-gray-700">
+      {listing.condition && <p><span className="text-gray-600">Condition:</span> {readable(listing.condition)}</p>}
       {(listing.accessType === 'borrow' || listing.accessType === 'share') && details.borrowShare && <>
         <p><span className="text-gray-500">Duration:</span> Up to {details.borrowShare.borrowDurationDays} days</p>
         <p><span className="text-gray-500">Pickup:</span> {details.borrowShare.pickupLocation}</p>
@@ -110,7 +98,7 @@ const ResourceCard = ({ listing, canRequest }: { listing: ResourceListing; canRe
         <p><span className="text-gray-500">Claim by:</span> {formatDate(details.donation.claimDeadline)}</p>
       </>}
     </div>
-    <p className="mt-auto pt-5 text-xs text-gray-400">{listing.quantityAvailable} unit{listing.quantityAvailable === 1 ? '' : 's'} available</p>
+    <p className="mt-auto pt-5 text-sm text-gray-600">{listing.quantityAvailable} unit{listing.quantityAvailable === 1 ? '' : 's'} available</p>
     {providerArrangedTypes.includes(listing.accessType) && <p className="mt-4 border-t border-gray-100 pt-4 text-xs leading-relaxed text-gray-500">TechBridge does not provide loans or financing. These arrangements are offered directly by verified providers, subject to their own terms.</p>}
     {canRequest && <Link to={`/resources/${listing._id}/request`} className="mt-5 inline-flex w-fit rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">Request this resource</Link>}
   </article>;
@@ -126,6 +114,7 @@ const ResourceHubPage = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'free' | 'subsidized' | 'marketplace'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +131,7 @@ const ResourceHubPage = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [search, category]);
+  }, [search, category, reload]);
 
   const visibleListings = useMemo(() => {
     if (activeTab === 'all') return resources;
@@ -152,18 +141,21 @@ const ResourceHubPage = () => {
     return [];
   }, [activeTab, resources]);
 
-  return <div className="min-h-screen bg-surface-50"><main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
-    <section className="mb-7 flex flex-col md:flex-row md:items-end justify-between gap-5"><div><p className="text-primary-600 text-sm font-semibold mb-2">TECHNICAL RESOURCE ACCESS HUB</p><h1 className="text-3xl font-bold text-surface-900">Get the tools to build your future</h1><p className="text-gray-600 mt-2 max-w-2xl">Explore structured, transparent ways to borrow, share, rent, receive sponsorship, or claim the equipment you need.</p></div><Link to="/resources/list" className="w-fit px-5 py-3 rounded-xl font-semibold text-white bg-primary-600 hover:bg-primary-700">List a resource</Link></section>
-    <section className="glass-card mb-5 grid gap-3 p-4 md:grid-cols-[1fr_260px]"><input className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /><select value={category} onChange={(event) => setCategory(event.target.value as ResourceCategory | '')} className="feed-input w-full"><option value="">All resource categories</option>{categories.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></section>
-    <div className="mb-7 flex gap-1 border-b border-gray-200">
-      <button onClick={() => setActiveTab('all')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'all' ? 'text-primary-600 border-primary-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>All available <span className="opacity-70 text-xs ml-1">({resources.length})</span></button>
-      <button onClick={() => setActiveTab('free')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'free' ? 'text-primary-600 border-primary-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Free Access <span className="opacity-70 text-xs ml-1">(Borrow, Donate)</span></button>
-      <button onClick={() => setActiveTab('subsidized')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'subsidized' ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Subsidized <span className="opacity-70 text-xs ml-1">(Installment, 0% Interest)</span></button>
-      <button onClick={() => setActiveTab('marketplace')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'marketplace' ? 'text-amber-600 border-amber-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}>Marketplace <span className="opacity-70 text-xs ml-1">(Rent)</span></button>
+  return <div className="bg-surface-50"><main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
+    <section className="mb-7 flex flex-col md:flex-row md:items-end justify-between gap-5"><div><h1 className="text-2xl sm:text-3xl font-bold text-surface-900">Technical resources</h1><p className="text-gray-600 mt-2 max-w-2xl">Explore structured, transparent ways to borrow, share, rent, receive sponsorship, or claim the equipment you need.</p></div><Link to="/resources/list" className="w-fit px-5 py-3 rounded-xl font-semibold text-white bg-primary-600 hover:bg-primary-700">List a resource</Link></section>
+    <section aria-label="Find resources" className="glass-card mb-5 grid gap-3 p-4 md:grid-cols-[1fr_260px]"><input aria-label="Search resources" className="feed-input w-full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by item name, for example: Laptop" /><select aria-label="Resource category" value={category} onChange={(event) => setCategory(event.target.value as ResourceCategory | '')} className="feed-input w-full"><option value="">All resource categories</option>{categories.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></section>
+    <div aria-label="Resource access options" className="mb-7 flex gap-1 overflow-x-auto border-b border-gray-200 [&>button]:shrink-0 [&>button]:whitespace-nowrap [&>button]:min-h-11">
+      <button aria-pressed={activeTab === 'all'} onClick={() => setActiveTab('all')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'all' ? 'text-primary-700 border-primary-600' : 'text-gray-600 border-transparent hover:text-gray-900'}`}>All available <span className="text-xs ml-1">({resources.length})</span></button>
+      <button aria-pressed={activeTab === 'free'} onClick={() => setActiveTab('free')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'free' ? 'text-primary-700 border-primary-600' : 'text-gray-600 border-transparent hover:text-gray-900'}`}>Free Access <span className="text-xs ml-1">(Borrow, Donate)</span></button>
+      <button aria-pressed={activeTab === 'subsidized'} onClick={() => setActiveTab('subsidized')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'subsidized' ? 'text-primary-700 border-primary-600' : 'text-gray-600 border-transparent hover:text-gray-900'}`}>Subsidized <span className="text-xs ml-1">(Installment, 0% Interest)</span></button>
+      <button aria-pressed={activeTab === 'marketplace'} onClick={() => setActiveTab('marketplace')} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'marketplace' ? 'text-primary-700 border-primary-600' : 'text-gray-600 border-transparent hover:text-gray-900'}`}>Marketplace <span className="text-xs ml-1">(Rent)</span></button>
     </div>
 
-    {error && <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">{error}</div>}
-    {loading ? <p className="py-14 text-center text-gray-500">Loading resource listings...</p> : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-surface-900">No available resources match these filters.</p><p className="mt-2 text-sm text-gray-500">Clear a filter or choose another access option.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && (typeof listing.listedBy === 'string' || listing.listedBy._id !== user._id)} />)}</div>}
+    {error && <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700"><p>{error}</p><button onClick={() => setReload((value) => value + 1)} className="min-h-11 font-semibold underline">Retry resources</button></div>}
+    {loading ? <p role="status" className="py-14 text-center text-gray-600">Loading resource listings...</p> : error ? null : visibleListings.length === 0 ? <div className="glass-card p-12 text-center"><p className="font-semibold text-surface-900">No available resources match these filters.</p><p className="mt-2 text-sm text-gray-600">Clear a filter or choose another access option.</p></div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">{visibleListings.map((listing) => {
+      const ownerId = typeof listing.listedBy === 'string' ? listing.listedBy : listing.listedBy?._id;
+      return <ResourceCard key={listing._id} listing={listing} canRequest={user?.role === 'student' && Boolean(ownerId) && ownerId !== user._id && listing.status === 'available' && listing.quantityAvailable > 0} />;
+    })}</div>}
   </main></div>;
 };
 

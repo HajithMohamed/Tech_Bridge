@@ -19,16 +19,16 @@ const Footer = () => {
           {/* Quick Links */}
           <div className="flex gap-8 sm:gap-16 text-center md:text-left">
             <div>
-              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Platform</h4>
+              <h4 className="text-sm font-semibold text-gray-300 mb-4">Platform</h4>
               <ul className="space-y-2">
-                <li><a href="#how-it-works" className="text-sm text-gray-400 hover:text-white transition-colors">How It Works</a></li>
-                <li><a href="#opportunities" className="text-sm text-gray-400 hover:text-white transition-colors">Opportunities</a></li>
+                <li><a href="/#how-it-works" className="text-sm text-gray-400 hover:text-white transition-colors">How It Works</a></li>
+                <li><Link to="/opportunities" className="text-sm text-gray-400 hover:text-white transition-colors">Opportunities</Link></li>
                 <li><Link to="/connections" className="text-sm text-gray-400 hover:text-white transition-colors">Academic & Alumni</Link></li>
                 <li><Link to="/register" className="text-sm text-primary-400 hover:text-primary-300 font-medium transition-colors">Get Started</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Contact</h4>
+              <h4 className="text-sm font-semibold text-gray-300 mb-4">Contact</h4>
               <ul className="space-y-2">
                 <li className="text-sm text-gray-400">techbridge@faculty.edu</li>
                 <li className="text-sm text-gray-400">Faculty of Technology</li>
@@ -43,8 +43,8 @@ const Footer = () => {
       {/* Bottom bar */}
       <div className="border-t border-surface-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-gray-500">&copy; 2026 TechBridge. Faculty of Technology.</p>
-          <p className="text-xs text-gray-600">Connecting students with opportunities.</p>
+          <p className="text-xs text-gray-400">&copy; 2026 TechBridge. Faculty of Technology.</p>
+          <p className="text-xs text-gray-400">Connecting students with opportunities.</p>
         </div>
       </div>
     </footer>

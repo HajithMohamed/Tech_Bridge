@@ -12,8 +12,12 @@ async function start() {
   const database = new TestDatabase();
   await database.start();
   try {
-    await User.create([studentFixture(), providerFixture(), adminFixture()]);
-    await Opportunity.create(scholarshipFixture());
+    await User.create([studentFixture(), providerFixture(), adminFixture(), providerFixture({
+      _id: new Types.ObjectId('000000000000000000000050'), fullName: 'Synthetic New Provider', email: 'new-provider@example.test',
+    })]);
+    await Opportunity.create([scholarshipFixture(), scholarshipFixture({
+      _id: new Types.ObjectId('000000000000000000000051'), title: 'Synthetic Follow-up Scholarship',
+    })]);
     await Resource.create(resourceFixture());
     const reservationResourceId = new Types.ObjectId('000000000000000000000013');
     await Resource.create(resourceFixture({ _id: reservationResourceId, itemName: 'Synthetic Reservation Equipment' }));
