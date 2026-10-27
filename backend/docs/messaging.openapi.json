@@ -3,7 +3,7 @@
   "info": {
     "title": "TechBridge messaging backend API",
     "version": "2.0.0-review",
-    "description": "Phase 0 documentation of the existing PR #22 implementation. No endpoint behavior changes. Common error envelopes are {success:false,message}; database outages are reported without internal details. Full bearer sessions and current account/provider verification are required. Messaging routes and complaint-evidence responses are no-store. Legacy report creation/resolution do not set that explicit header. No production server or credential is embedded."
+    "description": "Documents the PR #22 messaging implementation and Phase 1 security policy. Common error envelopes are {success:false,message}; database outages are reported without internal details. Full HS256 bearer sessions with an expiry and current account/provider verification are required. Protected endpoints, including report creation/resolution, return Cache-Control: no-store. See security-hardening.md for shared parser errors and deployment settings. No production server or credential is embedded."
   },
   "servers": [
     {
@@ -1872,7 +1872,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Full session only; provider-verification-only tokens are rejected."
+        "description": "Full HS256 session with integer expiry and valid platform claims only; provider-verification-only tokens are rejected. Single case-insensitive Bearer scheme, maximum 4096 header characters. Persisted roles, suspension, provider verification and token-version revocation remain authoritative."
       }
     },
     "schemas": {
