@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe, updateStudentProfile } from '../controllers/authController';
+import { register, login, getMe, updateStudentProfile, forgotPassword, resetPassword, verifyEmail, resendVerification } from '../controllers/authController';
 import { authorize, protect } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { newPasswordValid } from '../services/authChallenges';
+import { authThrottle } from '../services/authThrottle';
 
 const router = Router();
 
@@ -30,8 +32,8 @@ router.post(
     body('password')
       .notEmpty()
       .withMessage('Password is required')
-      .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters'),
+      .custom(newPasswordValid)
+      .withMessage('Password must have at least 12 characters and at most 72 UTF-8 bytes'),
     body('confirmPassword')
       .notEmpty()
       .withMessage('Please confirm your password')
@@ -91,7 +93,7 @@ router.post(
       .isArray({ min: 1 }).withMessage('Select at least one resource access method'),
     validate,
   ],
-  register
+  authThrottle('register'), register
 );
 
 /**
@@ -109,11 +111,22 @@ router.post(
       .isEmail()
       .withMessage('Please provide a valid email')
       .normalizeEmail(),
-    body('password').notEmpty().withMessage('Password is required'),
+    body('password').isString().notEmpty().withMessage('Password is required'),
     validate,
   ],
-  login
+  authThrottle('login'), login
 );
+
+const emailValidation = () => [body('email').isString().trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(), validate];
+router.post('/forgot-password', emailValidation(), authThrottle('forgot-password'), forgotPassword);
+router.post('/resend-verification', emailValidation(), authThrottle('resend-verification'), resendVerification);
+router.post('/verify-email', [body('token').isString().matches(/^[A-Za-z0-9_-]{43}$/).withMessage('This link is invalid or has expired. Request a new link.'), validate], authThrottle('verify-email'), verifyEmail);
+router.post('/reset-password', [
+  body('token').isString().matches(/^[A-Za-z0-9_-]{43}$/).withMessage('This link is invalid or has expired. Request a new link.'),
+  body('password').custom(newPasswordValid).withMessage('Password must have at least 12 characters and at most 72 UTF-8 bytes'),
+  body('confirmPassword').custom((value, { req }) => typeof value === 'string' && value === req.body.password).withMessage('Passwords do not match'),
+  validate,
+], authThrottle('reset-password'), resetPassword);
 
 /**
  * @route   GET /api/auth/me
