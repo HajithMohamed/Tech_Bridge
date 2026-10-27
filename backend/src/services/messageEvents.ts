@@ -9,6 +9,7 @@ import { communityPair } from './communityMessaging';
 import { communityVisible } from './communityPolicy';
 import MessagingSignal from '../models/MessagingSignal';
 import { verifyToken } from '../utils/jwt';
+import { bearerToken } from '../utils/bearer';
 import { AdminActionError } from './adminUsers';
 
 export type MessageSignal = { type: 'refresh' } | { type: 'typing'; conversationId: string; expiresAt: number };
@@ -47,9 +48,10 @@ export async function publishMessageSignal(userIds: string[], signal: MessageSig
   ]);
 }
 export async function currentStreamUser(authorization: string | undefined) {
-  if (!authorization?.startsWith('Bearer ')) throw new AdminActionError(401, 'Sign in to receive message updates.');
+  const token = bearerToken(authorization);
+  if (!token) throw new AdminActionError(401, 'Sign in to receive message updates.');
   let decoded;
-  try { decoded = verifyToken(authorization.slice(7)); } catch { throw new AdminActionError(401, 'Your session expired. Sign in again.'); }
+  try { decoded = verifyToken(token); } catch { throw new AdminActionError(401, 'Your session expired. Sign in again.'); }
   if (decoded.scope !== undefined) throw new AdminActionError(401, 'A full session is required.');
   const user = await User.findById(decoded.userId).select('+tokenVersion');
   if (!user || (user.tokenVersion || 0) !== (decoded.version || 0)) throw new AdminActionError(401, 'Your session changed. Sign in again.');
