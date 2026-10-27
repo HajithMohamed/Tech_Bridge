@@ -245,7 +245,7 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
     if (profile.availabilityHours !== undefined && (!Number.isInteger(profile.availabilityHours) || (profile.availabilityHours as number) < 0 || (profile.availabilityHours as number) > 168)) { res.status(400).json({ success: false, message: 'Availability must be between 0 and 168 hours.' }); return; }
     if (profile.preferredWorkType !== undefined && !['remote', 'on-site', 'hybrid', 'flexible'].includes(profile.preferredWorkType as string)) { res.status(400).json({ success: false, message: 'Select a valid work preference.' }); return; }
 
-    student.studentProfile = {
+    const academicProfile = {
       institution,
       degree: profile.degree as 'ICT' | 'ET' | 'BST' | 'other',
       studyYear: profile.studyYear as number,
@@ -254,10 +254,18 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
       ...(careerGoal ? { careerGoal } : {}),
       ...(typeof profile.availabilityHours === 'number' ? { availabilityHours: profile.availabilityHours } : {}),
       ...(profile.preferredWorkType ? { preferredWorkType: profile.preferredWorkType as 'remote' | 'on-site' | 'hybrid' | 'flexible' } : {}),
-      ...(student.studentProfile.creatorProfile ? { creatorProfile: student.studentProfile.creatorProfile } : {}),
     };
-    await student.save();
-    res.status(200).json({ success: true, message: 'Student profile updated.', data: { user: student } });
+    // Update only academic fields: replacing the parent can erase or restore stale
+    // creator consent and also attempts to re-cast a live Mongoose nested object.
+    const fields = Object.fromEntries(Object.entries(academicProfile).map(([key, value]) => [`studentProfile.${key}`, value]));
+    const absent = ['location', 'careerGoal', 'availabilityHours', 'preferredWorkType'].filter((key) => !(key in academicProfile));
+    const updated = await User.findOneAndUpdate(
+      { _id: student._id, role: 'student', accountStatus: 'active' },
+      { $set: fields, ...(absent.length ? { $unset: Object.fromEntries(absent.map((key) => [`studentProfile.${key}`, ''])) } : {}), $inc: { __v: 1 } },
+      { new: true, runValidators: true }
+    );
+    if (!updated) { res.status(403).json({ success: false, message: 'An active student account is required.' }); return; }
+    res.status(200).json({ success: true, message: 'Student profile updated.', data: { user: updated } });
   } catch (error) {
     console.error('Update student profile error:', error);
     res.status(500).json({ success: false, message: 'Unable to update student profile.' });
