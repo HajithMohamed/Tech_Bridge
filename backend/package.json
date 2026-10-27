@@ -16,7 +16,8 @@
     "test:integration": "vitest run tests/integration",
     "test:prepare": "tsx tests/prepare-mongo.ts",
     "test:e2e:server": "tsx tests/e2e-server.ts",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "audit:security": "npm audit --audit-level=moderate"
   },
   "keywords": [
     "techbridge",
@@ -45,7 +46,7 @@
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
-    "vite": "8.2.1",
+    "vite": "8.3.5",
     "vitest": "5.0.5"
   },
   "engines": {
