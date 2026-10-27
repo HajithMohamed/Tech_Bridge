@@ -25,7 +25,7 @@ export function publicWorkUrl(value: unknown): string {
   const text = creatorText(value, 'Public link', 1, 500);
   let url: URL;
   try { url = new URL(text); } catch { throw new AdminActionError(400, 'Use a complete public HTTP or HTTPS link.'); }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port || /[\\\s]/.test(text) || isIP(url.hostname) || !url.hostname.includes('.') || url.hostname.endsWith('.') || /\.(local|localhost|internal)$/i.test(url.hostname)) throw new AdminActionError(400, 'Use a public HTTP or HTTPS link without credentials or a custom port.');
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port || /[\\\s\u0000-\u001f\u007f<>]/.test(text) || isIP(url.hostname.replace(/^\[|\]$/g, '')) || !url.hostname.includes('.') || url.hostname.endsWith('.') || /\.(local|localhost|internal)$/i.test(url.hostname)) throw new AdminActionError(400, 'Use a public HTTP or HTTPS link without credentials or a custom port.');
   return url.href;
 }
 export function platformWorkUrl(platform: CreatorPlatform, value: unknown): string {
@@ -37,15 +37,27 @@ function textList(value: unknown, name: string, count: number, length: number): 
   if (!Array.isArray(value) || value.length > count || value.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > length)) throw new AdminActionError(400, `Provide up to ${count} valid ${name}.`);
   return [...new Set(value.map((item: string) => item.trim()))];
 }
+function profileText(value: unknown, name: string, min: number, max: number): string {
+  const text = creatorText(value, name, min, max);
+  if (/[\u0000-\u001f\u007f<>]/.test(text)) throw new AdminActionError(400, `${name} must be plain single-line text.`);
+  return text;
+}
+export function creatorRevision(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || Number(value) < 0 || Number(value) >= Number.MAX_SAFE_INTEGER) throw new AdminActionError(400, 'Provide a valid creator profile revision.');
+  return Number(value);
+}
 export function creatorProfileInput(value: unknown): ICreatorProfile {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AdminActionError(400, 'Provide your creator profile.');
   const body = value as Record<string, unknown>;
   if (typeof body.isDiscoverable !== 'boolean') throw new AdminActionError(400, 'Choose whether your creator profile is discoverable.');
-  const displayName = body.displayName === undefined || body.displayName === '' ? undefined : creatorText(body.displayName, 'Public display name', 2, 80);
+  const displayName = body.displayName === undefined || body.displayName === '' ? undefined : profileText(body.displayName, 'Public display name', 2, 80);
   const availability = body.availability ?? 'available';
   if (!creatorAvailability.includes(availability as typeof creatorAvailability[number])) throw new AdminActionError(400, 'Choose a valid creator availability.');
-  const niches = textList(body.niches, 'niches', 12, 80);
-  const contentTypes = textList(body.contentTypes, 'content types', 12, 80);
+  if (body.showInstitution !== undefined && typeof body.showInstitution !== 'boolean') throw new AdminActionError(400, 'Choose whether to show your institution.');
+  const profileImageUrl = body.profileImageUrl === undefined || body.profileImageUrl === '' ? undefined : publicWorkUrl(body.profileImageUrl);
+  const niches = textList(body.niches, 'niches', 12, 80).map((item) => profileText(item, 'Niche', 1, 80));
+  const contentTypes = textList(body.contentTypes, 'content types', 12, 80).map((item) => profileText(item, 'Content type', 1, 80));
   const sampleWorkLinks = textList(body.sampleWorkLinks ?? [], 'sample-work links', 8, 500).map(publicWorkUrl);
   const preferences = textList(body.compensationPreference, 'compensation preferences', 4, 30);
   if (preferences.some((item) => !creatorCompensation.includes(item as PromotionCompensationType))) throw new AdminActionError(400, 'Choose valid compensation preferences.');
@@ -55,10 +67,31 @@ export function creatorProfileInput(value: unknown): ICreatorProfile {
     const row = item as Record<string, unknown>; const platform = row.platform as CreatorPlatform;
     if (!creatorPlatforms.includes(platform)) throw new AdminActionError(400, 'Choose a valid creator platform.');
     if (row.followerCount !== undefined && (!Number.isInteger(row.followerCount) || Number(row.followerCount) < 0 || Number(row.followerCount) > 1_000_000_000)) throw new AdminActionError(400, 'Follower counts must be whole numbers between zero and one billion.');
-    return { platform, handle: creatorText(row.handle, 'Public handle', 1, 100), profileUrl: platformWorkUrl(platform, row.profileUrl), ...(typeof row.followerCount === 'number' ? { followerCount: row.followerCount } : {}) };
+    return { platform, handle: profileText(row.handle, 'Public handle', 1, 100), profileUrl: platformWorkUrl(platform, row.profileUrl), ...(typeof row.followerCount === 'number' ? { followerCount: row.followerCount } : {}) };
   });
   if (body.isDiscoverable && (!platforms.length || !niches.length || !contentTypes.length || !preferences.length)) throw new AdminActionError(400, 'Add a platform, niche, content type and compensation preference before becoming discoverable.');
-  return { isDiscoverable: body.isDiscoverable, ...(displayName ? { displayName } : {}), availability: availability as typeof creatorAvailability[number], platforms, niches, contentTypes, compensationPreference: preferences as PromotionCompensationType[], sampleWorkLinks };
+  return { isDiscoverable: body.isDiscoverable, ...(displayName ? { displayName } : {}), ...(profileImageUrl ? { profileImageUrl } : {}), showInstitution: body.showInstitution === true, availability: availability as typeof creatorAvailability[number], platforms, niches, contentTypes, compensationPreference: preferences as PromotionCompensationType[], sampleWorkLinks };
+}
+/** Public data is explicitly projected; verification/metrics labels are server-owned. */
+export function publicCreator(student: { _id: unknown; fullName: string; studentProfile?: { institution?: string; creatorProfile?: ICreatorProfile } }) {
+  const profile = student.studentProfile?.creatorProfile;
+  return {
+    _id: student._id,
+    fullName: profile?.displayName || student.fullName,
+    studentProfile: {
+      ...(profile?.showInstitution === true ? { institution: student.studentProfile?.institution, institutionSource: 'self_reported' } : {}),
+      creatorProfile: {
+        isDiscoverable: true,
+        ...(profile?.displayName ? { displayName: profile.displayName } : {}),
+        ...(profile?.profileImageUrl ? { profileImageUrl: profile.profileImageUrl } : {}),
+        availability: profile?.availability ?? 'available',
+        platforms: (profile?.platforms ?? []).map(({ platform, handle, profileUrl, followerCount }) => ({ platform, handle, profileUrl, ...(typeof followerCount === 'number' ? { followerCount } : {}) })),
+        niches: profile?.niches ?? [], contentTypes: profile?.contentTypes ?? [],
+        compensationPreference: profile?.compensationPreference ?? [], sampleWorkLinks: profile?.sampleWorkLinks ?? [],
+        metricsSource: 'self_reported', verificationStatus: 'unverified',
+      },
+    },
+  };
 }
 export const literalCreatorSearch = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function creatorQueryText(value: unknown): string {

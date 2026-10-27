@@ -1,12 +1,12 @@
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import PromotionRequest, { type PromotionCompensationType, type PromotionRequestStatus } from '../models/PromotionRequest';
-import User, { type CreatorPlatform, type IUser } from '../models/User';
+import User, { type CreatorPlatform, type ICreatorProfile } from '../models/User';
 import { AdminActionError } from '../services/adminUsers';
-import { creatorAvailability, creatorCompensation, creatorId, creatorPage, creatorPlatforms, creatorProfileInput, creatorQueryText, literalCreatorSearch } from '../services/creatorPolicy';
+import { creatorAvailability, creatorCompensation, creatorId, creatorPage, creatorPlatforms, creatorProfileInput, creatorQueryText, creatorRevision, literalCreatorSearch, publicCreator } from '../services/creatorPolicy';
 
 const providerFields = 'fullName providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
-const creatorFields = 'fullName studentProfile.creatorProfile';
+const creatorFields = 'fullName studentProfile.institution studentProfile.creatorProfile';
 function failure(res: Response, error: unknown) {
   res.status(error instanceof AdminActionError ? error.statusCode : 503).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Creator services are temporarily unavailable. Please try again.' });
 }
@@ -16,22 +16,35 @@ const verifyProvider = (req: Request, res: Response, next: NextFunction): void =
   }
   next();
 };
-function creatorSummary(student: IUser) {
-  const profile = student.studentProfile?.creatorProfile;
-  return { _id: student._id, fullName: profile?.displayName || student.fullName, studentProfile: { creatorProfile: profile } };
+async function mutateOwnedProfile(req: Request, profile?: ICreatorProfile, visibility?: boolean) {
+  const expectedRevision = creatorRevision(req.body?.revision);
+  return mongoose.connection.transaction(async (session) => {
+    // Lock the account so concurrent profile edits/revocation serialize and retry safely.
+    const owner = await User.findOneAndUpdate({ _id: req.user!._id, role: 'student', accountStatus: 'active' }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false });
+    if (!owner?.studentProfile) throw new AdminActionError(404, 'Student profile not found.');
+    const current = owner.toObject().studentProfile?.creatorProfile;
+    const revision = current?.revision ?? 0;
+    if (!Number.isSafeInteger(revision) || revision >= Number.MAX_SAFE_INTEGER || (expectedRevision !== undefined && expectedRevision !== revision)) throw new AdminActionError(409, 'Your creator profile changed. Reload it before trying again.');
+    // Enabling discovery revalidates stored legacy profiles. Withdrawal requires no other fields.
+    const replacement = profile ?? (visibility === true ? creatorProfileInput({ ...current, isDiscoverable: true }) : undefined);
+    const updates = replacement ? { 'studentProfile.creatorProfile': { ...replacement, revision: revision + 1 } } : { 'studentProfile.creatorProfile.isDiscoverable': false, 'studentProfile.creatorProfile.revision': revision + 1 };
+    const updated = await User.findByIdAndUpdate(owner._id, { $set: updates }, { new: true, session, runValidators: true });
+    if (!updated) throw new AdminActionError(404, 'Student profile not found.');
+    return updated;
+  });
 }
 export const updateCreatorProfile = async (req: Request, res: Response): Promise<void> => {
   try {
     const profile = creatorProfileInput(req.body);
-    const student = await mongoose.connection.transaction(async (session) => {
-      const owner = await User.findOneAndUpdate({ _id: req.user!._id, role: 'student', accountStatus: 'active' }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false });
-      if (!owner?.studentProfile) throw new AdminActionError(404, 'Student profile not found.');
-      owner.studentProfile.creatorProfile = profile;
-      owner.markModified('studentProfile.creatorProfile');
-      await owner.save({ session });
-      return owner;
-    });
+    const student = await mutateOwnedProfile(req, profile);
     res.json({ success: true, message: profile.isDiscoverable ? 'Your creator profile is visible to verified providers.' : 'Your creator profile is hidden from providers.', data: { user: student } });
+  } catch (error) { failure(res, error); }
+};
+export const updateCreatorVisibility = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (typeof req.body?.isDiscoverable !== 'boolean') throw new AdminActionError(400, 'Choose whether your creator profile is discoverable.');
+    const student = await mutateOwnedProfile(req, undefined, req.body.isDiscoverable);
+    res.json({ success: true, message: req.body.isDiscoverable ? 'Your creator profile is visible to verified providers.' : 'Your creator profile is hidden from providers.', data: { user: student } });
   } catch (error) { failure(res, error); }
 };
 export const listCreators = async (req: Request, res: Response): Promise<void> => {
@@ -57,14 +70,14 @@ export const listCreators = async (req: Request, res: Response): Promise<void> =
     if (clauses.length) filter.$and = clauses;
     const page = creatorPage(req.query.page); const limit = creatorPage(req.query.limit, 12, 24);
     const [students, total] = await Promise.all([User.find(filter).select(creatorFields).sort({ 'studentProfile.creatorProfile.displayName': 1, fullName: 1, _id: 1 }).skip((page - 1) * limit).limit(limit), User.countDocuments(filter)]);
-    res.json({ success: true, data: { creators: students.map(creatorSummary), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+    res.json({ success: true, data: { creators: students.map(publicCreator), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
   } catch (error) { failure(res, error); }
 };
 export const getCreator = async (req: Request, res: Response): Promise<void> => {
   try {
     const creator = await User.findOne({ _id: creatorId(req.params.studentId), role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true }).select(creatorFields);
     if (!creator) throw new AdminActionError(404, 'Creator profile not found.');
-    res.json({ success: true, data: { creator: creatorSummary(creator) } });
+    res.json({ success: true, data: { creator: publicCreator(creator) } });
   } catch (error) { failure(res, error); }
 };
 const compensationTypes: PromotionCompensationType[] = ['paid', 'product_exchange', 'experience', 'affiliate'];
