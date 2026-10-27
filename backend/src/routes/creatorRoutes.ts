@@ -3,6 +3,7 @@ import { getCreator, listCreators, updateCreatorProfile, verifiedCreatorProvider
 import { authorize, protect } from '../middleware/auth';
 
 const router = Router();
+router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 router.put('/profile', protect, authorize('student'), updateCreatorProfile);
 router.get('/', protect, authorize('provider'), verifiedCreatorProviderOnly, listCreators);

@@ -1,108 +1,74 @@
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
-import PromotionRequest, { PromotionCompensationType, PromotionRequestStatus } from '../models/PromotionRequest';
-import User, { CreatorCompensationPreference, CreatorPlatform, ICreatorPlatformProfile } from '../models/User';
+import PromotionRequest, { type PromotionCompensationType, type PromotionRequestStatus } from '../models/PromotionRequest';
+import User, { type CreatorPlatform, type IUser } from '../models/User';
+import { AdminActionError } from '../services/adminUsers';
+import { creatorAvailability, creatorCompensation, creatorId, creatorPage, creatorPlatforms, creatorProfileInput, creatorQueryText, literalCreatorSearch } from '../services/creatorPolicy';
 
-const platforms: CreatorPlatform[] = ['instagram', 'tiktok', 'youtube', 'facebook', 'other'];
-const compensationTypes: PromotionCompensationType[] = ['paid', 'product_exchange', 'experience', 'affiliate'];
 const providerFields = 'fullName providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
 const creatorFields = 'fullName studentProfile.creatorProfile';
-const requestStudentFields = 'fullName';
-
-const textList = (value: unknown, maxItems: number, maxLength: number): string[] | null => {
-  if (!Array.isArray(value) || value.length > maxItems) return null;
-  const cleaned = value.map((item) => typeof item === 'string' ? item.trim() : '').filter(Boolean);
-  return cleaned.every((item) => item.length <= maxLength) ? [...new Set(cleaned)] : null;
-};
-
-const validUrl = (value: string): boolean => {
-  try { const url = new URL(value); return url.protocol === 'https:' || url.protocol === 'http:'; }
-  catch { return false; }
-};
-
+function failure(res: Response, error: unknown) {
+  res.status(error instanceof AdminActionError ? error.statusCode : 503).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Creator services are temporarily unavailable. Please try again.' });
+}
 const verifyProvider = (req: Request, res: Response, next: NextFunction): void => {
-  if (!req.user?.providerProfile?.verified) {
-    res.status(403).json({ success: false, message: 'Only verified providers can access the creator marketplace.' });
-    return;
+  if (!req.user?.providerProfile?.verified || req.user.providerProfile.verificationStatus !== 'VERIFIED') {
+    res.status(403).json({ success: false, message: 'Only verified providers can access the creator marketplace.' }); return;
   }
   next();
 };
-
-/** PUT /api/creators/profile */
+function creatorSummary(student: IUser) {
+  const profile = student.studentProfile?.creatorProfile;
+  return { _id: student._id, fullName: profile?.displayName || student.fullName, studentProfile: { creatorProfile: profile } };
+}
 export const updateCreatorProfile = async (req: Request, res: Response): Promise<void> => {
   try {
-    const student = await User.findById(req.user!._id);
-    if (!student?.studentProfile) { res.status(404).json({ success: false, message: 'Student profile not found.' }); return; }
-    const body = req.body as Record<string, unknown>;
-    if (typeof body.isDiscoverable !== 'boolean') { res.status(400).json({ success: false, message: 'Choose whether your creator profile is discoverable.' }); return; }
-    const niches = textList(body.niches, 12, 80);
-    const contentTypes = textList(body.contentTypes, 12, 80);
-    const sampleWorkLinks = textList(body.sampleWorkLinks ?? [], 8, 500);
-    if (!niches || !contentTypes || !sampleWorkLinks || !sampleWorkLinks.every(validUrl)) { res.status(400).json({ success: false, message: 'Provide valid creator profile lists and sample-work links.' }); return; }
-    if (!Array.isArray(body.compensationPreference) || body.compensationPreference.length > compensationTypes.length || body.compensationPreference.some((item) => !compensationTypes.includes(item as PromotionCompensationType))) {
-      res.status(400).json({ success: false, message: 'Select valid compensation preferences.' }); return;
-    }
-    if (!Array.isArray(body.platforms) || body.platforms.length > 6) { res.status(400).json({ success: false, message: 'Add up to six valid creator platforms.' }); return; }
-    const creatorPlatforms: ICreatorPlatformProfile[] = [];
-    for (const item of body.platforms) {
-      const platform = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const name = platform.platform as CreatorPlatform;
-      const handle = typeof platform.handle === 'string' ? platform.handle.trim() : '';
-      const profileUrl = typeof platform.profileUrl === 'string' ? platform.profileUrl.trim() : '';
-      const followerCount = platform.followerCount;
-      if (!platforms.includes(name) || !handle || handle.length > 100 || !validUrl(profileUrl) || (followerCount !== undefined && (!Number.isInteger(followerCount) || (followerCount as number) < 0 || (followerCount as number) > 1_000_000_000))) {
-        res.status(400).json({ success: false, message: 'Each platform needs a valid type, handle, profile link, and optional follower count.' }); return;
-      }
-      creatorPlatforms.push({ platform: name, handle, profileUrl, ...(typeof followerCount === 'number' ? { followerCount } : {}) });
-    }
-    if (body.isDiscoverable && (!creatorPlatforms.length || !niches.length || !contentTypes.length || !(body.compensationPreference as unknown[]).length)) {
-      res.status(400).json({ success: false, message: 'Add a platform, niche, content type, and compensation preference before becoming discoverable.' }); return;
-    }
-    student.studentProfile.creatorProfile = {
-      isDiscoverable: body.isDiscoverable,
-      platforms: creatorPlatforms,
-      niches,
-      contentTypes,
-      compensationPreference: body.compensationPreference as CreatorCompensationPreference[],
-      ...(sampleWorkLinks.length ? { sampleWorkLinks } : {}),
-    };
-    student.markModified('studentProfile.creatorProfile');
-    await student.save();
-    res.json({ success: true, message: body.isDiscoverable ? 'Your creator profile is visible to verified providers.' : 'Your creator profile is hidden from providers.', data: { user: student } });
-  } catch (error) {
-    console.error('Update creator profile error:', error);
-    res.status(500).json({ success: false, message: 'Unable to save your creator profile.' });
-  }
+    const profile = creatorProfileInput(req.body);
+    const student = await mongoose.connection.transaction(async (session) => {
+      const owner = await User.findOneAndUpdate({ _id: req.user!._id, role: 'student', accountStatus: 'active' }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false });
+      if (!owner?.studentProfile) throw new AdminActionError(404, 'Student profile not found.');
+      owner.studentProfile.creatorProfile = profile;
+      owner.markModified('studentProfile.creatorProfile');
+      await owner.save({ session });
+      return owner;
+    });
+    res.json({ success: true, message: profile.isDiscoverable ? 'Your creator profile is visible to verified providers.' : 'Your creator profile is hidden from providers.', data: { user: student } });
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/creators */
 export const listCreators = async (req: Request, res: Response): Promise<void> => {
   try {
     const filter: Record<string, unknown> = { role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true };
-    const queryText = (value: unknown) => typeof value === 'string' ? value.trim().slice(0, 80) : '';
-    const regexFor = (value: string) => new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    const niche = queryText(req.query.niche);
-    const contentType = queryText(req.query.contentType);
-    const platform = queryText(req.query.platform);
-    const compensationPreference = queryText(req.query.compensationPreference);
-    if (niche) filter['studentProfile.creatorProfile.niches'] = regexFor(niche);
-    if (contentType) filter['studentProfile.creatorProfile.contentTypes'] = regexFor(contentType);
-    if (platform && platforms.includes(platform as CreatorPlatform)) filter['studentProfile.creatorProfile.platforms.platform'] = platform;
-    if (compensationPreference && compensationTypes.includes(compensationPreference as PromotionCompensationType)) filter['studentProfile.creatorProfile.compensationPreference'] = compensationPreference;
-    const creators = await User.find(filter).select(creatorFields).sort({ fullName: 1 }).limit(100);
-    res.json({ success: true, data: { creators } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load the creator directory.' }); }
+    const q = creatorQueryText(req.query.q); const niche = creatorQueryText(req.query.niche); const contentType = creatorQueryText(req.query.contentType);
+    const platform = creatorQueryText(req.query.platform); const compensation = creatorQueryText(req.query.compensationPreference);
+    const availability = creatorQueryText(req.query.availability);
+    if (platform && !creatorPlatforms.includes(platform as CreatorPlatform)) throw new AdminActionError(400, 'Choose a valid platform filter.');
+    if (compensation && !creatorCompensation.includes(compensation as typeof creatorCompensation[number])) throw new AdminActionError(400, 'Choose a valid compensation filter.');
+    if (availability && !creatorAvailability.includes(availability as typeof creatorAvailability[number])) throw new AdminActionError(400, 'Choose a valid availability filter.');
+    if (niche) filter['studentProfile.creatorProfile.niches'] = { $regex: literalCreatorSearch(niche), $options: 'i' };
+    if (contentType) filter['studentProfile.creatorProfile.contentTypes'] = { $regex: literalCreatorSearch(contentType), $options: 'i' };
+    if (platform) filter['studentProfile.creatorProfile.platforms.platform'] = platform;
+    if (compensation) filter['studentProfile.creatorProfile.compensationPreference'] = compensation;
+    const clauses: Record<string, unknown>[] = [];
+    if (q) {
+      const literal = { $regex: literalCreatorSearch(q), $options: 'i' };
+      clauses.push({ $or: [{ 'studentProfile.creatorProfile.displayName': literal }, { $and: [{ $or: [{ 'studentProfile.creatorProfile.displayName': { $exists: false } }, { 'studentProfile.creatorProfile.displayName': '' }] }, { fullName: literal }] }] });
+    }
+    if (availability === 'available') clauses.push({ $or: [{ 'studentProfile.creatorProfile.availability': 'available' }, { 'studentProfile.creatorProfile.availability': { $exists: false } }] });
+    else if (availability) filter['studentProfile.creatorProfile.availability'] = availability;
+    if (clauses.length) filter.$and = clauses;
+    const page = creatorPage(req.query.page); const limit = creatorPage(req.query.limit, 12, 24);
+    const [students, total] = await Promise.all([User.find(filter).select(creatorFields).sort({ 'studentProfile.creatorProfile.displayName': 1, fullName: 1, _id: 1 }).skip((page - 1) * limit).limit(limit), User.countDocuments(filter)]);
+    res.json({ success: true, data: { creators: students.map(creatorSummary), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/creators/:studentId */
 export const getCreator = async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!mongoose.isValidObjectId(req.params.studentId)) { res.status(400).json({ success: false, message: 'Invalid student ID.' }); return; }
-    const creator = await User.findOne({ _id: req.params.studentId, role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true }).select(creatorFields);
-    if (!creator) { res.status(404).json({ success: false, message: 'Creator profile not found.' }); return; }
-    res.json({ success: true, data: { creator } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load this creator profile.' }); }
+    const creator = await User.findOne({ _id: creatorId(req.params.studentId), role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true }).select(creatorFields);
+    if (!creator) throw new AdminActionError(404, 'Creator profile not found.');
+    res.json({ success: true, data: { creator: creatorSummary(creator) } });
+  } catch (error) { failure(res, error); }
 };
+const compensationTypes: PromotionCompensationType[] = ['paid', 'product_exchange', 'experience', 'affiliate'];
+const requestStudentFields = 'fullName';
 
 /** POST /api/promotion-requests */
 export const createPromotionRequest = async (req: Request, res: Response): Promise<void> => {
