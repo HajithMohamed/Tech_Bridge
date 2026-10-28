@@ -1,4 +1,6 @@
-export interface SecurityConfiguration { allowedOrigins: string[] }
+import { registrationMode, type RegistrationMode } from './registration';
+
+export interface SecurityConfiguration { allowedOrigins: string[]; registrationMode: RegistrationMode }
 
 /** Validate deployment settings without including rejected values in errors. */
 export function securityConfiguration(environment: NodeJS.ProcessEnv = process.env): SecurityConfiguration {
@@ -23,5 +25,5 @@ export function securityConfiguration(environment: NodeJS.ProcessEnv = process.e
     ) throw new Error('CORS_ORIGINS must contain explicit origins; production requires HTTPS.');
     return url.origin;
   });
-  return { allowedOrigins: [...new Set(origins)] };
+  return { allowedOrigins: [...new Set(origins)], registrationMode: registrationMode(environment) };
 }

@@ -2,6 +2,9 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Mail, Lock, Briefcase, Award, Wrench, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import axios from 'axios';
+import { resendEmailVerification } from '../api/authApi';
+import { authErrorMessage } from '../utils/authForms';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -14,6 +17,10 @@ const LoginPage = () => {
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [verificationNotice, setVerificationNotice] = useState('');
+  const [verificationError, setVerificationError] = useState('');
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -41,13 +48,14 @@ const LoginPage = () => {
     try {
       const signedIn = await login(formData);
       navigate(signedIn.role === 'admin' ? '/admin' : signedIn.role === 'provider' ? '/provider' : '/dashboard');
-    } catch {
-      // Error is handled by AuthContext
+    } catch (failure) {
+      setVerificationRequired(axios.isAxiosError(failure) && failure.response?.data?.code === 'EMAIL_VERIFICATION_REQUIRED');
     }
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    setVerificationRequired(false); setVerificationNotice(''); setVerificationError('');
     if (clientErrors[field]) {
       setClientErrors((prev) => {
         const next = { ...prev };
@@ -61,6 +69,13 @@ const LoginPage = () => {
   const getFieldError = (field: string): string | undefined => {
     if (clientErrors[field]) return clientErrors[field];
     return fieldErrors?.find((e) => e.field === field)?.message;
+  };
+
+  const resendVerification = async () => {
+    if (resending) return; setResending(true); setVerificationNotice(''); setVerificationError('');
+    try { setVerificationNotice((await resendEmailVerification(formData.email.trim())).message); }
+    catch (failure) { setVerificationError(authErrorMessage(failure, 'Unable to send a verification email. Please try again.')); }
+    finally { setResending(false); }
   };
 
   return (
@@ -139,7 +154,7 @@ const LoginPage = () => {
 
           <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8">
             {error && (
-              <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3 animate-fade-in">
+              <div role="alert" className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3 animate-fade-in">
                 <div className="p-1 rounded-full bg-red-100/50 mt-0.5">
                   <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -148,6 +163,10 @@ const LoginPage = () => {
                 <p className="text-red-700 text-sm font-medium">{error}</p>
               </div>
             )}
+
+            {verificationRequired && <div className="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4"><button type="button" disabled={resending} onClick={() => void resendVerification()} className="font-semibold text-primary-800 underline disabled:opacity-50">{resending ? 'Sending verification email...' : 'Resend verification email'}</button></div>}
+            {verificationNotice && <p role="status" className="mb-4 text-sm text-primary-800">{verificationNotice}</p>}
+            {verificationError && <p role="alert" className="mb-4 text-sm text-red-800">{verificationError}</p>}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
@@ -181,9 +200,9 @@ const LoginPage = () => {
                   <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
                     Password
                   </label>
-                  <a href="#" className="text-xs font-semibold text-primary-600 hover:text-primary-700 transition-colors">
+                  <Link to="/forgot-password" className="text-xs font-semibold text-primary-700 hover:text-primary-800 transition-colors">
                     Forgot Password?
-                  </a>
+                  </Link>
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -212,17 +231,6 @@ const LoginPage = () => {
                 {getFieldError('password') && (
                   <p className="mt-1.5 text-xs text-red-500 font-medium">{getFieldError('password')}</p>
                 )}
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 cursor-pointer select-none">
-                  Remember me
-                </label>
               </div>
 
               <button

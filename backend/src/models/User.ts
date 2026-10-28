@@ -45,6 +45,8 @@ export interface IUser extends Document {
   adminBaseRole?: 'student' | 'provider';
   tokenVersion?: number;
   lastTypingAt?: Date;
+  emailVerifiedAt?: Date;
+  requiresEmailVerification?: boolean;
   accountStatus: 'active' | 'suspended';
   studentProfile?: {
     institution: string;
@@ -111,6 +113,8 @@ const userSchema = new Schema<IUser>(
     adminBaseRole: { type: String, enum: ['student', 'provider'] },
     tokenVersion: { type: Number, default: 0, min: 0, select: false },
     lastTypingAt: { type: Date, select: false },
+    emailVerifiedAt: { type: Date },
+    requiresEmailVerification: { type: Boolean },
     accountStatus: { type: String, enum: ['active', 'suspended'], default: 'active', index: true },
     studentProfile: {
       institution: { type: String, trim: true },

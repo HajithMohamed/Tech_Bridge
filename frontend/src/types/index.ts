@@ -5,6 +5,8 @@ export interface User {
   role: 'student' | 'provider' | 'admin';
   adminBaseRole?: 'student' | 'provider';
   accountStatus?: 'active' | 'suspended';
+  emailVerifiedAt?: string;
+  requiresEmailVerification?: boolean;
   studentProfile?: StudentProfile;
   providerProfile?: ProviderProfile;
   providerVerificationStatus?: 'pending' | 'verified' | 'rejected';
