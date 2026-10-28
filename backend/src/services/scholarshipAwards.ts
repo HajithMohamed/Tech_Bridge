@@ -4,6 +4,7 @@ import Opportunity from '../models/Opportunity';
 import User from '../models/User';
 import { academicYearStart, awardCapacity, scholarshipRevision, ScholarshipError as ScholarshipAwardError } from './scholarshipPolicy';
 import { lockScholarshipActor, prepareScholarshipDecision, type ScholarshipDecisionOptions } from './scholarships';
+import { enqueueDomainNotification } from './notifications';
 export { ScholarshipError as ScholarshipAwardError } from './scholarshipPolicy';
 
 export function isApplicationStatus(value: unknown): value is ApplicationStatus {
@@ -49,10 +50,12 @@ export async function changeApplicationStatus(id: unknown, ownerId: Types.Object
       }
       if (opportunity.type === 'scholarship') await prepareScholarshipDecision(application, opportunity, ownerId, next, options, session);
       application.status = next;
+      if (opportunity.type !== 'scholarship') application.notificationRevision = (application.notificationRevision ?? 0) + 1;
       await application.save({ session }).catch((error: unknown) => {
         if (error instanceof mongoose.Error.ValidationError) throw new ScholarshipAwardError(400, 'Application validation failed.');
         throw error;
       });
+      if (opportunity.type !== 'scholarship') await enqueueDomainNotification('application', application.studentId, `application:${application._id}:${application.notificationRevision}`, application._id, session, 'decision');
     }
     await application.populate({ path: 'studentId', select: 'fullName email studentProfile.institution studentProfile.degree studentProfile.studyYear studentProfile.skills studentProfile.careerGoal', options: { session } });
     await application.populate({ path: 'opportunityId', select: 'title type location workMode applicationDeadline providerId status', options: { session } });

@@ -1,4 +1,5 @@
 import mongoose, { Types, type ClientSession } from 'mongoose';
+import { enqueueDomainNotification } from './notifications';
 import User from '../models/User';
 import AuditLog from '../models/AuditLog';
 import { CommunityClaim, CommunityClaimEvent, type CommunityClaimRecord } from '../models/CommunityClaim';
@@ -72,7 +73,8 @@ export async function decideCommunityClaim(actorId: Types.ObjectId, claimValue: 
         await VerificationEvent.create([{ providerId: provider._id, actorId, documentId, action: action === 'approve' ? 'verified' : 'more_info', fromStatus: fromVerification, toStatus: toVerification, reason }], { session });
       }
       const eventAction = { approve: 'approved', reject: 'rejected', 'request-info': 'more_info', revoke: 'revoked' }[action];
-      await CommunityClaimEvent.create([{ ...eventFields(claim), actorId, action: eventAction, fromStatus, toStatus, reason, affiliationMethod, affiliationReference }], { session });
+      const [event] = await CommunityClaimEvent.create([{ ...eventFields(claim), actorId, action: eventAction, fromStatus, toStatus, reason, affiliationMethod, affiliationReference }], { session });
+      await enqueueDomainNotification('verification', provider._id, `community:${event._id}`, claim._id, session, 'decision', 'community');
       await AuditLog.create([{ adminId: actorId, targetType: 'user', targetId: provider._id, action: `community_claim_${eventAction}`, reason, before: { role: 'provider', accountStatus: provider.accountStatus, verificationStatus: fromStatus }, after: { role: 'provider', accountStatus: provider.accountStatus, verificationStatus: toStatus } }], { session });
       return claim;
     }, options);

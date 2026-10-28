@@ -8,6 +8,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: IUser;
+      notificationVerificationOnly?: boolean;
     }
   }
 }
@@ -15,7 +16,7 @@ declare global {
 /**
  * Protect routes — verifies JWT Bearer token and attaches user to request
  */
-const authenticate = (verificationOnly: boolean) => async (
+const authenticate = (verificationOnly: boolean, notificationAccess = false) => async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -35,7 +36,7 @@ const authenticate = (verificationOnly: boolean) => async (
 
     // Verify token
     const decoded = verifyToken(token);
-    if (decoded.scope !== undefined && (!verificationOnly || decoded.scope !== 'verification')) {
+    if (decoded.scope !== undefined && ((!verificationOnly && !notificationAccess) || decoded.scope !== 'verification')) {
       res.status(401).json({ success: false, message: 'This session is restricted to provider verification.' });
       return;
     }
@@ -65,16 +66,20 @@ const authenticate = (verificationOnly: boolean) => async (
       return;
     }
 
-    if (verificationOnly && user.role !== 'provider') {
+    if ((verificationOnly || (notificationAccess && decoded.scope === 'verification')) && user.role !== 'provider') {
       res.status(403).json({ success: false, message: 'A provider account is required.' });
       return;
     }
-    if (!verificationOnly && user.role === 'provider' && (user.providerProfile?.verified !== true || user.providerProfile.verificationStatus !== 'VERIFIED')) {
+    if (notificationAccess && user.requiresEmailVerification === true && !user.emailVerifiedAt) {
+      res.status(403).json({ success: false, message: 'Verify your email before accessing notifications.' }); return;
+    }
+    if (!verificationOnly && !notificationAccess && user.role === 'provider' && (user.providerProfile?.verified !== true || user.providerProfile.verificationStatus !== 'VERIFIED')) {
       res.status(403).json({ success: false, message: 'Complete provider verification before accessing the platform.' });
       return;
     }
 
     req.user = user;
+    req.notificationVerificationOnly = notificationAccess && decoded.scope === 'verification';
     next();
   } catch (error) {
     res.status(401).json({
@@ -86,6 +91,7 @@ const authenticate = (verificationOnly: boolean) => async (
 
 export const protect = authenticate(false);
 export const protectVerification = authenticate(true);
+export const protectNotifications = authenticate(false, true);
 
 /**
  * Authorize by role — checks if the user's role is in the allowed list
