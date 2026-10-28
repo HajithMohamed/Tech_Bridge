@@ -6,6 +6,7 @@ import AuditLog from '../models/AuditLog';
 import { VerificationDocument, VerificationEvent, type VerificationStatus } from '../models/ProviderVerification';
 import { adminId, adminReason, AdminActionError } from './adminUsers';
 import { validateVerificationDocument, verificationTransition } from './verificationPolicy';
+import { enqueueDomainNotification } from './notifications';
 
 export const verificationStatus = (provider: IUser): VerificationStatus => provider.providerProfile?.verificationStatus || 'PENDING';
 const transactionOptions = { readPreference: 'primary' as const, readConcern: { level: 'snapshot' as const }, writeConcern: { w: 'majority' as const }, maxCommitTimeMS: 5000 };
@@ -46,7 +47,8 @@ export async function decideProviderVerification(actorId: Types.ObjectId, provid
     if (action !== 'verified') await invalidateCommunityClaim(provider._id, actorId, reason, 'verification_changed', session);
     const snapshot = (status: string) => ({ role: provider.role, accountStatus: provider.accountStatus || 'active', verificationStatus: status });
     await AuditLog.create([{ adminId: actorId, targetType: 'user', targetId: providerId, action: `provider_${action}`, reason, before: snapshot(fromStatus), after: snapshot(toStatus) }], { session });
-    await VerificationEvent.create([{ providerId, actorId, ...(currentId ? { documentId: currentId } : {}), action, fromStatus, toStatus, reason }], { session });
+    const [event] = await VerificationEvent.create([{ providerId, actorId, ...(currentId ? { documentId: currentId } : {}), action, fromStatus, toStatus, reason }], { session });
+    await enqueueDomainNotification('verification', provider._id, `verification:${event._id}`, provider._id, session, 'decision');
     return changed;
   }, transactionOptions);
 }

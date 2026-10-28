@@ -3,6 +3,7 @@ import Resource from '../models/Resource';
 import ResourceRequest, { IResourceRequest } from '../models/ResourceRequest';
 import User from '../models/User';
 import AuditLog from '../models/AuditLog';
+import { enqueueDomainNotification } from './notifications';
 import { ResourceDispute, ResourceEvent } from '../models/ResourceActivity';
 import { allocationDates, resourceDate, resourceId, resourcePriority, resourceRevision, resourceText, returnPolicy, ResourceReservationError } from './resourcePolicy';
 
@@ -31,7 +32,11 @@ export async function lockResourceContext(idValue: unknown, actorId: Types.Objec
   return context;
 }
 export async function resourceEvent(session: ClientSession, actorId: Types.ObjectId, resource: { _id: Types.ObjectId }, row: IResourceRequest | null, action: string, details: Record<string, unknown> = {}) {
-  await ResourceEvent.create([{ resourceId: resource._id, ...(row ? { requestId: row._id, revision: row.revision ?? 0 } : {}), actorId, action, ...details }], { session });
+  const [event] = await ResourceEvent.create([{ resourceId: resource._id, ...(row ? { requestId: row._id, revision: row.revision ?? 0 } : {}), actorId, action, ...details }], { session });
+  if (row && ['submitted', 'accepted', 'rejected', 'waitlisted', 'completed', 'cancelled', 'return_requested', 'return_confirmed', 'dispute_opened', 'dispute_resolved', 'dispute_withdrawn'].includes(action)) {
+    const recipient = row.studentId.equals(actorId) ? row.providerId : row.studentId;
+    await enqueueDomainNotification('resource', recipient, `resource:${event._id}`, row._id, session, action.startsWith('return') ? 'return' : action === 'submitted' ? 'submitted' : 'updated');
+  }
 }
 export async function noResourceDispute(row: IResourceRequest, session: ClientSession) {
   if (await ResourceDispute.exists({ requestId: row._id, status: 'open' }).session(session)) throw new ResourceReservationError(409, 'Resolve or withdraw the open dispute before changing the allocation.');

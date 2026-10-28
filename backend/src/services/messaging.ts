@@ -9,6 +9,7 @@ import PromotionRequest from '../models/PromotionRequest';
 import { AdminActionError } from './adminUsers';
 import { assertCommunityMessaging, communityPair } from './communityMessaging';
 import { assertContactPreferences } from './messagingPolicy';
+import { enqueueDomainNotification } from './notifications';
 
 export const messagingTransactionOptions = { readPreference: 'primary' as const, readConcern: { level: 'snapshot' as const }, writeConcern: { w: 'majority' as const }, maxCommitTimeMS: 5000 };
 export const keyFor = (a: Types.ObjectId, b: Types.ObjectId) => [String(a), String(b)].sort().join(':');
@@ -65,6 +66,7 @@ export async function writeMessage(conversationId: Types.ObjectId, senderId: Typ
     if (minute >= 20 || hour >= 100) throw new AdminActionError(429, 'Message limit reached. Please wait before sending again.');
     const [message] = await Message.create([{ conversationId, senderId, content }], { session });
     await Conversation.updateOne({ _id: conversationId }, { $set: { lastMessageAt: message.createdAt } }, { session });
+    await enqueueDomainNotification('message', otherId, `message:${message._id}`, message._id, session);
     return { message, participantIds: conversation.participantIds };
   }, messagingTransactionOptions);
 }

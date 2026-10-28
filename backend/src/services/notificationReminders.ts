@@ -1,0 +1,41 @@
+import mongoose from 'mongoose';
+import Application from '../models/Application';
+import Opportunity from '../models/Opportunity';
+import ResourceRequest from '../models/ResourceRequest';
+import { NotificationProducer } from '../models/Notification';
+import { enqueueNotification } from './notifications';
+import { notificationTemplate, NotificationError } from './notificationPolicy';
+import { notificationTransactions } from './notificationDelivery';
+
+/** Bounded rotating scans: progress over source rows, including non-due rows. */
+export async function enqueueNotificationReminders(limit = 100, now = new Date()) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isFinite(now.getTime())) throw new NotificationError(400, 'Invalid reminder scan.');
+  const end = new Date(now.getTime() + 86_400_000);
+  const scholarships = await mongoose.connection.transaction(async session => {
+    const cursor = await NotificationProducer.findOneAndUpdate({ key: 'scholarship-reminders' }, { $inc: { revision: 1 } }, { upsert: true, new: true, session });
+    let applications = await Application.find({ status: { $in: ['applied', 'reviewed', 'waitlisted'] }, ...(cursor.afterId ? { _id: { $gt: cursor.afterId } } : {}) }).select('studentId opportunityId').sort({ _id: 1 }).limit(limit).session(session);
+    if (!applications.length && cursor.afterId) applications = await Application.find({ status: { $in: ['applied', 'reviewed', 'waitlisted'] } }).select('studentId opportunityId').sort({ _id: 1 }).limit(limit).session(session);
+    const opportunities = await Opportunity.find({ _id: { $in: applications.map(row => row.opportunityId) }, type: 'scholarship', status: 'open', scholarshipWithdrawnByAdmin: { $ne: true }, applicationDeadline: { $gt: now, $lte: end } }).select('applicationDeadline').session(session);
+    const byId = new Map(opportunities.map(row => [String(row._id), row])); let considered = 0;
+    for (const row of applications) {
+      const opportunity = byId.get(String(row.opportunityId)); if (!opportunity) continue; considered++;
+      const safe = notificationTemplate('scholarship', 'student', 'deadline');
+      await enqueueNotification({ ownerId: String(row.studentId), kind: 'scholarship', action: 'deadline', ...safe, sourceType: 'scholarship', sourceId: row._id, scheduledFor: opportunity.applicationDeadline, dedupeKey: `scholarship-deadline:${row._id}:${opportunity.applicationDeadline.toISOString()}` }, session);
+    }
+    await NotificationProducer.updateOne({ _id: cursor._id }, applications.length ? { $set: { afterId: applications[applications.length - 1]._id } } : { $unset: { afterId: '' } }, { session });
+    return { scanned: applications.length, considered };
+  }, notificationTransactions);
+  const resources = await mongoose.connection.transaction(async session => {
+    const cursor = await NotificationProducer.findOneAndUpdate({ key: 'resource-reminders' }, { $inc: { revision: 1 } }, { upsert: true, new: true, session });
+    let requests = await ResourceRequest.find({ status: 'accepted', ...(cursor.afterId ? { _id: { $gt: cursor.afterId } } : {}) }).select('studentId allocation').sort({ _id: 1 }).limit(limit).session(session); let considered = 0;
+    if (!requests.length && cursor.afterId) requests = await ResourceRequest.find({ status: 'accepted' }).select('studentId allocation').sort({ _id: 1 }).limit(limit).session(session);
+    for (const row of requests) {
+      const due = row.allocation?.dueAt; if (!row.allocation?.returnRequired || !due || due > end) continue; considered++;
+      const action = due < now ? 'overdue' : 'due'; const safe = notificationTemplate('resource', 'student', action);
+      await enqueueNotification({ ownerId: String(row.studentId), kind: 'resource', action, ...safe, sourceType: 'resource', sourceId: row._id, scheduledFor: due, dedupeKey: `resource-reminder:${row._id}:${due.toISOString()}:${now.toISOString().slice(0, 10)}` }, session);
+    }
+    await NotificationProducer.updateOne({ _id: cursor._id }, requests.length ? { $set: { afterId: requests[requests.length - 1]._id } } : { $unset: { afterId: '' } }, { session });
+    return { scanned: requests.length, considered };
+  }, notificationTransactions);
+  return { scholarships, resources };
+}

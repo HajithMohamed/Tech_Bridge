@@ -6,6 +6,7 @@ import User from '../models/User';
 import { ScholarshipAppeal, ScholarshipEvent, ScholarshipEvidence, ScholarshipPolicy, ScholarshipReview, type ScholarshipEventRecord } from '../models/Scholarship';
 import { academicYearStart, defaultScholarshipPolicy, duplicateBenefitConflict, scholarshipEligibility, scholarshipId, scholarshipPolicyInput, scholarshipPriority, scholarshipReason, scholarshipRevision, scholarshipTransition, ScholarshipError } from './scholarshipPolicy';
 import { validateVerificationDocument } from './verificationPolicy';
+import { enqueueDomainNotification } from './notifications';
 
 type App = InstanceType<typeof Application>;
 type Opp = InstanceType<typeof Opportunity>;
@@ -29,7 +30,11 @@ export async function scholarshipContext(id: unknown, actorId: Types.ObjectId, r
   return { application, opportunity };
 }
 export async function scholarshipEvent(application: App, actorId: Types.ObjectId, action: ScholarshipEventRecord['action'], reason: string, session: ClientSession, extra: Partial<ScholarshipEventRecord> = {}) {
-  await ScholarshipEvent.create([{ applicationId: application._id, opportunityId: application.opportunityId, actorId, action, reason, ...extra }], { session });
+  const [event] = await ScholarshipEvent.create([{ applicationId: application._id, opportunityId: application.opportunityId, actorId, action, reason, ...extra }], { session });
+  if (['submitted', 'decision', 'appeal_submitted', 'appeal_upheld', 'appeal_reopened'].includes(action)) {
+    const recipient = application.studentId.equals(actorId) ? application.providerId : application.studentId;
+    await enqueueDomainNotification('scholarship', recipient, `scholarship:${event._id}`, application._id, session, action.startsWith('appeal') ? 'appeal' : action === 'submitted' ? 'submitted' : 'decision');
+  }
 }
 async function previousBenefits(studentId: Types.ObjectId, excluding: Types.ObjectId, session: ClientSession) {
   const rows = await Application.find({ studentId, status: 'accepted', _id: { $ne: excluding } }).populate({ path: 'opportunityId', select: 'type', options: { session } }).session(session);

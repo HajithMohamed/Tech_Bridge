@@ -5,6 +5,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "notifications:once": "tsx src/notificationWorker.ts --once",
+    "notifications:worker": "tsx src/notificationWorker.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/seed.ts",

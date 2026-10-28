@@ -14,6 +14,7 @@ export interface IApplication extends Document {
   selfDeclaredNeed: 'low' | 'medium' | 'high';
   scholarshipVersion?: number;
   scholarshipRevision?: number;
+  notificationRevision?: number;
   waitlistedAt?: Date;
   awardedAt?: Date;
   updatedAt: Date;
@@ -36,6 +37,7 @@ const applicationSchema = new Schema<IApplication>(
     selfDeclaredNeed: { type: String, required: true, enum: ['low', 'medium', 'high'] },
     scholarshipVersion: { type: Number, enum: [1] },
     scholarshipRevision: { type: Number, min: 0 },
+    notificationRevision: { type: Number, min: 0 },
     waitlistedAt: Date,
     awardedAt: Date,
   },
@@ -45,6 +47,7 @@ const applicationSchema = new Schema<IApplication>(
 // A student may apply to each opportunity once only.
 applicationSchema.index({ studentId: 1, opportunityId: 1 }, { unique: true });
 applicationSchema.index({ opportunityId: 1, status: 1, appliedAt: 1, _id: 1 });
+applicationSchema.index({ status: 1, _id: 1 });
 
 const Application = mongoose.model<IApplication>('Application', applicationSchema);
 

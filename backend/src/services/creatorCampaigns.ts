@@ -38,7 +38,7 @@ async function notifyCampaign(row: IPromotionRequest, actorId: Types.ObjectId, a
   const studentRecipient = !row.studentId.equals(actorId); const ownerId = studentRecipient ? row.studentId : row.providerId;
   if (!await User.exists({ _id: ownerId }).session(session)) return;
   const words: Record<CampaignAction, string> = { drafted: 'Campaign draft', terms_updated: 'Campaign draft updated', sent: 'New campaign request', started: 'Campaign in progress', created: 'New campaign request', accepted: 'Campaign accepted', declined: 'Campaign declined', cancelled: 'Campaign cancelled', submitted: 'Deliverables submitted', changes_requested: 'Campaign changes requested', approved: 'Campaign deliverables approved', completed: 'Campaign completed' };
-  await enqueueNotification({ ownerId: String(ownerId), kind: 'campaign', title: words[action], body: 'Review the campaign details and next steps in your campaign workspace.', href: studentRecipient ? '/my-promotion-requests' : '/provider/promotion-requests', dedupeKey: `campaign:${row._id}:${row.revision ?? 0}:${ownerId}` }, session);
+  await enqueueNotification({ ownerId: String(ownerId), kind: 'campaign', action: action === 'created' || action === 'sent' ? 'invited' : 'updated', sourceId: row._id, sourceType: 'campaign', title: words[action], body: 'Review the campaign details and next steps in your campaign workspace.', href: studentRecipient ? '/my-promotion-requests' : '/provider/promotion-requests', dedupeKey: `campaign:${row._id}:${row.revision ?? 0}:${ownerId}` }, session);
 }
 export async function createCampaign(providerId: Types.ObjectId, body: Record<string, unknown>) {
   const values = campaignProposalInput(body);

@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import Application from '../models/Application';
 import Opportunity from '../models/Opportunity';
 import User from '../models/User';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
+import { enqueueDomainNotification } from '../services/notifications';
 import { ScholarshipReview } from '../models/Scholarship';
 import { submitScholarship } from '../services/scholarships';
 import { compareScholarshipCandidates, scholarshipId } from '../services/scholarshipPolicy';
@@ -71,14 +72,15 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const application = opportunity.type === 'scholarship' ? await submitScholarship(req.user!._id, req.body) : await Application.create({
-      studentId: req.user!._id,
-      providerId: opportunity.providerId,
-      opportunityId: opportunity._id,
-      message: typeof message === 'string' ? message.trim() : undefined,
-      justification: justification.trim(),
-      selfDeclaredNeed,
-    });
+    const application = opportunity.type === 'scholarship' ? await submitScholarship(req.user!._id, req.body) : await mongoose.connection.transaction(async session => {
+      const student = await User.updateOne({ _id: req.user!._id, role: 'student', accountStatus: { $ne: 'suspended' } }, { $inc: { __v: 1 } }, { session, timestamps: false });
+      if (!student.matchedCount) throw new ScholarshipAwardError(403, 'An active student account is required.');
+      const current = await Opportunity.findOneAndUpdate({ _id: opportunity._id, providerId: opportunity.providerId, type: { $ne: 'scholarship' }, status: 'open', applicationDeadline: { $gt: new Date() } }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false });
+      if (!current) throw new ScholarshipAwardError(404, 'This opportunity is no longer accepting applications.');
+      const [created] = await Application.create([{ studentId: req.user!._id, providerId: current.providerId, opportunityId: current._id, message: typeof message === 'string' ? message.trim() : undefined, justification: justification.trim(), selfDeclaredNeed }], { session });
+      await enqueueDomainNotification('application', current.providerId, `application-submitted:${created._id}`, created._id, session, 'submitted');
+      return created;
+    }, { readPreference: 'primary', readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, maxCommitTimeMS: 5000 });
     await application.populate('opportunityId', opportunitySelect);
 
     res.status(201).json({
@@ -88,8 +90,8 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
     });
   } catch (error) {
     if (error instanceof ScholarshipAwardError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
-    console.error('Create application error:', error);
-    res.status(400).json({ success: false, message: 'Unable to submit your application.' });
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) { res.status(409).json({ success: false, message: 'You have already applied to this opportunity.' }); return; }
+    res.status(error instanceof mongoose.Error.ValidationError ? 400 : 503).json({ success: false, message: 'Unable to submit your application.' });
   }
 };
 
