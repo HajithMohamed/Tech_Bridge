@@ -6,8 +6,10 @@ This publishes work for review; it is not an approved complete authentication ph
 
 ## Existing work preserved
 
-- Registration returns a generic 202 response and records required email verification.
-  Existing accounts without the new requirement retain login compatibility.
+- Registration preserves the approved 201 contract by default. Explicit server
+  AUTH_REGISTRATION_MODE=email_verification enables generic 202 and required
+  email verification with a configured local adapter. Existing accounts retain
+  their persisted requirement independently of the current registration mode.
 - Challenge tokens are random, stored as SHA-256 hashes, purpose/email-bound,
   expiring and transactionally consumed once. Password resets bcrypt-hash the
   new password, increment tokenVersion and consume sibling links.
@@ -22,11 +24,13 @@ This publishes work for review; it is not an approved complete authentication ph
 
 - The three new standalone pages are not registered in App.tsx yet. Component
   tests mount their own routes; this is not full application route coverage.
-- Existing backend/browser registration tests expect the old 201 contract and
-  must be deliberately reconciled with the proposed email-verification workflow.
-  Do not weaken or remove those assertions merely to turn CI green.
-- Production mail delivery, recovery audit events, complete regression/E2E
-  coverage and approval of the breaking registration contract remain outstanding.
+- The 201/202 backend compatibility regression is reconciled through explicit
+  server rollout configuration; existing regression assertions are preserved.
+  See [the contract and acceptance criteria](../backend/docs/auth-registration-compatibility.md).
+  The draft frontend still expects the verification protocol and needs deliberate
+  integration before the whole feature is ready to merge.
+- Production mail delivery, recovery audit events, complete authentication feature
+  integration and approval of the optional verification contract remain outstanding.
 - The normal protection middleware's handling of email-verification requirements,
   identity-change races and delivery-failure operator feedback need further review.
 - No real account migration or production record change is proposed. Do not set
@@ -34,15 +38,16 @@ This publishes work for review; it is not an approved complete authentication ph
 
 ## Validation
 
-Backend source/test TypeScript, build and all 288 backend unit cases passed in the
+The original publication's source/test TypeScript, build and 288 backend unit cases passed in the
 isolated review worktree. Seven targeted API cases exercise login compatibility,
 verification, password reset/session revocation, competing resets, invalid links,
 generic undelivered-mail behavior and throttling against a disposable database.
 Their executed results and frontend results are recorded in the PR.
 The seven new API cases passed. Frontend lint, source/test types, production build,
 10 unit cases and all 54 integration cases passed. The full backend regression
-run is tracked separately because of the registration-contract blockers above.
-The focused API tests do not certify the full existing registration regression suite.
+run at that time had the now-reconciled registration-contract failures. The current
+correction's full executed results and CI links supersede those historical counts
+and are recorded in PR #24. Do not infer readiness of the full feature from CI alone.
 
 No local administrator password, password hash, JWT, .env.admin or mail-spool file
 is included. The requested local administrator reset affected only Docker data and

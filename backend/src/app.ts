@@ -23,6 +23,7 @@ import scholarshipRoutes from './routes/scholarshipRoutes';
 export const createApp = () => {
   const app = express();
   const configuration = securityConfiguration();
+  app.locals.registrationMode = configuration.registrationMode;
   app.disable('x-powered-by');
   // Never infer trusted proxy hops from user-controlled forwarding headers.
   app.set('trust proxy', false);

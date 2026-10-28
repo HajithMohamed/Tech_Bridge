@@ -13,6 +13,7 @@ const recoveryMessage = 'If an eligible account matches this email, we will send
  * @access  Public
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
+  const verificationRequired = req.app.locals.registrationMode === 'email_verification';
   try {
     const { fullName, email, password, role, studentProfile, providerProfile } = req.body;
 
@@ -31,6 +32,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
+      if (!verificationRequired) {
+        res.status(400).json({ success: false, message: 'A user with this email already exists' });
+        return;
+      }
       if (existingUser.requiresEmailVerification === true && !existingUser.emailVerifiedAt) await deliverAuthChallenge(existingUser, 'verify_email');
       res.status(202).json({ success: true, message: registrationMessage });
       return;
@@ -47,7 +52,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email,
       password,
       role: userRole,
-      requiresEmailVerification: true,
+      requiresEmailVerification: verificationRequired,
       ...(userRole === 'student'
         ? { studentProfile: safeStudentProfile }
         : {
@@ -62,11 +67,25 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           }),
     });
 
-    await deliverAuthChallenge(user, 'verify_email');
-    res.status(202).json({ success: true, message: registrationMessage });
+    if (verificationRequired) {
+      await deliverAuthChallenge(user, 'verify_email');
+      res.status(202).json({ success: true, message: registrationMessage });
+      return;
+    }
+    // Preserve the established student session and pending-provider envelope.
+    // Legacy mode never claims that an email has been independently verified.
+    const pendingProvider = user.role === 'provider' && !user.providerProfile?.verified;
+    const token = pendingProvider ? undefined : generateToken(String(user._id), user.role, user.tokenVersion || 0);
+    res.status(201).json({ success: true, message: pendingProvider
+      ? 'Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.'
+      : 'Registration successful', data: { user: {
+        _id: user._id, fullName: user.fullName, email: user.email, role: user.role,
+        accountStatus: user.accountStatus, studentProfile: user.studentProfile,
+        providerProfile: user.providerProfile, createdAt: user.createdAt,
+      }, ...(token ? { token } : {}) } });
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
-      res.status(202).json({ success: true, message: registrationMessage });
+      res.status(verificationRequired ? 202 : 400).json(verificationRequired ? { success: true, message: registrationMessage } : { success: false, message: 'A user with this email already exists' });
       return;
     }
     res.status(500).json({
