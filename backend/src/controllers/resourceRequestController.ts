@@ -1,178 +1,63 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import ResourceRequest from '../models/ResourceRequest';
 import Resource from '../models/Resource';
 import User from '../models/User';
 import { resourceRequestPriority } from '../utils/priorityEngine';
-import { ResourceReservationError, transitionResourceRequest } from '../services/resourceReservation';
+import { transitionResourceRequest } from '../services/resourceReservation';
+import { submitResourceRequest } from '../services/resourceLifecycle';
+import { isResourceOverdue } from '../services/resourcePolicy';
+import { resourceBody, resourceFailure } from './resourceLifecycleController';
 
 const studentSelect = 'fullName email studentProfile.institution studentProfile.degree studentProfile.studyYear studentProfile.skills studentProfile.careerGoal';
-const resourceSelect = 'itemName category condition accessType quantityAvailable status';
+const resourceSelect = 'itemName category condition accessType quantityAvailable status inventoryRevision withdrawnByAdmin';
 const providerSelect = 'fullName email providerProfile.organizationName providerProfile.organizationType providerProfile.verified providerProfile.contactEmail providerProfile.phone';
-const idString = (value: unknown) => {
-  if (value && typeof value === 'object' && '_id' in value) return String((value as { _id: unknown })._id);
-  return String(value);
-};
+const idString = (value: unknown) => value && typeof value === 'object' && '_id' in value ? String(value._id) : String(value);
+const objectIds = (values: unknown[]) => [...new Set(values.map(idString))].filter(value => /^[a-f\d]{24}$/i.test(value)).map(value => new Types.ObjectId(value));
 
 const enrichRequests = async (requests: InstanceType<typeof ResourceRequest>[]) => {
   if (!requests.length) return [];
-  const studentIds = requests.map((request) => idString(request.studentId));
-  const resourceIds = requests.map((request) => idString(request.resourceId));
-  const [students, resources, existingBenefits] = await Promise.all([
-    User.find({ _id: { $in: studentIds } }),
-    Resource.find({ _id: { $in: resourceIds } }),
-    ResourceRequest.aggregate<{ _id: { studentId: typeof studentIds[number]; resourceCategory: string }; count: number }>([
+  const studentIds = objectIds(requests.map(row => row.studentId)); const resourceIds = objectIds(requests.map(row => row.resourceId));
+  const [students, resources, benefits] = await Promise.all([
+    User.find({ _id: { $in: studentIds } }), Resource.find({ _id: { $in: resourceIds } }),
+    ResourceRequest.aggregate<{ _id: { studentId: Types.ObjectId; resourceCategory: string }; count: number }>([
       { $match: { status: 'accepted', studentId: { $in: studentIds } } },
       { $group: { _id: { studentId: '$studentId', resourceCategory: '$resourceCategory' }, count: { $sum: 1 } } },
     ]),
   ]);
-  const studentMap = new Map(students.map((student) => [student._id.toString(), student]));
-  const resourceMap = new Map(resources.map((resource) => [resource._id.toString(), resource]));
-  const benefitMap = new Map(existingBenefits.map((item) => [`${item._id.studentId.toString()}:${item._id.resourceCategory}`, item.count]));
-  const byResource = new Map<string, InstanceType<typeof ResourceRequest>[]>();
-  requests.forEach((request) => {
-    const key = idString(request.resourceId);
-    byResource.set(key, [...(byResource.get(key) || []), request]);
-  });
-  const enriched = [...byResource.values()].flatMap((group) => {
-    const dates = group.map((request) => request.createdAt.getTime());
-    const firstAt = new Date(Math.min(...dates));
-    const lastAt = new Date(Math.max(...dates));
-    const acceptedCount = group.filter((request) => request.status === 'accepted').length;
-    return group.map((request) => ({
-      ...request.toObject(),
-      ...resourceRequestPriority(request, resourceMap.get(idString(request.resourceId)), studentMap.get(idString(request.studentId)), benefitMap.get(`${idString(request.studentId)}:${request.resourceCategory}`) || 0, firstAt, lastAt, acceptedCount),
-    }));
-  });
-  return enriched.sort((a, b) => b.priorityScore - a.priorityScore || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const studentMap = new Map(students.map(row => [String(row._id), row])); const resourceMap = new Map(resources.map(row => [String(row._id), row]));
+  const benefitMap = new Map(benefits.map(row => [`${row._id.studentId}:${row._id.resourceCategory}`, row.count]));
+  const groups = new Map<string, InstanceType<typeof ResourceRequest>[]>();
+  for (const row of requests) { const key = idString(row.resourceId); groups.set(key, [...(groups.get(key) ?? []), row]); }
+  return [...groups.values()].flatMap(group => {
+    const times = group.map(row => row.createdAt.getTime()); const first = new Date(Math.min(...times)); const last = new Date(Math.max(...times)); const accepted = group.filter(row => row.status === 'accepted').length;
+    return group.map(row => ({ ...row.toObject(), ...resourceRequestPriority(row, resourceMap.get(idString(row.resourceId)), studentMap.get(idString(row.studentId)), benefitMap.get(`${idString(row.studentId)}:${row.resourceCategory}`) ?? 0, first, last, accepted), ...(row.prioritySnapshot ? { priorityScore: row.prioritySnapshot.priorityScore, priorityReasons: row.prioritySnapshot.priorityReasons, isWaitlisted: row.status === 'waitlisted' } : {}), isOverdue: isResourceOverdue(row) }));
+  }).sort((a, b) => b.priorityScore - a.priorityScore || a.createdAt.getTime() - b.createdAt.getTime() || String(a._id).localeCompare(String(b._id)));
 };
 
-/** POST /api/resource-requests */
 export const createResourceRequest = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { resourceId, requestedAccessType, durationOrTerms, message, justification, selfDeclaredNeed } = req.body;
-    const resource = await Resource.findOne({ _id: resourceId, status: 'available' });
-
-    if (!resource) {
-      res.status(404).json({ success: false, message: 'Resource not found or no longer available.' });
-      return;
-    }
-
-    if (resource.listedBy.equals(req.user!._id)) {
-      res.status(400).json({ success: false, message: 'You cannot request your own resource listing.' });
-      return;
-    }
-
-    if (resource.accessType !== requestedAccessType) {
-      res.status(400).json({ success: false, message: 'Invalid access type requested for this resource.' });
-      return;
-    }
-
-    const existing = await ResourceRequest.findOne({
-      studentId: req.user!._id,
-      resourceCategory: resource.category,
-      status: { $in: ['pending', 'accepted'] },
-    });
-    if (existing) {
-      res.status(409).json({ success: false, message: `You already have an active request or accepted ${resource.category.replace('_', ' ')} resource.` });
-      return;
-    }
-
-    if (typeof justification !== 'string' || justification.trim().length < 30 || justification.trim().length > 800) {
-      res.status(400).json({ success: false, message: 'Please provide a justification between 30 and 800 characters.' });
-      return;
-    }
-    if (!['low', 'medium', 'high'].includes(selfDeclaredNeed)) {
-      res.status(400).json({ success: false, message: 'Select your declared need level.' });
-      return;
-    }
-
-    if (typeof message === 'string' && message.trim().length > 1000) {
-      res.status(400).json({ success: false, message: 'Your message must be 1000 characters or fewer.' });
-      return;
-    }
-    if (typeof durationOrTerms === 'string' && durationOrTerms.trim().length > 200) {
-      res.status(400).json({ success: false, message: 'Requested terms must be 200 characters or fewer.' });
-      return;
-    }
-
-    const request = await ResourceRequest.create({
-      studentId: req.user!._id,
-      providerId: resource.listedBy,
-      resourceId: resource._id,
-      requestedAccessType,
-      resourceCategory: resource.category,
-      durationOrTerms: typeof durationOrTerms === 'string' ? durationOrTerms.trim() : undefined,
-      message: typeof message === 'string' ? message.trim() : undefined,
-      justification: justification.trim(),
-      selfDeclaredNeed,
-    });
-    
-    await request.populate('resourceId', resourceSelect);
-
-    res.status(201).json({
-      success: true,
-      message: 'Resource request submitted',
-      data: { request },
-    });
-  } catch (error) {
-    console.error('Create resource request error:', error);
-    res.status(400).json({ success: false, message: 'Unable to submit your request.' });
-  }
+  try { const row = await submitResourceRequest(req.user!._id, resourceBody(req)); await row.populate('resourceId', resourceSelect); res.status(201).json({ success: true, message: 'Resource request submitted', data: { request: row } }); } catch (error) { resourceFailure(res, error); }
 };
-
-/** GET /api/resource-requests/mine */
 export const listMyResourceRequests = async (req: Request, res: Response): Promise<void> => {
   try {
-    const requests = await ResourceRequest.find({ studentId: req.user!._id })
-      .populate('resourceId', resourceSelect)
-      .populate('providerId', providerSelect)
-      .sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: { requests } });
-  } catch (error) {
-    console.error('List student resource requests error:', error);
-    res.status(500).json({ success: false, message: 'Unable to fetch your requests.' });
-  }
+    const rows = await ResourceRequest.find({ studentId: req.user!._id }).populate('resourceId', resourceSelect).populate('providerId', providerSelect).sort({ createdAt: -1 });
+    res.json({ success: true, data: { requests: rows.map(row => ({ ...row.toObject(), isOverdue: isResourceOverdue(row) })) } });
+  } catch (error) { resourceFailure(res, error); }
 };
-
-/** GET /api/resource-requests/provider */
+const ownerRequests = async (req: Request) => {
+  const resourceIds = await Resource.find({ listedBy: req.user!._id }).distinct('_id');
+  return ResourceRequest.find({ providerId: req.user!._id, resourceId: { $in: resourceIds } }).populate('studentId', studentSelect).populate('resourceId', resourceSelect).sort({ createdAt: 1 });
+};
 export const listProviderResourceRequests = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const requests = await ResourceRequest.find({ providerId: req.user!._id })
-      .populate('studentId', studentSelect)
-      .populate('resourceId', resourceSelect)
-      .sort({ createdAt: 1 });
-    const enriched = await enrichRequests(requests as InstanceType<typeof ResourceRequest>[]);
-    res.status(200).json({ success: true, data: { requests: enriched } });
-  } catch (error) {
-    console.error('List provider resource requests error:', error);
-    res.status(500).json({ success: false, message: 'Unable to fetch requests.' });
-  }
+  try { const requests = await enrichRequests(await ownerRequests(req)); res.json({ success: true, data: { requests } }); } catch (error) { resourceFailure(res, error); }
 };
-
-/** GET /api/resource-requests/received — requests for a student's own shared listings */
 export const listReceivedResourceRequests = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const requests = await ResourceRequest.find({ providerId: req.user!._id })
-      .populate('studentId', studentSelect)
-      .populate('resourceId', resourceSelect)
-      .sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: { requests } });
-  } catch (error) {
-    console.error('List received resource requests error:', error);
-    res.status(500).json({ success: false, message: 'Unable to fetch received requests.' });
-  }
+  try { const requests = await enrichRequests(await ownerRequests(req)); res.json({ success: true, data: { requests } }); } catch (error) { resourceFailure(res, error); }
 };
-
-/** PATCH /api/resource-requests/:id/status */
 export const updateResourceRequestStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const request = await transitionResourceRequest(req.params.id, req.user!._id, req.body?.status);
-    res.status(200).json({ success: true, message: `Request ${request.status}.`, data: { request } });
-  } catch (error) {
-    if (error instanceof ResourceReservationError) {
-      res.status(error.statusCode).json({ success: false, message: error.message });
-      return;
-    }
-    res.status(503).json({ success: false, message: 'Unable to update this request. Please try again later.' });
-  }
+    const body = resourceBody(req);
+    const row = await transitionResourceRequest(req.params.id, req.user!._id, body.status, { reason: body.reason, revision: body.revision, startAt: body.startAt, dueAt: body.dueAt, priorityOverrideReason: body.priorityOverrideReason });
+    res.json({ success: true, message: `Request ${row.status}.`, data: { request: row } });
+  } catch (error) { resourceFailure(res, error); }
 };

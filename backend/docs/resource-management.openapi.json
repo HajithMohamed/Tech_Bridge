@@ -1,0 +1,4663 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TechBridge Phase 5 Resource Management",
+    "version": "1.0.0",
+    "description": "Backend-only extension of existing resource reservation. All protected responses are no-store. Access requires active JWT session, current database role and verified providers; no private admin override. Transactions require MongoDB replica set. No payment, background reminders or new frontend controls. Read resource-management.md for legacy/deployment limitations."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Resources"
+    }
+  ],
+  "paths": {
+    "/api/resources": {
+      "get": {
+        "summary": "Discover available resources",
+        "description": "Existing item, category and accessType filters. Only available listings are returned; public owner serialization excludes private account fields.",
+        "operationId": "getapiresources",
+        "security": [],
+        "x-authorized-roles": [
+          "public"
+        ],
+        "x-database-models": [
+          "Resource",
+          "User"
+        ],
+        "parameters": [
+          {
+            "name": "item",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "laptop",
+                "arduino",
+                "raspberry_pi",
+                "sensor",
+                "electronic_component",
+                "dev_board",
+                "other"
+              ]
+            }
+          },
+          {
+            "name": "accessType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "borrow",
+                "share",
+                "rent",
+                "installment",
+                "interest_free",
+                "sponsorship",
+                "donation"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "resources": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Resource"
+                          }
+                        }
+                      },
+                      "required": [
+                        "resources"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create listing and declare ownership arrangement",
+        "description": "Students may offer borrow/share/donation; borrow/share are student-only. Provider-managed types require existing verified technical-resource capabilities and enabled access method. Existing category/access field validation remains enforced.",
+        "operationId": "postapiresources",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "verified provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Resource",
+          "User"
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "resource": {
+                          "$ref": "#/components/schemas/Resource"
+                        }
+                      },
+                      "required": [
+                        "resource"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resources/mine": {
+      "get": {
+        "summary": "List own listings",
+        "description": "Current authenticated owner only; includes paused/withdrawn source records.",
+        "operationId": "getapiresourcesmine",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "Resource"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "resources": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Resource"
+                          }
+                        }
+                      },
+                      "required": [
+                        "resources"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resources/{id}": {
+      "get": {
+        "summary": "Read public resource",
+        "description": "Withdrawn resources return 404. Public metadata only; no applicant/dispute/history data.",
+        "operationId": "getapiresourcesid",
+        "security": [],
+        "x-authorized-roles": [
+          "public"
+        ],
+        "x-database-models": [
+          "Resource",
+          "User"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "resource": {
+                          "$ref": "#/components/schemas/Resource"
+                        }
+                      },
+                      "required": [
+                        "resource"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete unapplied own listing",
+        "description": "Any request history blocks deletion; pause the listing instead. Unapplied listing deletion is audited.",
+        "operationId": "deleteapiresourcesid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "Resource",
+          "ResourceRequest",
+          "User",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resources/{id}/status": {
+      "patch": {
+        "summary": "Pause or reopen own listing",
+        "description": "Owner pause is distinct from automatic depletion. Reopening requires positive free units and no administrative withdrawal.",
+        "operationId": "patchapiresourcesidstatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "Resource",
+          "User",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "resource": {
+                          "$ref": "#/components/schemas/Resource"
+                        }
+                      },
+                      "required": [
+                        "resource"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvailabilityUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resources/{id}/inventory": {
+      "patch": {
+        "summary": "Adjust genuine free inventory",
+        "description": "Transactional adjustment; with active allocations require matching inventoryRevision and reason. Any supplied revision is checked. Paused listings stay paused.",
+        "operationId": "patchapiresourcesidinventory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "Resource",
+          "ResourceRequest",
+          "User",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "resource": {
+                          "$ref": "#/components/schemas/Resource"
+                        }
+                      },
+                      "required": [
+                        "resource"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resources/{id}/history": {
+      "get": {
+        "summary": "Read listing-level inventory history",
+        "description": "Owner only; request-specific events are excluded to preserve private history boundaries.",
+        "operationId": "getapiresourcesidhistory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "Resource",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceEvent"
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10000
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 50
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        },
+                        "pages": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "events",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resources/{id}/waitlist": {
+      "get": {
+        "summary": "Read persistent ranked waitlist",
+        "description": "Sort snapshot score descending, submission ascending, ID ascending. Capacity is advisory and rechecked on writes. Legacy missing snapshots are unscored.",
+        "operationId": "getapiresourcesidwaitlist",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "Resource",
+          "ResourceRequest"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceRequest"
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10000
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 50
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        },
+                        "pages": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        },
+                        "quantityAvailable": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        },
+                        "allocationBlocked": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resources/{id}/waitlist/advance": {
+      "post": {
+        "summary": "Record explicit human queue allocation",
+        "description": "Requires selected request still waitlisted for this source; one free unit, active-category policy, eligible account and live listing. Out-of-order choice needs documented override; never automatic.",
+        "operationId": "postapiresourcesidwaitlistadvance",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "Resource",
+          "ResourceRequest",
+          "User",
+          "ResourceDispute",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "$ref": "#/components/schemas/ResourceRequest"
+                        }
+                      },
+                      "required": [
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceWaitlist"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests": {
+      "post": {
+        "summary": "Submit request or explicitly join waitlist",
+        "description": "One active request/allocation per category. Student/source-owner checks and audit commit transactionally. Claimed depleted resources require joinWaitlist=true; paused/expired/withdrawn sources reject. No inventory reserved until approval.",
+        "operationId": "postapiresourcerequests",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "Resource",
+          "ResourceRequest",
+          "User",
+          "ResourceEvent"
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "$ref": "#/components/schemas/ResourceRequest"
+                        }
+                      },
+                      "required": [
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/mine": {
+      "get": {
+        "summary": "List own requests",
+        "description": "Own records only; derives isOverdue without writes.",
+        "operationId": "getapiresourcerequestsmine",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceRequest"
+                          }
+                        }
+                      },
+                      "required": [
+                        "requests"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/provider": {
+      "get": {
+        "summary": "List provider-owned request queue",
+        "description": "Both recorded owner and current source ownership must match. New snapshot scores take precedence over legacy live scoring; ObjectId benefit aggregation and deterministic ties.",
+        "operationId": "getapiresourcerequestsprovider",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "verified provider"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceRequest"
+                          }
+                        }
+                      },
+                      "required": [
+                        "requests"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/received": {
+      "get": {
+        "summary": "List requests for own shared listings",
+        "description": "Student listing owner only, dual ownership scope, snapshot-aware priority and derived overdue flags.",
+        "operationId": "getapiresourcerequestsreceived",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceRequest"
+                          }
+                        }
+                      },
+                      "required": [
+                        "requests"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}": {
+      "get": {
+        "summary": "Read own request and allocation",
+        "description": "No general admin override. Return deadline is unknown for legacy unsnapshotted allocations; reads do not modify state.",
+        "operationId": "getapiresourcerequestsid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student applicant",
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "ResourceDispute"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "$ref": "#/components/schemas/ResourceRequest"
+                        },
+                        "availability": {
+                          "type": "object",
+                          "properties": {
+                            "quantityAvailable": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000
+                            },
+                            "status": {
+                              "type": "string",
+                              "minLength": 0,
+                              "maxLength": 1000
+                            },
+                            "inventoryRevision": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "withdrawnByAdmin": {
+                              "type": "boolean"
+                            },
+                            "paused": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}/status": {
+      "patch": {
+        "summary": "Make owner allocation decision",
+        "description": "Preserves original atomic reservation and student category locks. No reopening terminal decisions, double reservations or transfer replenishment. Loan completion requires explicit return workflow. Waitlist decisions need reason; direct approvals are human/advisory.",
+        "operationId": "patchapiresourcerequestsidstatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User",
+          "ResourceDispute",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "$ref": "#/components/schemas/ResourceRequest"
+                        }
+                      },
+                      "required": [
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusDecision"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}/history": {
+      "get": {
+        "summary": "Read participant-scoped request history",
+        "description": "Append-only domain events. Dispute statements are not duplicated into history. Current owner/applicant only; no admin override.",
+        "operationId": "getapiresourcerequestsidhistory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student applicant",
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceEvent"
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10000
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 50
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        },
+                        "pages": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "events",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}/cancel": {
+      "post": {
+        "summary": "Cancel an unallocated request",
+        "description": "Pending/waitlisted only; revision required. No inventory mutation.",
+        "operationId": "postapiresourcerequestsidcancel",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student applicant"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "$ref": "#/components/schemas/ResourceRequest"
+                        }
+                      },
+                      "required": [
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRevision"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}/return": {
+      "post": {
+        "summary": "Borrower requests physical return",
+        "description": "Accepted returnable allocation only, borrowing period started, no open dispute. Does not restore inventory or mark receipt.",
+        "operationId": "postapiresourcerequestsidreturn",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student applicant"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User",
+          "ResourceDispute",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "$ref": "#/components/schemas/ResourceRequest"
+                        }
+                      },
+                      "required": [
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRevision"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}/return/confirm": {
+      "post": {
+        "summary": "Owner confirms actual physical receipt",
+        "description": "Requires pending borrower return, current revision, original source ownership/category/access and proven reservation. Exactly one unit increments current free stock in same transaction as completion/audit. Paused/withdrawn listings remain hidden. Legacy proof requires explicit attestation.",
+        "operationId": "postapiresourcerequestsidreturnconfirm",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User",
+          "ResourceDispute",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "request": {
+                          "$ref": "#/components/schemas/ResourceRequest"
+                        }
+                      },
+                      "required": [
+                        "request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReturnConfirmation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}/disputes": {
+      "get": {
+        "summary": "Read participant-scoped dispute records",
+        "description": "At most three cases. Confidential statement accessible only to applicant/current owner; no general admin access.",
+        "operationId": "getapiresourcerequestsiddisputes",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student applicant",
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "ResourceDispute"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "disputes": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceDispute"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Open confidential allocation dispute",
+        "description": "Accepted/completed allocation only. One open case, at most three total. Bumps request revision. Open disputes block return/completion. No independent arbitration or stock change.",
+        "operationId": "postapiresourcerequestsiddisputes",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student applicant",
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User",
+          "ResourceDispute",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "dispute": {
+                          "$ref": "#/components/schemas/ResourceDispute"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenDispute"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resource-requests/{id}/disputes/{disputeId}/resolve": {
+      "post": {
+        "summary": "Resolve or withdraw an open dispute",
+        "description": "Creator may withdraw; source owner may record resolution. Match current request revision; no inventory adjustment, ownership adjudication or automatic return.",
+        "operationId": "postapiresourcerequestsiddisputesdisputeIdresolve",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student applicant",
+          "student listing owner",
+          "verified provider listing owner",
+          "admin listing owner"
+        ],
+        "x-database-models": [
+          "ResourceRequest",
+          "Resource",
+          "User",
+          "ResourceDispute",
+          "ResourceEvent"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "dispute": {
+                          "$ref": "#/components/schemas/ResourceDispute"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveDispute"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/resources/{id}": {
+      "delete": {
+        "summary": "Moderate resource without orphaning allocations",
+        "description": "With request history: retain source, mark withdrawn/paused/claimed, hide public lookup, block allocations/reopening. Actual returns remain possible. Without requests: delete. Resource mutation and admin/domain audit are transactional.",
+        "operationId": "deleteapiadminresourcesid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "admin"
+        ],
+        "x-database-models": [
+          "Resource",
+          "ResourceRequest",
+          "User",
+          "ResourceEvent",
+          "AuditLog"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveReason"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/reports/{id}": {
+      "patch": {
+        "summary": "Resolve report and optionally moderate its target",
+        "description": "Existing report contract. For resource removal, retain/withdraw applied source using the same audited helper. Report resolution itself remains separate from target moderation; other targets preserve existing behavior.",
+        "operationId": "patchapiadminreportsid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "admin"
+        ],
+        "x-database-models": [
+          "Report",
+          "Resource",
+          "ResourceRequest",
+          "User",
+          "ResourceEvent",
+          "AuditLog"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "type": "object",
+                          "description": "Existing Report model: reporterId, targetType/targetId, reason, status, resolutionNote and timestamps."
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, body, dates, reason, page or revision type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, revoked or restricted session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized role, inactive account or unverified provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, invalid transition, unavailable stock, dispute, duplicate, deadline or ownership conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server failure; existing listing-read endpoints retain their generic 500 contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary database/transaction/audit failure; no private details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModerationInput"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": false
+          },
+          "message": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "ActionSuccess": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true
+          },
+          "message": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "Allocation": {
+        "type": "object",
+        "properties": {
+          "returnRequired": {
+            "type": "boolean"
+          },
+          "accessType": {
+            "type": "string",
+            "enum": [
+              "borrow",
+              "share",
+              "rent",
+              "installment",
+              "interest_free",
+              "sponsorship",
+              "donation"
+            ]
+          },
+          "inventoryReserved": {
+            "type": "boolean"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        },
+        "required": [
+          "returnRequired",
+          "accessType",
+          "inventoryReserved"
+        ]
+      },
+      "Priority": {
+        "type": "object",
+        "properties": {
+          "priorityScore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "priorityReasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1000
+            }
+          },
+          "components": {
+            "type": "object",
+            "properties": {
+              "need": {
+                "type": "number"
+              },
+              "fit": {
+                "type": "number"
+              },
+              "benefits": {
+                "type": "number"
+              },
+              "timing": {
+                "type": "number"
+              }
+            }
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        }
+      },
+      "Resource": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "itemName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 160
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "laptop",
+              "arduino",
+              "raspberry_pi",
+              "sensor",
+              "electronic_component",
+              "dev_board",
+              "other"
+            ]
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "new",
+              "used_good",
+              "used_fair"
+            ]
+          },
+          "accessType": {
+            "type": "string",
+            "enum": [
+              "borrow",
+              "share",
+              "rent",
+              "installment",
+              "interest_free",
+              "sponsorship",
+              "donation"
+            ]
+          },
+          "listedBy": {
+            "description": "Owner ID or public-safe populated owner, depending on endpoint.",
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "providerOrgVerified": {
+            "type": "boolean"
+          },
+          "quantityAvailable": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "claimed"
+            ]
+          },
+          "inventoryRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "availabilityPaused": {
+            "type": "boolean"
+          },
+          "withdrawnByAdmin": {
+            "type": "boolean"
+          },
+          "returnPolicy": {
+            "type": "string",
+            "enum": [
+              "returnable",
+              "transfer"
+            ]
+          },
+          "returnDurationDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "itemDetails": {
+            "type": "object"
+          },
+          "accessDetails": {
+            "type": "object"
+          },
+          "imageDataUrl": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 3500000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        }
+      },
+      "ResourceRequest": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "studentId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "providerId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resourceId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "$ref": "#/components/schemas/Resource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestedAccessType": {
+            "type": "string",
+            "enum": [
+              "borrow",
+              "share",
+              "rent",
+              "installment",
+              "interest_free",
+              "sponsorship",
+              "donation"
+            ]
+          },
+          "resourceCategory": {
+            "type": "string",
+            "enum": [
+              "laptop",
+              "arduino",
+              "raspberry_pi",
+              "sensor",
+              "electronic_component",
+              "dev_board",
+              "other"
+            ]
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 800
+          },
+          "selfDeclaredNeed": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "durationOrTerms": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 200
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected",
+              "completed",
+              "waitlisted",
+              "cancelled"
+            ]
+          },
+          "lifecycleVersion": {
+            "const": 1,
+            "description": "Absent on legacy records; server-owned."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "requestedStartAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "requestedReturnAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "allocation": {
+            "$ref": "#/components/schemas/Allocation"
+          },
+          "prioritySnapshot": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "waitlistedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "returnRequestedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "returnedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "inventoryRestoredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "isOverdue": {
+            "type": "boolean"
+          },
+          "openDispute": {
+            "type": "boolean"
+          },
+          "returnConfirmationRequired": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        }
+      },
+      "ResourceEvent": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "resourceId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "requestId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "disputeId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "actorId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "fromStatus": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "toStatus": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "quantityBefore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "quantityAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "priorityOverrideReason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "legacyReservationConfirmed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        }
+      },
+      "ResourceDispute": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "resourceId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "requestId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "createdBy": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 2000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "resolved",
+              "withdrawn"
+            ]
+          },
+          "resolution": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "resolvedBy": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        }
+      },
+      "SubmitRequest": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "requestedAccessType": {
+            "type": "string",
+            "enum": [
+              "borrow",
+              "share",
+              "rent",
+              "installment",
+              "interest_free",
+              "sponsorship",
+              "donation"
+            ]
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 800
+          },
+          "selfDeclaredNeed": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "durationOrTerms": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 200
+          },
+          "joinWaitlist": {
+            "type": "boolean"
+          },
+          "requestedStartAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "requestedReturnAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        },
+        "required": [
+          "resourceId",
+          "requestedAccessType",
+          "justification",
+          "selfDeclaredNeed"
+        ],
+        "description": "Server ignores applicant-supplied status, owner, version, allocation and scoring authority fields. Explicit joinWaitlist allows depleted but not paused/withdrawn/expired listings."
+      },
+      "StatusDecision": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected",
+              "completed",
+              "waitlisted"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "priorityOverrideReason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "Waitlisting requires reason. Any supplied revision must match. Legacy accept/reject/transfer-complete without reason remains supported and explicitly labeled in history. Loan completion uses return endpoints instead."
+      },
+      "ReasonRevision": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "reason",
+          "revision"
+        ]
+      },
+      "ReturnConfirmation": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "confirmLegacyReservation": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason",
+          "revision"
+        ],
+        "description": "Legacy accepted loans without allocation proof additionally require confirmLegacyReservation=true. No transfer can be restored through this flag."
+      },
+      "OpenDispute": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 2000
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "statement",
+          "revision"
+        ]
+      },
+      "ResolveDispute": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "withdrawn"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "revision"
+        ]
+      },
+      "InventoryUpdate": {
+        "type": "object",
+        "properties": {
+          "quantityAvailable": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "inventoryRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          }
+        },
+        "required": [
+          "quantityAvailable"
+        ],
+        "description": "Quantity is free stock, not total ownership. Revision and reason are mandatory with active allocations. Every supplied revision is checked. Owner must assert genuinely available units."
+      },
+      "AvailabilityUpdate": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "claimed"
+            ]
+          },
+          "inventoryRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "Claimed explicitly pauses; available clears pause and requires positive free quantity. Withdrawn resources cannot be reopened."
+      },
+      "AdvanceWaitlist": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "priorityOverrideReason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO timestamp ending Z; invalid calendar dates are rejected."
+          }
+        },
+        "required": [
+          "requestId",
+          "revision",
+          "reason"
+        ],
+        "description": "Explicit human allocation; outside ranked order requires priorityOverrideReason. Does not bypass capacity, category, ownership, dispute or deadline checks."
+      },
+      "ResourceCreate": {
+        "type": "object",
+        "properties": {
+          "itemName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 160
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "laptop",
+              "arduino",
+              "raspberry_pi",
+              "sensor",
+              "electronic_component",
+              "dev_board",
+              "other"
+            ]
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "new",
+              "used_good",
+              "used_fair"
+            ]
+          },
+          "accessType": {
+            "type": "string",
+            "enum": [
+              "borrow",
+              "share",
+              "rent",
+              "installment",
+              "interest_free",
+              "sponsorship",
+              "donation"
+            ]
+          },
+          "quantityAvailable": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "claimed"
+            ]
+          },
+          "imageDataUrl": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 3500000,
+            "pattern": "^data:image/(jpeg|png|webp);base64,"
+          },
+          "returnPolicy": {
+            "type": "string",
+            "enum": [
+              "returnable",
+              "transfer"
+            ]
+          },
+          "returnDurationDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "itemDetails": {
+            "type": "object",
+            "description": "Existing category-specific contract: laptop requires brand/model/processor/processorGeneration/ramGb/storageGb/storageType; arduino model/microcontroller/operatingVoltage/digitalPins/analogPins; raspberryPi model/processor/ramGb/storageSupport; sensor sensorType/measuredParameter/operatingVoltage/interface; electronicComponent componentType/valueOrRating/packageType; devBoard boardModel/microcontrollerOrProcessor/memory/connectivity; other description. Bounded strings, finite nonnegative numeric values and valid storage enums remain enforced."
+          },
+          "accessDetails": {
+            "type": "object",
+            "description": "Existing contract by accessType: borrowShare borrowDurationDays/pickupLocation/returnCondition; rent pricePerMonth/currency/minRentalMonths, optional securityDeposit; installment totalPrice/downPayment/monthlyInstallmentAmount/numberOfMonths/lateFeePolicy; interestFree totalPrice/monthlyInstallmentAmount/numberOfMonths/eligibilityCriteria/repaymentStartDate, interestRate forced zero; sponsorship eligibilityCriteria/applicationDeadline/numberOfUnitsAvailable/sponsorOrganization; donation itemAgeYears/conditionNotes/pickupOrDeliveryMethod/claimDeadline. Positive integer periods/counts, nonnegative amounts, bounded text, age <=100 and future sponsorship/donation deadlines remain validated."
+          }
+        },
+        "required": [
+          "itemName",
+          "category",
+          "accessType",
+          "quantityAvailable",
+          "itemDetails",
+          "accessDetails"
+        ],
+        "description": "Borrow/share/rent require return. Donation/installment/interest_free transfer ownership. Sponsorship may opt into returnable with returnDurationDays. Version, moderation and inventory authority fields are server-owned."
+      },
+      "ModerationInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "reviewed",
+              "dismissed"
+            ]
+          },
+          "resolutionNote": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "removeTarget": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "RemoveReason": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        }
+      }
+    }
+  }
+}

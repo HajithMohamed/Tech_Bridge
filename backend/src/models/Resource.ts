@@ -123,6 +123,11 @@ export interface IResourceListing extends Document {
   providerOrgVerified: boolean;
   quantityAvailable: number;
   status: ResourceStatus;
+  returnPolicy?: 'returnable' | 'transfer';
+  returnDurationDays?: number;
+  inventoryRevision?: number;
+  availabilityPaused?: boolean;
+  withdrawnByAdmin?: boolean;
   imageDataUrl?: string;
   itemDetails: IResourceItemDetails;
   accessDetails: IResourceAccessDetails;
@@ -148,8 +153,13 @@ const resourceSchema = new Schema<IResourceListing>(
     },
     listedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     providerOrgVerified: { type: Boolean, required: true, default: false, index: true },
-    quantityAvailable: { type: Number, required: true, min: 0, default: 1 },
+    quantityAvailable: { type: Number, required: true, min: 0, max: 1_000_000, validate: Number.isSafeInteger, default: 1 },
     status: { type: String, enum: ['available', 'claimed'], default: 'available', index: true },
+    returnPolicy: { type: String, enum: ['returnable', 'transfer'] },
+    returnDurationDays: { type: Number, min: 1, max: 3650 },
+    inventoryRevision: { type: Number, min: 0, default: 0 },
+    availabilityPaused: { type: Boolean, default: false },
+    withdrawnByAdmin: { type: Boolean, default: false },
     imageDataUrl: { type: String, maxlength: 4_000_000 },
     itemDetails: {
       laptop: {

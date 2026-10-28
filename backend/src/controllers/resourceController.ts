@@ -10,6 +10,9 @@ import Resource, {
   IResourceListing,
 } from '../models/Resource';
 import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
+import { changeResourceAvailability, removeResourceWithHistory } from '../services/resourceLifecycle';
+import { listingReturnPolicy, returnPolicy } from '../services/resourcePolicy';
+import { resourceBody, resourceFailure } from './resourceLifecycleController';
 
 const categories: ResourceCategory[] = ['laptop', 'arduino', 'raspberry_pi', 'sensor', 'electronic_component', 'dev_board', 'other'];
 const accessTypes: ResourceAccessType[] = ['borrow', 'share', 'rent', 'installment', 'interest_free', 'sponsorship', 'donation'];
@@ -220,12 +223,13 @@ const listingPayload = (body: Payload) => {
   if (!categories.includes(body.category as ResourceCategory)) throw new Error('Select a valid resource category.');
   if (body.condition !== undefined && !['new', 'used_good', 'used_fair'].includes(body.condition as ResourceCondition)) throw new Error('Select a valid item condition.');
   if (!accessTypes.includes(body.accessType as ResourceAccessType)) throw new Error('Select a valid access type.');
-  if (!validInteger(body.quantityAvailable, 1)) throw new Error('Quantity available must be a whole number of at least 1.');
+  if (!validInteger(body.quantityAvailable, 1) || !Number.isSafeInteger(body.quantityAvailable) || body.quantityAvailable > 1_000_000) throw new Error('Quantity available must be a whole number from 1 to 1000000.');
   if (body.status !== undefined && !statuses.includes(body.status as ResourceStatus)) throw new Error('Select a valid listing status.');
 
   const accessType = body.accessType as ResourceAccessType;
   return {
     itemName,
+    ...listingReturnPolicy(accessType, body.returnPolicy, body.returnDurationDays),
     category: body.category as ResourceCategory,
     ...(body.condition === undefined || body.condition === '' ? {} : { condition: body.condition as ResourceCondition }),
     accessType,
@@ -250,6 +254,7 @@ const canOfferProviderManagedAccess = (req: Request): boolean => {
 export const createResource = async (req: Request, res: Response): Promise<void> => {
   try {
     const payload = listingPayload(req.body as Payload);
+    returnPolicy(payload);
     if (req.user?.role === 'student' && !studentAccessTypes.includes(payload.accessType)) {
       res.status(403).json({ success: false, message: 'Students can list resources only for borrow, share, or donation.' });
       return;
@@ -269,6 +274,7 @@ export const createResource = async (req: Request, res: Response): Promise<void>
 
     const resource = await Resource.create({
       ...payload,
+      availabilityPaused: payload.status === 'claimed',
       listedBy: req.user!._id,
       providerOrgVerified: req.user!.role === 'provider' && req.user!.providerProfile?.verified === true,
     });
@@ -310,7 +316,7 @@ export const listMyResources = async (req: Request, res: Response): Promise<void
 /** GET /api/resources/:id */
 export const getResource = async (req: Request, res: Response): Promise<void> => {
   try {
-    const resource = await Resource.findById(req.params.id).populate('listedBy', listedBySelect);
+    const resource = await Resource.findOne({ _id: req.params.id, withdrawnByAdmin: { $ne: true } }).populate('listedBy', listedBySelect);
     if (!resource) { res.status(404).json({ success: false, message: 'Resource listing not found.' }); return; }
     res.status(200).json({ success: true, data: { resource: publicResource(resource) } });
   } catch {
@@ -321,52 +327,23 @@ export const getResource = async (req: Request, res: Response): Promise<void> =>
 /** PATCH /api/resources/:id/status */
 export const updateResourceStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!statuses.includes(req.body.status as ResourceStatus)) {
-      res.status(400).json({ success: false, message: 'Status must be available or claimed.' });
-      return;
-    }
-    const existing = await Resource.findOne({ _id: req.params.id, listedBy: req.user!._id });
-    if (!existing) { res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' }); return; }
-    if (req.body.status === 'available' && existing.quantityAvailable < 1) {
-      res.status(400).json({ success: false, message: 'Add at least one available unit before reopening this listing.' });
-      return;
-    }
-    existing.status = req.body.status as ResourceStatus;
-    await existing.save();
-    const resource = existing;
+    const resource = await changeResourceAvailability(req.params.id, req.user!._id, 'status', resourceBody(req));
     res.status(200).json({ success: true, message: 'Listing status updated.', data: { resource } });
-  } catch {
-    res.status(400).json({ success: false, message: 'Unable to update listing status.' });
-  }
+  } catch (error) { resourceFailure(res, error); }
 };
 
 /** PATCH /api/resources/:id/inventory */
 export const updateResourceInventory = async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!validInteger(req.body.quantityAvailable, 0)) {
-      res.status(400).json({ success: false, message: 'Available units must be a whole number of zero or more.' });
-      return;
-    }
-    const quantityAvailable = req.body.quantityAvailable as number;
-    const resource = await Resource.findOneAndUpdate(
-      { _id: req.params.id, listedBy: req.user!._id },
-      { quantityAvailable, status: quantityAvailable > 0 ? 'available' : 'claimed' },
-      { new: true }
-    );
-    if (!resource) { res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' }); return; }
+    const resource = await changeResourceAvailability(req.params.id, req.user!._id, 'inventory', resourceBody(req));
     res.status(200).json({ success: true, message: 'Available units updated.', data: { resource } });
-  } catch {
-    res.status(400).json({ success: false, message: 'Unable to update available units.' });
-  }
+  } catch (error) { resourceFailure(res, error); }
 };
 
 /** DELETE /api/resources/:id */
 export const deleteResource = async (req: Request, res: Response): Promise<void> => {
   try {
-    const resource = await Resource.findOneAndDelete({ _id: req.params.id, listedBy: req.user!._id });
-    if (!resource) { res.status(404).json({ success: false, message: 'Resource listing not found or you do not own it.' }); return; }
+    await removeResourceWithHistory(req.params.id, req.user!._id);
     res.status(200).json({ success: true, message: 'Resource listing deleted.' });
-  } catch {
-    res.status(400).json({ success: false, message: 'Unable to delete resource listing.' });
-  }
+  } catch (error) { resourceFailure(res, error); }
 };

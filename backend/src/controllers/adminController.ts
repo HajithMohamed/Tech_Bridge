@@ -4,12 +4,13 @@ import mongoose from 'mongoose';
 import AuditLog from '../models/AuditLog';
 import Opportunity from '../models/Opportunity';
 import Report from '../models/Report';
-import Resource from '../models/Resource';
 import User from '../models/User';
 import { reviewReportedMessage, resolveMessageReport } from '../services/messageReports';
 import { messageId, messageText } from '../services/messagingPolicy';
 import { removeScholarshipAwareListing } from '../services/scholarships';
 import { ScholarshipError } from '../services/scholarshipPolicy';
+import { removeResourceWithHistory } from '../services/resourceLifecycle';
+import { ResourceReservationError } from '../services/resourcePolicy';
 
 const audit = (adminId: mongoose.Types.ObjectId, action: string, targetType: 'user' | 'opportunity' | 'resource', targetId: mongoose.Types.ObjectId, reason?: string) =>
   AuditLog.create({ adminId, action, targetType, targetId, ...(reason ? { reason } : {}) });
@@ -17,7 +18,7 @@ const audit = (adminId: mongoose.Types.ObjectId, action: string, targetType: 'us
 const validId = (id: string | string[]) => mongoose.isValidObjectId(Array.isArray(id) ? id[0] : id);
 
 const adminFailure = (res: Response, error: unknown): void => {
-  if (error instanceof AdminActionError || error instanceof ScholarshipError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
+  if (error instanceof AdminActionError || error instanceof ScholarshipError || error instanceof ResourceReservationError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
   res.status(503).json({ success: false, message: 'Unable to complete this administrative action. Please try again later.' });
 };
 export const listUsers = async (req: Request, res: Response): Promise<void> => {
@@ -85,8 +86,7 @@ export const resolveReport = async (req: Request, res: Response): Promise<void> 
       const removed = await removeScholarshipAwareListing(String(report.targetId), req.user!._id, 'admin');
       await audit(req.user!._id, removed.retained ? 'scholarship_closed_from_report' : 'opportunity_removed_from_report', 'opportunity', report.targetId, report.resolutionNote);
     } else if (removeTarget && report.targetType === 'resource') {
-      await Resource.findByIdAndDelete(report.targetId);
-      await audit(req.user!._id, 'resource_removed_from_report', 'resource', report.targetId, report.resolutionNote);
+      await removeResourceWithHistory(String(report.targetId), req.user!._id, true, report.resolutionNote || undefined);
     } else {
       await audit(req.user!._id, 'report_resolved', 'user', report.reporterId, report.resolutionNote);
     }
@@ -105,10 +105,11 @@ const removeListing = (targetType: 'opportunity' | 'resource') => async (req: Re
   try {
     if (!validId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid listing ID.' }); return; }
     const removal = targetType === 'opportunity' ? await removeScholarshipAwareListing(req.params.id, req.user!._id, 'admin') : null;
-    const listing = removal ? removal.listing : await Resource.findByIdAndDelete(req.params.id);
+    const resourceRemoval = targetType === 'resource' ? await removeResourceWithHistory(req.params.id, req.user!._id, true, req.body?.reason) : null;
+    const listing = removal ? removal.listing : resourceRemoval?.resource;
     if (!listing) { res.status(404).json({ success: false, message: 'Listing not found.' }); return; }
     const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 1000) : undefined;
-    await audit(req.user!._id, removal?.retained ? 'scholarship_closed_with_history' : `${targetType}_removed`, targetType, listing._id, reason);
+    if (!resourceRemoval) await audit(req.user!._id, removal?.retained ? 'scholarship_closed_with_history' : `${targetType}_removed`, targetType, listing._id, reason);
     res.json({ success: true, message: `${targetType === 'opportunity' ? 'Opportunity' : 'Resource'} removed.` });
   } catch (error) { adminFailure(res, error); }
 };
