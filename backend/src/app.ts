@@ -16,6 +16,7 @@ import promotionRequestRoutes from './routes/promotionRequestRoutes';
 import { providerVerificationRoutes } from './routes/providerVerificationRoutes';
 import { adminCommunityRoutes, communityRoutes } from './routes/communityRoutes';
 import { securityConfiguration } from './config/security';
+import scholarshipRoutes from './routes/scholarshipRoutes';
 
 
 /** Build the API without connecting to MongoDB or opening a listener. */
@@ -48,6 +49,7 @@ export const createApp = () => {
   app.use('/api/opportunities', opportunityRoutes);
   app.use('/api/resources', resourceRoutes);
   app.use('/api/applications', applicationRoutes);
+  app.use('/api/scholarships', scholarshipRoutes);
   app.use('/api/provider', providerRoutes);
   app.use('/api/providers', publicProviderRoutes);
   app.use('/api/resource-requests', resourceRequestRoutes);

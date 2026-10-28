@@ -2,36 +2,33 @@ import mongoose, { Types } from 'mongoose';
 import Application, { ApplicationStatus } from '../models/Application';
 import Opportunity from '../models/Opportunity';
 import User from '../models/User';
-
-export class ScholarshipAwardError extends Error {
-  constructor(public readonly statusCode: number, message: string) { super(message); }
-}
+import { academicYearStart, awardCapacity, scholarshipRevision, ScholarshipError as ScholarshipAwardError } from './scholarshipPolicy';
+import { lockScholarshipActor, prepareScholarshipDecision, type ScholarshipDecisionOptions } from './scholarships';
+export { ScholarshipError as ScholarshipAwardError } from './scholarshipPolicy';
 
 export function isApplicationStatus(value: unknown): value is ApplicationStatus {
-  return typeof value === 'string' && ['applied', 'reviewed', 'accepted', 'rejected'].includes(value);
+  return typeof value === 'string' && ['applied', 'reviewed', 'accepted', 'rejected', 'waitlisted'].includes(value);
 }
 
-export function scholarshipCapacity(value: unknown): number {
-  if (value === undefined) return 1; // Preserve the existing legacy missing-capacity fallback.
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
-    throw new ScholarshipAwardError(409, 'This scholarship has an invalid award capacity.');
-  }
-  return value;
-}
+export const scholarshipCapacity = awardCapacity;
 
 // Preserve the existing application-date policy and server-local calendar year.
 // This is not an institutional academic-year or actual award-date policy.
-export const currentAcademicYearStart = (now = new Date()) => new Date(now.getFullYear(), 0, 1);
+export const currentAcademicYearStart = academicYearStart;
 const transactionOptions = { readPreference: 'primary' as const, readConcern: { level: 'snapshot' as const }, writeConcern: { w: 'majority' as const }, maxCommitTimeMS: 5000 };
 
-export async function changeApplicationStatus(id: unknown, ownerId: Types.ObjectId, next: unknown) {
+export async function changeApplicationStatus(id: unknown, ownerId: Types.ObjectId, next: unknown, options: ScholarshipDecisionOptions = {}) {
   if (typeof id !== 'string' || !Types.ObjectId.isValid(id)) throw new ScholarshipAwardError(400, 'Invalid application ID.');
-  if (!isApplicationStatus(next)) throw new ScholarshipAwardError(400, 'Status must be applied, reviewed, accepted, or rejected.');
+  if (!isApplicationStatus(next)) throw new ScholarshipAwardError(400, 'Choose a valid application status.');
+  scholarshipRevision(options.revision, options.requireWaitlisted === true);
   return mongoose.connection.transaction(async (session) => {
     const application = await Application.findOne({ _id: id, providerId: ownerId }).session(session);
     if (!application) throw new ScholarshipAwardError(404, 'Application not found.');
     const opportunity = await Opportunity.findOne({ _id: application.opportunityId, providerId: ownerId }).session(session);
     if (!opportunity) throw new ScholarshipAwardError(404, 'Opportunity not found or you do not own it.');
+    if (options.opportunityId && String(opportunity._id) !== options.opportunityId) throw new ScholarshipAwardError(404, 'Waitlisted application not found.');
+    if (options.requireWaitlisted && application.status !== 'waitlisted') throw new ScholarshipAwardError(409, 'Choose a currently waitlisted application.');
+    if (next === 'waitlisted' && opportunity.type !== 'scholarship') throw new ScholarshipAwardError(400, 'Persistent waitlists are available for scholarships.');
 
     if (application.status !== next) {
       if (opportunity.type === 'scholarship' && next === 'accepted') {
@@ -42,18 +39,15 @@ export async function changeApplicationStatus(id: unknown, ownerId: Types.Object
         );
         if (student.matchedCount !== 1) throw new ScholarshipAwardError(409, 'The student account is no longer eligible for approval.');
       }
+      if (opportunity.type === 'scholarship') await lockScholarshipActor(ownerId, 'provider', session);
       // Every status writer and opportunity editor shares this serialization point.
       // A conflicting transaction retries against the committed application count.
       await Opportunity.updateOne({ _id: opportunity._id, providerId: ownerId }, { $inc: { __v: 1 } }, { session, timestamps: false });
       if (opportunity.type === 'scholarship' && next === 'accepted') {
         const accepted = await Application.countDocuments({ opportunityId: opportunity._id, status: 'accepted', _id: { $ne: application._id } }).session(session);
         if (accepted >= scholarshipCapacity(opportunity.numberOfAwards)) throw new ScholarshipAwardError(409, 'This scholarship has reached its number of awards.');
-        const benefits = await Application.find({ studentId: application.studentId, status: 'accepted', appliedAt: { $gte: currentAcademicYearStart() }, _id: { $ne: application._id } })
-          .populate({ path: 'opportunityId', select: 'type', options: { session } }).session(session);
-        if (benefits.some((benefit) => (benefit.opportunityId as unknown as { type?: string })?.type === 'scholarship')) {
-          throw new ScholarshipAwardError(409, 'This student already holds an accepted scholarship for this academic year.');
-        }
       }
+      if (opportunity.type === 'scholarship') await prepareScholarshipDecision(application, opportunity, ownerId, next, options, session);
       application.status = next;
       await application.save({ session }).catch((error: unknown) => {
         if (error instanceof mongoose.Error.ValidationError) throw new ScholarshipAwardError(400, 'Application validation failed.');
@@ -73,6 +67,8 @@ export async function editOpportunityWithAwardGuard(id: Types.ObjectId, ownerId:
       { _id: id, providerId: ownerId }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false }
     );
     if (!opportunity) throw new ScholarshipAwardError(404, 'Opportunity not found or you do not own it.');
+    if (opportunity.scholarshipWithdrawnByAdmin) throw new ScholarshipAwardError(403, 'This withdrawn scholarship is retained for history and cannot be republished.');
+    const previous = opportunity.toObject();
     const previousType = opportunity.type;
     applyChanges(opportunity); // Existing payload/capability validation runs on the current document.
     if (previousType === 'scholarship' || opportunity.type === 'scholarship') {
@@ -80,6 +76,12 @@ export async function editOpportunityWithAwardGuard(id: Types.ObjectId, ownerId:
         throw new ScholarshipAwardError(409, 'Scholarship type cannot change after applications have been submitted.');
       }
       if (opportunity.type === 'scholarship') {
+        if (await Application.exists({ opportunityId: id, scholarshipVersion: 1 }).session(session)) {
+          for (const field of ['title', 'description', 'requiredSkills', 'location', 'workMode', 'amount', 'currency', 'coverageType', 'eligibilityCriteria', 'renewable'] as const) {
+            if (JSON.stringify(previous[field]) !== JSON.stringify(opportunity[field])) throw new ScholarshipAwardError(409, 'Published scholarship terms are frozen after versioned applications. Create a new listing for different terms.');
+          }
+          if (opportunity.applicationDeadline < previous.applicationDeadline) throw new ScholarshipAwardError(409, 'Do not shorten the deadline after versioned applications.');
+        }
         const accepted = await Application.countDocuments({ opportunityId: id, status: 'accepted' }).session(session);
         if (accepted > scholarshipCapacity(opportunity.numberOfAwards)) throw new ScholarshipAwardError(409, 'Award capacity cannot be lower than the accepted application count.');
       }
