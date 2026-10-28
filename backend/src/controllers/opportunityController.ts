@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import Opportunity, { IOpportunity, OpportunityType } from '../models/Opportunity';
 import Application from '../models/Application';
 import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
+import { removeScholarshipAwareListing } from '../services/scholarships';
 
 const opportunityTypes: OpportunityType[] = [
   'job',
@@ -277,13 +278,14 @@ export const updateOpportunity = async (req: Request, res: Response): Promise<vo
 /** DELETE /api/opportunities/:id */
 export const deleteOpportunity = async (req: Request, res: Response): Promise<void> => {
   try {
-    const opportunity = await Opportunity.findOneAndDelete({ _id: req.params.id, providerId: req.user!._id });
+    const { listing: opportunity } = await removeScholarshipAwareListing(req.params.id, req.user!._id, 'provider');
     if (!opportunity) {
       res.status(404).json({ success: false, message: 'Opportunity not found or you do not own it' });
       return;
     }
     res.status(200).json({ success: true, message: 'Opportunity deleted' });
   } catch (error) {
+    if (error instanceof ScholarshipAwardError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
     res.status(400).json({ success: false, message: 'Invalid opportunity ID' });
   }
 };

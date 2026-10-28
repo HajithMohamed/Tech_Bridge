@@ -28,6 +28,7 @@ export interface IOpportunity extends Document {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+  scholarshipWithdrawnByAdmin?: boolean;
   
   // Conditional fields
   duration?: string; // For internships, training
@@ -104,6 +105,7 @@ const opportunitySchema = new Schema<IOpportunity>(
       type: Boolean,
       required: function (this: IOpportunity) { return this.type === 'scholarship'; },
     },
+    scholarshipWithdrawnByAdmin: { type: Boolean },
     duration: { type: String, trim: true, maxlength: 120 },
     isPaid: { type: Boolean },
     preferredAcademicBackground: { type: String, trim: true, maxlength: 250 },
