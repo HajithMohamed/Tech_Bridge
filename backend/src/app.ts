@@ -15,15 +15,26 @@ import creatorRoutes from './routes/creatorRoutes';
 import promotionRequestRoutes from './routes/promotionRequestRoutes';
 import { providerVerificationRoutes } from './routes/providerVerificationRoutes';
 import { adminCommunityRoutes, communityRoutes } from './routes/communityRoutes';
+import { securityConfiguration } from './config/security';
+import scholarshipRoutes from './routes/scholarshipRoutes';
 
 
 /** Build the API without connecting to MongoDB or opening a listener. */
 export const createApp = () => {
   const app = express();
+  const configuration = securityConfiguration();
+  app.disable('x-powered-by');
+  // Never infer trusted proxy hops from user-controlled forwarding headers.
+  app.set('trust proxy', false);
+  app.use((_req, res, next) => {
+    res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
+    next();
+  });
+  app.use(['/api/auth', '/api/admin', '/api/provider', '/api/provider-verification', '/api/messages', '/api/community/claim', '/api/applications', '/api/resource-requests', '/api/promotion-requests', '/api/creators/profile'], (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   // Middleware
   app.use(
     cors({
-      origin: ['http://localhost:5173', 'http://localhost:3000'],
+      origin: configuration.allowedOrigins,
       credentials: true,
     })
   );
@@ -38,6 +49,7 @@ export const createApp = () => {
   app.use('/api/opportunities', opportunityRoutes);
   app.use('/api/resources', resourceRoutes);
   app.use('/api/applications', applicationRoutes);
+  app.use('/api/scholarships', scholarshipRoutes);
   app.use('/api/provider', providerRoutes);
   app.use('/api/providers', publicProviderRoutes);
   app.use('/api/resource-requests', resourceRequestRoutes);
@@ -67,9 +79,10 @@ export const createApp = () => {
 
 
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (res.headersSent) { _next(error); return; }
     const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
-    const code = status === 413 ? 413 : status === 400 ? 400 : 500;
-    res.status(code).json({ success: false, message: code === 413 ? 'Request body is too large.' : code === 400 ? 'Invalid request body.' : 'Unable to process the request.' });
+    const code = status === 413 ? 413 : status === 415 ? 415 : status === 400 ? 400 : 500;
+    res.set('Cache-Control', 'no-store').status(code).json({ success: false, message: code === 413 ? 'Request body is too large.' : code === 415 ? 'Unsupported request encoding.' : code === 400 ? 'Invalid request body.' : 'Unable to process the request.' });
   });
   return app;
 };

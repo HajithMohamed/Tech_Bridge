@@ -63,6 +63,8 @@ export interface CreatorPlatformProfile {
 
 export interface CreatorProfile {
   isDiscoverable: boolean;
+  displayName?: string;
+  availability?: 'available' | 'busy' | 'unavailable';
   platforms: CreatorPlatformProfile[];
   niches: string[];
   contentTypes: string[];

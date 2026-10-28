@@ -24,6 +24,11 @@ export interface ICreatorPlatformProfile {
 
 export interface ICreatorProfile {
   isDiscoverable: boolean;
+  displayName?: string;
+  availability?: 'available' | 'busy' | 'unavailable';
+  profileImageUrl?: string;
+  showInstitution?: boolean;
+  revision?: number;
   platforms: ICreatorPlatformProfile[];
   niches: string[];
   contentTypes: string[];
@@ -122,6 +127,11 @@ const userSchema = new Schema<IUser>(
       preferredWorkType: { type: String, enum: ['remote', 'on-site', 'hybrid', 'flexible'] },
       creatorProfile: {
         isDiscoverable: { type: Boolean, default: false },
+        displayName: { type: String, trim: true, minlength: 2, maxlength: 80 },
+        availability: { type: String, enum: ['available', 'busy', 'unavailable'] },
+        profileImageUrl: { type: String, trim: true, maxlength: 500 },
+        showInstitution: { type: Boolean, default: false },
+        revision: { type: Number, min: 0, default: 0 },
         platforms: [{
           platform: { type: String, enum: ['instagram', 'tiktok', 'youtube', 'facebook', 'other'] },
           handle: { type: String, trim: true, maxlength: 100 },

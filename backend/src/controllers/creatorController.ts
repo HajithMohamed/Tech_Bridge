@@ -1,175 +1,129 @@
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
-import PromotionRequest, { PromotionCompensationType, PromotionRequestStatus } from '../models/PromotionRequest';
-import User, { CreatorCompensationPreference, CreatorPlatform, ICreatorPlatformProfile } from '../models/User';
+import PromotionRequest from '../models/PromotionRequest';
+import User, { type CreatorPlatform, type ICreatorProfile, type IUser } from '../models/User';
+import { AdminActionError } from '../services/adminUsers';
+import { creatorAvailability, creatorCompensation, creatorId, creatorPage, creatorPlatforms, creatorProfileInput, creatorQueryText, creatorRevision, literalCreatorSearch, publicCreator } from '../services/creatorPolicy';
+import { changeCampaign, createCampaign, type CampaignMutation } from '../services/creatorCampaigns';
+import { campaignStage } from '../services/campaignLifecycle';
 
-const platforms: CreatorPlatform[] = ['instagram', 'tiktok', 'youtube', 'facebook', 'other'];
-const compensationTypes: PromotionCompensationType[] = ['paid', 'product_exchange', 'experience', 'affiliate'];
 const providerFields = 'fullName providerProfile.organizationName providerProfile.organizationType providerProfile.verified';
-const creatorFields = 'fullName studentProfile.creatorProfile';
-const requestStudentFields = 'fullName';
-
-const textList = (value: unknown, maxItems: number, maxLength: number): string[] | null => {
-  if (!Array.isArray(value) || value.length > maxItems) return null;
-  const cleaned = value.map((item) => typeof item === 'string' ? item.trim() : '').filter(Boolean);
-  return cleaned.every((item) => item.length <= maxLength) ? [...new Set(cleaned)] : null;
-};
-
-const validUrl = (value: string): boolean => {
-  try { const url = new URL(value); return url.protocol === 'https:' || url.protocol === 'http:'; }
-  catch { return false; }
-};
-
+const creatorFields = 'fullName studentProfile.institution studentProfile.creatorProfile';
+function failure(res: Response, error: unknown) {
+  res.status(error instanceof AdminActionError ? error.statusCode : 503).json({ success: false, message: error instanceof AdminActionError ? error.message : 'Creator services are temporarily unavailable. Please try again.' });
+}
 const verifyProvider = (req: Request, res: Response, next: NextFunction): void => {
-  if (!req.user?.providerProfile?.verified) {
-    res.status(403).json({ success: false, message: 'Only verified providers can access the creator marketplace.' });
-    return;
+  if (!req.user?.providerProfile?.verified || req.user.providerProfile.verificationStatus !== 'VERIFIED') {
+    res.status(403).json({ success: false, message: 'Only verified providers can access the creator marketplace.' }); return;
   }
   next();
 };
-
-/** PUT /api/creators/profile */
+async function mutateOwnedProfile(req: Request, profile?: ICreatorProfile, visibility?: boolean) {
+  const expectedRevision = creatorRevision(req.body?.revision);
+  return mongoose.connection.transaction(async (session) => {
+    // Lock the account so concurrent profile edits/revocation serialize and retry safely.
+    const owner = await User.findOneAndUpdate({ _id: req.user!._id, role: 'student', accountStatus: 'active' }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false });
+    if (!owner?.studentProfile) throw new AdminActionError(404, 'Student profile not found.');
+    const current = owner.toObject().studentProfile?.creatorProfile;
+    const revision = current?.revision ?? 0;
+    if (!Number.isSafeInteger(revision) || revision >= Number.MAX_SAFE_INTEGER || (expectedRevision !== undefined && expectedRevision !== revision)) throw new AdminActionError(409, 'Your creator profile changed. Reload it before trying again.');
+    // Enabling discovery revalidates stored legacy profiles. Withdrawal requires no other fields.
+    const replacement = profile ?? (visibility === true ? creatorProfileInput({ ...current, isDiscoverable: true }) : undefined);
+    const updates = replacement ? { 'studentProfile.creatorProfile': { ...replacement, revision: revision + 1 } } : { 'studentProfile.creatorProfile.isDiscoverable': false, 'studentProfile.creatorProfile.revision': revision + 1 };
+    const updated = await User.findByIdAndUpdate(owner._id, { $set: updates }, { new: true, session, runValidators: true });
+    if (!updated) throw new AdminActionError(404, 'Student profile not found.');
+    return updated;
+  });
+}
+const visibleCampaigns = { $or: [{ workflowVersion: { $ne: 2 } }, { publishedAt: { $exists: true, $ne: null } }] };
+function campaignView(row: InstanceType<typeof PromotionRequest>) {
+  const value = row.toObject(); const creator = value.studentId as unknown as IUser | null;
+  const profile = creator?.studentProfile?.creatorProfile;
+  const creatorView = creator ? (profile?.isDiscoverable ? publicCreator(creator) : { _id: creator._id, fullName: profile?.displayName || creator.fullName, studentProfile: { creatorProfile: { isDiscoverable: false, niches: [], platforms: [] } } }) : null;
+  return { ...value, stage: campaignStage(row), studentId: creatorView };
+}
+async function campaignResponse(id: mongoose.Types.ObjectId, user: IUser) {
+  const owner = user.role === 'student' ? { studentId: user._id, ...visibleCampaigns } : { providerId: user._id };
+  const row = await PromotionRequest.findOne({ _id: id, ...owner }).populate('studentId', creatorFields).populate('providerId', providerFields);
+  if (!row) throw new AdminActionError(404, 'Campaign request not found.');
+  return campaignView(row);
+}
 export const updateCreatorProfile = async (req: Request, res: Response): Promise<void> => {
   try {
-    const student = await User.findById(req.user!._id);
-    if (!student?.studentProfile) { res.status(404).json({ success: false, message: 'Student profile not found.' }); return; }
-    const body = req.body as Record<string, unknown>;
-    if (typeof body.isDiscoverable !== 'boolean') { res.status(400).json({ success: false, message: 'Choose whether your creator profile is discoverable.' }); return; }
-    const niches = textList(body.niches, 12, 80);
-    const contentTypes = textList(body.contentTypes, 12, 80);
-    const sampleWorkLinks = textList(body.sampleWorkLinks ?? [], 8, 500);
-    if (!niches || !contentTypes || !sampleWorkLinks || !sampleWorkLinks.every(validUrl)) { res.status(400).json({ success: false, message: 'Provide valid creator profile lists and sample-work links.' }); return; }
-    if (!Array.isArray(body.compensationPreference) || body.compensationPreference.length > compensationTypes.length || body.compensationPreference.some((item) => !compensationTypes.includes(item as PromotionCompensationType))) {
-      res.status(400).json({ success: false, message: 'Select valid compensation preferences.' }); return;
-    }
-    if (!Array.isArray(body.platforms) || body.platforms.length > 6) { res.status(400).json({ success: false, message: 'Add up to six valid creator platforms.' }); return; }
-    const creatorPlatforms: ICreatorPlatformProfile[] = [];
-    for (const item of body.platforms) {
-      const platform = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const name = platform.platform as CreatorPlatform;
-      const handle = typeof platform.handle === 'string' ? platform.handle.trim() : '';
-      const profileUrl = typeof platform.profileUrl === 'string' ? platform.profileUrl.trim() : '';
-      const followerCount = platform.followerCount;
-      if (!platforms.includes(name) || !handle || handle.length > 100 || !validUrl(profileUrl) || (followerCount !== undefined && (!Number.isInteger(followerCount) || (followerCount as number) < 0 || (followerCount as number) > 1_000_000_000))) {
-        res.status(400).json({ success: false, message: 'Each platform needs a valid type, handle, profile link, and optional follower count.' }); return;
-      }
-      creatorPlatforms.push({ platform: name, handle, profileUrl, ...(typeof followerCount === 'number' ? { followerCount } : {}) });
-    }
-    if (body.isDiscoverable && (!creatorPlatforms.length || !niches.length || !contentTypes.length || !(body.compensationPreference as unknown[]).length)) {
-      res.status(400).json({ success: false, message: 'Add a platform, niche, content type, and compensation preference before becoming discoverable.' }); return;
-    }
-    student.studentProfile.creatorProfile = {
-      isDiscoverable: body.isDiscoverable,
-      platforms: creatorPlatforms,
-      niches,
-      contentTypes,
-      compensationPreference: body.compensationPreference as CreatorCompensationPreference[],
-      ...(sampleWorkLinks.length ? { sampleWorkLinks } : {}),
-    };
-    student.markModified('studentProfile.creatorProfile');
-    await student.save();
-    res.json({ success: true, message: body.isDiscoverable ? 'Your creator profile is visible to verified providers.' : 'Your creator profile is hidden from providers.', data: { user: student } });
-  } catch (error) {
-    console.error('Update creator profile error:', error);
-    res.status(500).json({ success: false, message: 'Unable to save your creator profile.' });
-  }
+    const profile = creatorProfileInput(req.body);
+    const student = await mutateOwnedProfile(req, profile);
+    res.json({ success: true, message: profile.isDiscoverable ? 'Your creator profile is visible to verified providers.' : 'Your creator profile is hidden from providers.', data: { user: student } });
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/creators */
+export const updateCreatorVisibility = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (typeof req.body?.isDiscoverable !== 'boolean') throw new AdminActionError(400, 'Choose whether your creator profile is discoverable.');
+    const student = await mutateOwnedProfile(req, undefined, req.body.isDiscoverable);
+    res.json({ success: true, message: req.body.isDiscoverable ? 'Your creator profile is visible to verified providers.' : 'Your creator profile is hidden from providers.', data: { user: student } });
+  } catch (error) { failure(res, error); }
+};
 export const listCreators = async (req: Request, res: Response): Promise<void> => {
   try {
     const filter: Record<string, unknown> = { role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true };
-    const queryText = (value: unknown) => typeof value === 'string' ? value.trim().slice(0, 80) : '';
-    const regexFor = (value: string) => new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    const niche = queryText(req.query.niche);
-    const contentType = queryText(req.query.contentType);
-    const platform = queryText(req.query.platform);
-    const compensationPreference = queryText(req.query.compensationPreference);
-    if (niche) filter['studentProfile.creatorProfile.niches'] = regexFor(niche);
-    if (contentType) filter['studentProfile.creatorProfile.contentTypes'] = regexFor(contentType);
-    if (platform && platforms.includes(platform as CreatorPlatform)) filter['studentProfile.creatorProfile.platforms.platform'] = platform;
-    if (compensationPreference && compensationTypes.includes(compensationPreference as PromotionCompensationType)) filter['studentProfile.creatorProfile.compensationPreference'] = compensationPreference;
-    const creators = await User.find(filter).select(creatorFields).sort({ fullName: 1 }).limit(100);
-    res.json({ success: true, data: { creators } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load the creator directory.' }); }
+    const q = creatorQueryText(req.query.q); const niche = creatorQueryText(req.query.niche); const contentType = creatorQueryText(req.query.contentType);
+    const platform = creatorQueryText(req.query.platform); const compensation = creatorQueryText(req.query.compensationPreference);
+    const availability = creatorQueryText(req.query.availability);
+    if (platform && !creatorPlatforms.includes(platform as CreatorPlatform)) throw new AdminActionError(400, 'Choose a valid platform filter.');
+    if (compensation && !creatorCompensation.includes(compensation as typeof creatorCompensation[number])) throw new AdminActionError(400, 'Choose a valid compensation filter.');
+    if (availability && !creatorAvailability.includes(availability as typeof creatorAvailability[number])) throw new AdminActionError(400, 'Choose a valid availability filter.');
+    if (niche) filter['studentProfile.creatorProfile.niches'] = { $regex: literalCreatorSearch(niche), $options: 'i' };
+    if (contentType) filter['studentProfile.creatorProfile.contentTypes'] = { $regex: literalCreatorSearch(contentType), $options: 'i' };
+    if (platform) filter['studentProfile.creatorProfile.platforms.platform'] = platform;
+    if (compensation) filter['studentProfile.creatorProfile.compensationPreference'] = compensation;
+    const clauses: Record<string, unknown>[] = [];
+    if (q) {
+      const literal = { $regex: literalCreatorSearch(q), $options: 'i' };
+      clauses.push({ $or: [{ 'studentProfile.creatorProfile.displayName': literal }, { $and: [{ $or: [{ 'studentProfile.creatorProfile.displayName': { $exists: false } }, { 'studentProfile.creatorProfile.displayName': '' }] }, { fullName: literal }] }] });
+    }
+    if (availability === 'available') clauses.push({ $or: [{ 'studentProfile.creatorProfile.availability': 'available' }, { 'studentProfile.creatorProfile.availability': { $exists: false } }] });
+    else if (availability) filter['studentProfile.creatorProfile.availability'] = availability;
+    if (clauses.length) filter.$and = clauses;
+    const page = creatorPage(req.query.page); const limit = creatorPage(req.query.limit, 12, 24);
+    const [students, total] = await Promise.all([User.find(filter).select(creatorFields).sort({ 'studentProfile.creatorProfile.displayName': 1, fullName: 1, _id: 1 }).skip((page - 1) * limit).limit(limit), User.countDocuments(filter)]);
+    res.json({ success: true, data: { creators: students.map(publicCreator), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/creators/:studentId */
 export const getCreator = async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!mongoose.isValidObjectId(req.params.studentId)) { res.status(400).json({ success: false, message: 'Invalid student ID.' }); return; }
-    const creator = await User.findOne({ _id: req.params.studentId, role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true }).select(creatorFields);
-    if (!creator) { res.status(404).json({ success: false, message: 'Creator profile not found.' }); return; }
-    res.json({ success: true, data: { creator } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load this creator profile.' }); }
+    const creator = await User.findOne({ _id: creatorId(req.params.studentId), role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true }).select(creatorFields);
+    if (!creator) throw new AdminActionError(404, 'Creator profile not found.');
+    res.json({ success: true, data: { creator: publicCreator(creator) } });
+  } catch (error) { failure(res, error); }
 };
-
-/** POST /api/promotion-requests */
 export const createPromotionRequest = async (req: Request, res: Response): Promise<void> => {
   try {
-    const body = req.body as Record<string, unknown>;
-    const studentId = body.studentId;
-    const campaignBrief = typeof body.campaignBrief === 'string' ? body.campaignBrief.trim() : '';
-    const deliverables = typeof body.deliverables === 'string' ? body.deliverables.trim() : '';
-    const compensationType = body.compensationType as PromotionCompensationType;
-    const compensationDetails = typeof body.compensationDetails === 'string' ? body.compensationDetails.trim() : '';
-    const deadline = body.deadline ? new Date(String(body.deadline)) : undefined;
-    if (!mongoose.isValidObjectId(studentId) || !campaignBrief || campaignBrief.length > 1000 || !deliverables || deliverables.length > 2000 || !compensationTypes.includes(compensationType) || compensationDetails.length > 1000 || (deadline && Number.isNaN(deadline.getTime()))) {
-      res.status(400).json({ success: false, message: 'Provide a discoverable creator, campaign brief, deliverables, and compensation type.' }); return;
-    }
-    if (deadline && deadline.getTime() <= Date.now()) { res.status(400).json({ success: false, message: 'Campaign deadline must be in the future.' }); return; }
-    const creator = await User.exists({ _id: studentId, role: 'student', accountStatus: 'active', 'studentProfile.creatorProfile.isDiscoverable': true });
-    if (!creator) { res.status(404).json({ success: false, message: 'This creator profile is not available.' }); return; }
-    const request = await PromotionRequest.create({ studentId, providerId: req.user!._id, campaignBrief, deliverables, compensationType, ...(compensationDetails ? { compensationDetails } : {}), ...(deadline ? { deadline } : {}) });
-    const populatedRequest = await PromotionRequest.findById(request._id)
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
-    res.status(201).json({ success: true, message: 'Promotion request sent.', data: { request: populatedRequest || request } });
-  } catch (error) {
-    console.error('Create promotion request error:', error);
-    res.status(500).json({ success: false, message: 'Unable to send this promotion request.' });
-  }
+    const id = await createCampaign(req.user!._id, req.body);
+    res.status(201).json({ success: true, message: req.body.saveAsDraft ? 'Campaign draft saved.' : 'Promotion request sent.', data: { request: await campaignResponse(id, req.user!) } });
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/promotion-requests/mine */
-export const listMyPromotionRequests = async (req: Request, res: Response): Promise<void> => {
+const listCampaigns = (forProvider: boolean) => async (req: Request, res: Response): Promise<void> => {
   try {
-    const requests = await PromotionRequest.find({ studentId: req.user!._id }).sort({ createdAt: -1 })
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
-    res.json({ success: true, data: { requests } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load promotion requests.' }); }
+    const page = creatorPage(req.query.page); const limit = creatorPage(req.query.limit, 20, 50); const status = creatorQueryText(req.query.status);
+    if (status && !['pending', 'accepted', 'declined', 'completed', 'cancelled'].includes(status)) throw new AdminActionError(400, 'Choose a valid campaign status.');
+    const filter = { ...(forProvider ? { providerId: req.user!._id } : { studentId: req.user!._id, ...visibleCampaigns }), ...(status ? { status } : {}) };
+    const [requests, total] = await Promise.all([PromotionRequest.find(filter).select('-history -submissions').sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).populate('studentId', creatorFields).populate('providerId', providerFields), PromotionRequest.countDocuments(filter)]);
+    res.json({ success: true, data: { requests: requests.map(campaignView), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+  } catch (error) { failure(res, error); }
 };
-
-/** GET /api/promotion-requests/provider */
-export const listProviderPromotionRequests = async (req: Request, res: Response): Promise<void> => {
+export const listMyPromotionRequests = listCampaigns(false);
+export const listProviderPromotionRequests = listCampaigns(true);
+export const getPromotionRequest = async (req: Request, res: Response): Promise<void> => {
+  try { res.json({ success: true, data: { request: await campaignResponse(creatorId(req.params.id), req.user!) } }); }
+  catch (error) { failure(res, error); }
+};
+const campaignChange = (mutation: CampaignMutation) => async (req: Request, res: Response): Promise<void> => {
   try {
-    const requests = await PromotionRequest.find({ providerId: req.user!._id }).sort({ createdAt: -1 })
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
-    res.json({ success: true, data: { requests } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to load promotion requests.' }); }
+    const id = await changeCampaign(creatorId(req.params.id), req.user!._id, mutation, req.body);
+    res.json({ success: true, message: 'Campaign updated.', data: { request: await campaignResponse(id, req.user!) } });
+  } catch (error) { failure(res, error); }
 };
-
-/** PATCH /api/promotion-requests/:id/status */
-export const updatePromotionRequestStatus = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!mongoose.isValidObjectId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid promotion request ID.' }); return; }
-    const status = req.body.status as PromotionRequestStatus;
-    const request = await PromotionRequest.findById(req.params.id);
-    if (!request) { res.status(404).json({ success: false, message: 'Promotion request not found.' }); return; }
-    const isStudent = req.user!.role === 'student' && request.studentId.equals(req.user!._id);
-    const isProvider = req.user!.role === 'provider' && request.providerId.equals(req.user!._id) && req.user!.providerProfile?.verified;
-    if (!isStudent && !isProvider) { res.status(403).json({ success: false, message: 'You cannot update this promotion request.' }); return; }
-    if (isStudent && request.status === 'pending' && ['accepted', 'declined'].includes(status)) request.status = status;
-    else if (isProvider && request.status === 'accepted' && status === 'completed') request.status = 'completed';
-    else { res.status(400).json({ success: false, message: 'This status change is not allowed.' }); return; }
-    await request.save();
-    const populatedRequest = await PromotionRequest.findById(request._id)
-      .populate('studentId', requestStudentFields)
-      .populate('providerId', providerFields);
-    res.json({ success: true, message: 'Promotion request updated.', data: { request: populatedRequest || request } });
-  } catch { res.status(500).json({ success: false, message: 'Unable to update this promotion request.' }); }
-};
-
+export const updatePromotionRequestStatus = campaignChange('status');
+export const submitPromotionDeliverables = campaignChange('submission');
+export const reviewPromotionDeliverables = campaignChange('review');
+export const updatePromotionTerms = campaignChange('terms');
 export const verifiedCreatorProviderOnly = verifyProvider;

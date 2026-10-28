@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
 import User, { IUser } from '../models/User';
+import { bearerToken } from '../utils/bearer';
 
 // Extend Express Request to include user
 declare global {
@@ -19,16 +20,10 @@ const authenticate = (verificationOnly: boolean) => async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  // Include authorization failures and every protected endpoint, including dashboards.
+  res.set('Cache-Control', 'no-store');
   try {
-    let token: string | undefined;
-
-    // Extract token from Authorization header
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer')
-    ) {
-      token = req.headers.authorization.split(' ')[1];
-    }
+    const token = bearerToken(req.headers.authorization);
 
     if (!token) {
       res.status(401).json({
