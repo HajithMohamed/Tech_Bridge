@@ -124,10 +124,13 @@ describe('physical returns and inventory integrity', () => {
     const response = await action(id, 'return/confirm', ids.outsider, { revision: 2, reason }); expect(response.status).toBe(503); expect(JSON.stringify(response.body)).not.toContain('Private');
     await stock(0); expect(await ResourceRequest.findById(id).lean()).toMatchObject({ status: 'accepted', revision: 2 }); expect((await ResourceRequest.findById(id))?.inventoryRestoredAt).toBeUndefined();
   });
-  it('keeps a deliberately paused listing closed after a real return', async () => {
-    const id = await acceptedLoan(); expect((await request(app).patch(`${itemPath}/status`).set('Authorization', auth(ids.outsider)).send({ status: 'claimed' })).status).toBe(200);
-    await action(id, 'return', ids.student, { revision: 1, reason }); expect((await action(id, 'return/confirm', ids.outsider, { revision: 2, reason })).status).toBe(200); await stock(1, 'claimed');
-    expect((await request(app).patch(`${itemPath}/status`).set('Authorization', auth(ids.outsider)).send({ status: 'available' })).status).toBe(200); await stock(1);
+  it.each([true, false])('keeps a deliberately paused listing closed after a real return (stored marker: %s)', async pauseMarker => {
+    const id = await acceptedLoan();
+    if (pauseMarker) expect((await request(app).patch(`${itemPath}/status`).set('Authorization', auth(ids.outsider)).send({ status: 'claimed' })).status).toBe(200);
+    else await Resource.updateOne({ _id: ids.resource }, { $set: { quantityAvailable: 2, status: 'claimed' }, $unset: { availabilityPaused: '' } });
+    const restored = pauseMarker ? 1 : 3;
+    await action(id, 'return', ids.student, { revision: 1, reason }); expect((await action(id, 'return/confirm', ids.outsider, { revision: 2, reason })).status).toBe(200); await stock(restored, 'claimed');
+    expect((await request(app).patch(`${itemPath}/status`).set('Authorization', auth(ids.outsider)).send({ status: 'available' })).status).toBe(200); await stock(restored);
   });
   it('reports overdue from stored deadlines without changing inventory on reads', async () => {
     const id = await acceptedLoan(); await ResourceRequest.updateOne({ _id: id }, { 'allocation.startAt': new Date('2000-01-01'), 'allocation.dueAt': new Date('2000-01-08') });
@@ -153,8 +156,9 @@ describe('physical returns and inventory integrity', () => {
     await Resource.updateOne({ _id: ids.resource }, { quantityAvailable: 0, status: 'claimed' });
     expect((await action(String(row._id), 'return', ids.student, { revision: 0, reason })).status).toBe(200);
     expect((await action(String(row._id), 'return/confirm', ids.outsider, { revision: 1, reason })).status).toBe(409); await stock(0);
-    expect((await action(String(row._id), 'return/confirm', ids.outsider, { revision: 1, reason, confirmLegacyReservation: true })).status).toBe(200); await stock(1);
+    expect((await action(String(row._id), 'return/confirm', ids.outsider, { revision: 1, reason, confirmLegacyReservation: true })).status).toBe(200); await stock(1, 'claimed');
     expect((await ResourceEvent.findOne({ requestId: row._id, action: 'return_confirmed' }))?.legacyReservationConfirmed).toBe(true);
+    expect((await request(app).patch(`${itemPath}/status`).set('Authorization', auth(ids.outsider)).send({ status: 'available' })).status).toBe(200); await stock(1);
   });
   it('requires revision and reason to adjust free stock while allocations are active', async () => {
     const id = await createId(); await status(id, 'accepted');

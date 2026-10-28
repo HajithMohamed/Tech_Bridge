@@ -113,6 +113,9 @@ Owner `status: claimed` deliberately pauses a listing. Automatic depletion marks
 it claimed without pausing it. A physical return can reopen an automatically
 depleted listing; it never reopens an owner pause or administrative withdrawal.
 Restocking a paused listing keeps it paused until an explicit valid reopening.
+Legacy claimed listings with positive stock, or with unsnapshotted allocations,
+remain claimed after restoration because their original pause intent is unknown.
+The owner can explicitly reopen them once the returned free unit is confirmed.
 
 ## Waitlists and scoring limitations
 

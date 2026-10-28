@@ -98,7 +98,11 @@ export async function confirmResourceReturn(id: unknown, actorId: Types.ObjectId
     if (!row.allocation.returnRequired || !row.allocation.inventoryReserved || row.allocation.accessType !== resource.accessType || !resource.listedBy.equals(row.providerId) || resource.category !== row.resourceCategory) throw new ResourceReservationError(409, 'The original reserved resource ownership needs review before restoring inventory.');
     if (!Number.isSafeInteger(resource.quantityAvailable) || resource.quantityAvailable < 0 || resource.quantityAvailable >= 1_000_000) throw new ResourceReservationError(409, 'Inventory needs review before restoration.');
     const quantityBefore = resource.quantityAvailable;
-    const nextStatus = resource.withdrawnByAdmin || resource.availabilityPaused ? 'claimed' : 'available';
+    // Older claimed listings have no reliable pause marker. Restore the unit,
+    // but require an explicit reopening when legacy intent is ambiguous.
+    const retainClosed = resource.withdrawnByAdmin || resource.availabilityPaused ||
+      (resource.status === 'claimed' && (quantityBefore > 0 || legacyReservationConfirmed));
+    const nextStatus = retainClosed ? 'claimed' : 'available';
     await Resource.updateOne({ _id: resource._id }, { $inc: { quantityAvailable: 1, inventoryRevision: 1 }, $set: { status: nextStatus } }, { session });
     row.status = 'completed'; row.returnedAt = new Date(); row.inventoryRestoredAt = row.returnedAt; row.revision = (row.revision ?? 0) + 1; await row.save({ session });
     await resourceEvent(session, actorId, resource, row, 'return_confirmed', { reason, legacyReservationConfirmed, fromStatus: 'accepted', toStatus: 'completed', quantityBefore, quantityAfter: quantityBefore + 1 }); return row;

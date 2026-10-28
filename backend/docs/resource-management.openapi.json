@@ -2823,7 +2823,7 @@
     "/api/resource-requests/{id}/return/confirm": {
       "post": {
         "summary": "Owner confirms actual physical receipt",
-        "description": "Requires pending borrower return, current revision, original source ownership/category/access and proven reservation. Exactly one unit increments current free stock in same transaction as completion/audit. Paused/withdrawn listings remain hidden. Legacy proof requires explicit attestation.",
+        "description": "Requires pending borrower return, current revision, original source ownership/category/access and proven reservation. Exactly one unit increments current free stock in same transaction as completion/audit. Paused/withdrawn listings remain hidden. Legacy proof requires explicit attestation. Legacy claimed listings with unknown pause intent stay closed until the owner explicitly reopens them.",
         "operationId": "postapiresourcerequestsidreturnconfirm",
         "security": [
           {
