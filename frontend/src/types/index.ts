@@ -228,7 +228,7 @@ export interface ResourceListing {
   category: ResourceCategory;
   condition?: ResourceCondition;
   accessType: ResourceAccessType;
-  listedBy: string | ResourceListingOwner;
+  listedBy: string | ResourceListingOwner | null;
   providerOrgVerified: boolean;
   quantityAvailable: number;
   status: ResourceStatus;
@@ -267,12 +267,14 @@ export interface ApplicationOpportunity {
   workMode: WorkMode;
   applicationDeadline: string;
   status: OpportunityStatus;
+  providerId?: string | OpportunityProvider | null;
 }
 
 export interface OpportunityApplication {
   _id: string;
-  opportunityId: string | ApplicationOpportunity;
+  opportunityId: string | ApplicationOpportunity | null;
   studentId: string | ApplicationApplicant;
+  providerId?: string | OpportunityProvider | null;
   message?: string;
   justification: string;
   selfDeclaredNeed: 'low' | 'medium' | 'high';
@@ -376,9 +378,9 @@ export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'compl
 
 export interface ResourceRequest {
   _id: string;
-  studentId: string | User | ApplicationApplicant;
-  providerId: string | User;
-  resourceId: string | ResourceListing;
+  studentId: string | User | ApplicationApplicant | null;
+  providerId: string | User | null;
+  resourceId: string | ResourceListing | null;
   requestedAccessType: ResourceAccessType;
   resourceCategory?: ResourceCategory;
   durationOrTerms?: string;
