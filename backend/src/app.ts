@@ -18,6 +18,7 @@ import { adminCommunityRoutes, communityRoutes } from './routes/communityRoutes'
 import { securityConfiguration } from './config/security';
 import scholarshipRoutes from './routes/scholarshipRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import mentorshipRoutes from './routes/mentorshipRoutes';
 
 
 /** Build the API without connecting to MongoDB or opening a listener. */
@@ -46,6 +47,7 @@ export const createApp = () => {
   // Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/mentorship', mentorshipRoutes);
   app.use('/api/provider-verification', providerVerificationRoutes());
   app.use('/api/community', communityRoutes());
   app.use('/api/admin/community-claims', adminCommunityRoutes());

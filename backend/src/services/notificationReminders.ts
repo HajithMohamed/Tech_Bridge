@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Application from '../models/Application';
 import Opportunity from '../models/Opportunity';
 import ResourceRequest from '../models/ResourceRequest';
+import { Mentorship } from '../models/Mentorship';
 import { NotificationProducer } from '../models/Notification';
 import { enqueueNotification } from './notifications';
 import { notificationTemplate, NotificationError } from './notificationPolicy';
@@ -37,5 +38,18 @@ export async function enqueueNotificationReminders(limit = 100, now = new Date()
     await NotificationProducer.updateOne({ _id: cursor._id }, requests.length ? { $set: { afterId: requests[requests.length - 1]._id } } : { $unset: { afterId: '' } }, { session });
     return { scanned: requests.length, considered };
   }, notificationTransactions);
-  return { scholarships, resources };
+  const mentorships = await mongoose.connection.transaction(async session => {
+    const cursor = await NotificationProducer.findOneAndUpdate({ key: 'mentorship-reminders' }, { $inc: { revision: 1 } }, { upsert: true, new: true, session });
+    let rows = await Mentorship.find({ status: 'scheduled', ...(cursor.afterId ? { _id: { $gt: cursor.afterId } } : {}) }).select('mentorId studentId appointment').sort({ _id: 1 }).limit(limit).session(session);
+    if (!rows.length && cursor.afterId) rows = await Mentorship.find({ status: 'scheduled' }).select('mentorId studentId appointment').sort({ _id: 1 }).limit(limit).session(session);
+    let considered = 0;
+    for (const row of rows) {
+      const startAt = row.appointment?.startAt; if (!startAt || startAt <= now || startAt > end) continue; considered++;
+      const safe = notificationTemplate('mentorship', 'student', 'due');
+      for (const ownerId of [row.studentId, row.mentorId]) await enqueueNotification({ ownerId: String(ownerId), kind: 'mentorship', action: 'due', ...safe, sourceType: 'mentorship', sourceId: row._id, scheduledFor: startAt, dedupeKey: `mentorship-reminder:${row._id}:${startAt.toISOString()}` }, session);
+    }
+    await NotificationProducer.updateOne({ _id: cursor._id }, rows.length ? { $set: { afterId: rows[rows.length - 1]._id } } : { $unset: { afterId: '' } }, { session });
+    return { scanned: rows.length, considered };
+  }, notificationTransactions);
+  return { scholarships, resources, mentorships };
 }

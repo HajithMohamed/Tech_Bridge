@@ -22,5 +22,5 @@ const preferenceSchema = new Schema({
 }, { timestamps: true });
 export const NotificationPreferences = mongoose.model('NotificationPreferences', preferenceSchema);
 
-const producerSchema = new Schema({ key: { type: String, enum: ['scholarship-reminders', 'resource-reminders'], required: true, unique: true }, afterId: Schema.Types.ObjectId, revision: { type: Number, default: 0 } }, { timestamps: true });
+const producerSchema = new Schema({ key: { type: String, enum: ['scholarship-reminders', 'resource-reminders', 'mentorship-reminders'], required: true, unique: true }, afterId: Schema.Types.ObjectId, revision: { type: Number, default: 0 } }, { timestamps: true });
 export const NotificationProducer = mongoose.model('NotificationProducer', producerSchema);
