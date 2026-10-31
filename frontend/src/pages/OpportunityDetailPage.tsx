@@ -93,7 +93,7 @@ const OpportunityDetailPage = () => {
         .then((applications) => setHasApplied(applications.some((application) => {
           const appliedOpportunityId = typeof application.opportunityId === 'string'
             ? application.opportunityId
-            : application.opportunityId._id;
+            : application.opportunityId?._id;
           return appliedOpportunityId === id;
         })))
         .catch(() => undefined);

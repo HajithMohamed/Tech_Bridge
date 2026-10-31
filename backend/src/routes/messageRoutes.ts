@@ -1,13 +1,21 @@
 import { Router } from 'express';
-import { listConversationMessages, listConversations, listMentors, markConversationRead, sendMessage, startConversation } from '../controllers/messageController';
+import { messagingSummary, blockMember, getMessagingSettings, updateMessagingSettings, typing, messageStream, listConversationMessages, listConversations, listMentors, markConversationRead, sendMessage, startConversation } from '../controllers/messageController';
 import { protect } from '../middleware/auth';
 
 const router = Router();
 router.use(protect);
+router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+router.get('/events', messageStream);
+router.get('/settings', getMessagingSettings);
+router.get('/summary', messagingSummary);
+router.put('/settings', updateMessagingSettings);
+router.put('/blocks/:id', blockMember(true));
+router.delete('/blocks/:id', blockMember(false));
 router.get('/directory', listMentors);
 router.post('/conversations', startConversation);
 router.get('/conversations', listConversations);
 router.get('/conversations/:id/messages', listConversationMessages);
 router.post('/conversations/:id/messages', sendMessage);
 router.patch('/conversations/:id/read', markConversationRead);
+router.post('/conversations/:id/typing', typing);
 export default router;

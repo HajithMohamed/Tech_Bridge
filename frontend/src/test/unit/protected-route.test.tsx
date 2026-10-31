@@ -10,7 +10,7 @@ type AuthValue = NonNullable<ContextType<typeof AuthContext>>;
 function renderRoute(overrides: Partial<AuthValue> = {}) {
   const value: AuthValue = {
     user: studentFixture(), token: 'synthetic-token', isAuthenticated: true, isLoading: false, error: null, fieldErrors: null,
-    login: vi.fn(async () => {}), register: vi.fn(async () => {}), logout: vi.fn(), updateStoredUser: vi.fn(), clearError: vi.fn(), ...overrides,
+    login: vi.fn(async () => studentFixture()), register: vi.fn(async () => {}), logout: vi.fn(), updateStoredUser: vi.fn(), clearError: vi.fn(), ...overrides,
   };
   return render(<AuthContext.Provider value={value}><MemoryRouter initialEntries={['/admin']}><Routes>
     <Route path="/" element={<p>Public landing</p>} />

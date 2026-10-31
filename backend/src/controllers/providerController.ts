@@ -5,22 +5,21 @@ import Resource from '../models/Resource';
 import ResourceRequest from '../models/ResourceRequest';
 import User from '../models/User';
 import { isProviderOfferingAllowed, providerOfferings } from '../utils/providerCapabilities';
+import { publicProviderProfileSelect, toPublicProviderDetails } from '../utils/publicProvider';
+import { saveVerifiedProviderProfile } from '../services/providerVerification';
+import { AdminActionError } from '../services/adminUsers';
+import mongoose from 'mongoose';
+import { effectiveOpportunityStatus } from '../services/opportunityPolicy';
 
 const providerServices = ['jobs', 'internships', 'scholarships', 'training', 'mentorship', 'technical_resources'];
 
-const expireOpportunities = async (): Promise<void> => {
-  await Opportunity.updateMany(
-    { status: 'open', applicationDeadline: { $lt: new Date() } },
-    { $set: { status: 'expired' } }
-  );
-};
 
 /** GET /api/provider/dashboard */
 export const getProviderDashboard = async (req: Request, res: Response): Promise<void> => {
   try {
-    await expireOpportunities();
     const providerId = req.user!._id;
     const opportunities = await Opportunity.find({ providerId }).select('_id title type status applicationDeadline createdAt views');
+    opportunities.forEach(row => { row.status = effectiveOpportunityStatus(row); });
     const ids = opportunities.map((opportunity) => opportunity._id);
     const [applicationsReceived, acceptedApplications, connectedStudentIds, resourceCount, resourceRequestsReceived, pendingResourceRequests, acceptedResourceRequests, resourceRequestsAccepted, resourceStudentIds, recentApplications, recentResourceRequests] = await Promise.all([
       Application.countDocuments({ providerId }),
@@ -114,6 +113,7 @@ export const updateProviderProfile = async (req: Request, res: Response): Promis
     if (!provider?.providerProfile) { res.status(404).json({ success: false, message: 'Provider profile not found.' }); return; }
     const fields = ['organizationName', 'contactPerson', 'contactEmail', 'phone', 'location', 'website', 'logoUrl', 'description'] as const;
     for (const field of fields) {
+      if (req.body[field] !== undefined && typeof req.body[field] !== 'string') { res.status(400).json({ success: false, message: 'Provider text fields must be strings.' }); return; }
       if (req.body[field] !== undefined) provider.providerProfile[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
     }
     if (!provider.providerProfile.organizationName || !provider.providerProfile.contactPerson || !provider.providerProfile.contactEmail || !provider.providerProfile.phone || !provider.providerProfile.location) {
@@ -143,10 +143,14 @@ export const updateProviderProfile = async (req: Request, res: Response): Promis
       }
       provider.providerProfile.resourceAccessMethods = req.body.resourceAccessMethods;
     }
-    await provider.save();
-    res.status(200).json({ success: true, message: 'Provider profile updated', data: { user: provider } });
+    const changes: Record<string, unknown> = {};
+    for (const field of [...fields, 'opportunityCategories', 'resourceAccessMethods'] as const) if (req.body[field] !== undefined) changes[field] = provider.providerProfile[field];
+    const updated = await saveVerifiedProviderProfile(provider._id, Number(provider.get('__v') || 0), changes);
+    res.status(200).json({ success: true, message: updated?.providerProfile?.verified ? 'Provider profile updated' : 'Profile updated. Submit updated evidence for verification.', data: { user: updated } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Unable to update provider profile.' });
+    if (error instanceof AdminActionError) { res.status(error.statusCode).json({ success: false, message: error.message }); return; }
+    if (error instanceof mongoose.Error.ValidationError) { res.status(400).json({ success: false, message: 'Check your provider profile fields.' }); return; }
+    res.status(503).json({ success: false, message: 'Unable to update provider profile.' });
   }
 };
 
@@ -154,14 +158,14 @@ export const updateProviderProfile = async (req: Request, res: Response): Promis
 export const getPublicProviderProfile = async (req: Request, res: Response): Promise<void> => {
   try {
     const provider = await User.findOne({ _id: req.params.id, role: 'provider' })
-      .select('fullName providerProfile createdAt');
+      .select(publicProviderProfileSelect);
     if (!provider?.providerProfile) {
       res.status(404).json({ success: false, message: 'Provider profile not found.' });
       return;
     }
-
+    const publishedOwner = await User.exists({ _id: provider._id, role: 'provider', accountStatus: { $ne: 'suspended' }, 'providerProfile.verified': true, 'providerProfile.verificationStatus': 'VERIFIED', $or: [{ requiresEmailVerification: { $ne: true } }, { emailVerifiedAt: { $type: 'date' } }] });
     const [opportunities, resources] = await Promise.all([
-      Opportunity.find({ providerId: provider._id, status: 'open' })
+      Opportunity.find({ providerId: provider._id, ...(!publishedOwner ? { _id: { $exists: false } } : {}), status: 'open', applicationDeadline: { $gt: new Date() }, scholarshipWithdrawnByAdmin: { $ne: true }, opportunityWithdrawnByAdmin: { $ne: true } })
         .select('title type description location workMode applicationDeadline status requiredSkills createdAt')
         .sort({ createdAt: -1 }),
       Resource.find({ listedBy: provider._id, status: 'available' })
@@ -175,11 +179,11 @@ export const getPublicProviderProfile = async (req: Request, res: Response): Pro
         provider: {
           _id: provider._id,
           fullName: provider.fullName,
-          providerProfile: provider.providerProfile,
+          providerProfile: toPublicProviderDetails(provider.providerProfile),
           createdAt: provider.createdAt,
         },
         opportunities,
-        resources,
+        resources: resources.map((resource) => ({ ...resource.toObject(), providerOrgVerified: provider.providerProfile?.verified === true })),
       },
     });
   } catch {

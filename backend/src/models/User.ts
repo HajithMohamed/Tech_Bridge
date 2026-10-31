@@ -24,6 +24,11 @@ export interface ICreatorPlatformProfile {
 
 export interface ICreatorProfile {
   isDiscoverable: boolean;
+  displayName?: string;
+  availability?: 'available' | 'busy' | 'unavailable';
+  profileImageUrl?: string;
+  showInstitution?: boolean;
+  revision?: number;
   platforms: ICreatorPlatformProfile[];
   niches: string[];
   contentTypes: string[];
@@ -37,6 +42,11 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'student' | 'provider' | 'admin';
+  adminBaseRole?: 'student' | 'provider';
+  tokenVersion?: number;
+  lastTypingAt?: Date;
+  emailVerifiedAt?: Date;
+  requiresEmailVerification?: boolean;
   accountStatus: 'active' | 'suspended';
   studentProfile?: {
     institution: string;
@@ -53,7 +63,8 @@ export interface IUser extends Document {
     organizationName: string;
     organizationType: OrganizationType;
     verified: boolean;
-    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NEEDS_INFO';
+    verificationDocumentId?: mongoose.Types.ObjectId;
     rejectionReason?: string;
     contactEmail: string;
     contactPerson: string;
@@ -99,6 +110,11 @@ const userSchema = new Schema<IUser>(
       enum: ['student', 'provider', 'admin'],
       default: 'student',
     },
+    adminBaseRole: { type: String, enum: ['student', 'provider'] },
+    tokenVersion: { type: Number, default: 0, min: 0, select: false },
+    lastTypingAt: { type: Date, select: false },
+    emailVerifiedAt: { type: Date },
+    requiresEmailVerification: { type: Boolean },
     accountStatus: { type: String, enum: ['active', 'suspended'], default: 'active', index: true },
     studentProfile: {
       institution: { type: String, trim: true },
@@ -111,6 +127,11 @@ const userSchema = new Schema<IUser>(
       preferredWorkType: { type: String, enum: ['remote', 'on-site', 'hybrid', 'flexible'] },
       creatorProfile: {
         isDiscoverable: { type: Boolean, default: false },
+        displayName: { type: String, trim: true, minlength: 2, maxlength: 80 },
+        availability: { type: String, enum: ['available', 'busy', 'unavailable'] },
+        profileImageUrl: { type: String, trim: true, maxlength: 500 },
+        showInstitution: { type: Boolean, default: false },
+        revision: { type: Number, min: 0, default: 0 },
         platforms: [{
           platform: { type: String, enum: ['instagram', 'tiktok', 'youtube', 'facebook', 'other'] },
           handle: { type: String, trim: true, maxlength: 100 },
@@ -130,7 +151,8 @@ const userSchema = new Schema<IUser>(
         enum: ['company', 'training_org', 'scholarship_org', 'resource_provider', 'local_business', 'alumni', 'faculty', 'ngo', 'individual'],
       },
       verified: { type: Boolean, default: false },
-      verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING' },
+      verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED', 'NEEDS_INFO'], default: 'PENDING' },
+      verificationDocumentId: { type: Schema.Types.ObjectId, ref: 'VerificationDocument' },
       rejectionReason: { type: String, trim: true, maxlength: 1000 },
       contactEmail: {
         type: String,

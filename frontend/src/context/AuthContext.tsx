@@ -2,6 +2,7 @@ import { createContext, useState, useEffect, useCallback, type ReactNode } from 
 import type { User, LoginData, RegisterData } from '../types';
 import { loginUser, registerUser, getMe } from '../api/authApi';
 import axios from 'axios';
+import { authErrorMessage } from '../utils/authForms';
 
 interface AuthContextType {
   user: User | null;
@@ -10,7 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   fieldErrors: Array<{ field: string; message: string }> | null;
-  login: (data: LoginData) => Promise<void>;
+  login: (data: LoginData) => Promise<User>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   updateStoredUser: (user: User) => void;
@@ -82,10 +83,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       setUser(userData);
       setToken(newToken);
+      return userData;
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data) {
         const errorData = err.response.data;
-        setError(errorData.message || 'Login failed');
+        setError(authErrorMessage(err, 'Login failed'));
         if (errorData.errors) {
           setFieldErrors(errorData.errors);
         }
@@ -104,22 +106,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setFieldErrors(null);
 
     try {
-      const response = await registerUser(data);
-      const { user: userData, token: newToken } = response.data;
-
-      if (!newToken) {
-        return;
-      }
-
-      localStorage.setItem('techbridge_token', newToken);
-      localStorage.setItem('techbridge_user', JSON.stringify(userData));
-
-      setUser(userData);
-      setToken(newToken);
+      // Registration starts email verification and never establishes a session.
+      await registerUser(data);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data) {
         const errorData = err.response.data;
-        setError(errorData.message || 'Registration failed');
+        setError(authErrorMessage(err, 'Registration failed'));
         if (errorData.errors) {
           setFieldErrors(errorData.errors);
         }

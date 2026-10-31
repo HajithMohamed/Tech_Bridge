@@ -10,7 +10,8 @@ import Conversation from '../../src/models/Conversation';
 import Message from '../../src/models/Message';
 import PromotionRequest from '../../src/models/PromotionRequest';
 import ResourceRequest from '../../src/models/ResourceRequest';
-import { generateToken } from '../../src/utils/jwt';
+import { generateToken, generateVerificationToken } from '../../src/utils/jwt';
+import { verificationUpload } from '../support/verification-document';
 import { TestDatabase } from '../support/database';
 import { adminFixture, alumniFixture, applicationFixture, campaignFixture, conversationFixture, ids, lecturerFixture, messageFixture, providerFixture, resourceFixture, resourceRequestFixture, scholarshipFixture, studentFixture, testPassword } from '../support/fixtures';
 
@@ -68,7 +69,11 @@ describe('real API + isolated MongoDB', () => {
     await User.create(adminFixture());
     const provider = providerFixture();
     await User.create({ ...provider, providerProfile: { ...provider.providerProfile, verified: false, verificationStatus: 'PENDING' } });
-    const response = await request(app).patch(`/api/admin/providers/${ids.provider}/verify`).set('Authorization', bearer(ids.admin.toString(), 'admin'));
+    const upload = await request(app).post('/api/provider-verification/documents').auth(generateVerificationToken(ids.provider.toString()), { type: 'bearer' }).send(verificationUpload());
+    expect(upload.status).toBe(201);
+    const documentId = upload.body.data.documentId;
+    expect((await request(app).get(`/api/admin/providers/${ids.provider}/documents/${documentId}`).set('Authorization', bearer(ids.admin.toString(), 'admin'))).status).toBe(200);
+    const response = await request(app).patch(`/api/admin/providers/${ids.provider}/verify`).set('Authorization', bearer(ids.admin.toString(), 'admin')).send({ documentId, reason: 'Synthetic evidence reviewed' });
     expect(response.status).toBe(200);
     expect((await User.findById(ids.provider))?.providerProfile?.verified).toBe(true);
     expect(await AuditLog.countDocuments({ action: 'provider_verified', targetId: ids.provider })).toBe(1);

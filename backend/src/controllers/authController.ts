@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import User from '../models/User';
 import { generateToken } from '../utils/jwt';
 import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
+import { AuthChallengeError, consumeAuthChallenge, deliverAuthChallenge } from '../services/authChallenges';
+
+const registrationMessage = 'If this email can be registered, check your inbox for a verification link. Existing accounts can sign in or request a new verification email.';
+const recoveryMessage = 'If an eligible account matches this email, we will send a link. Check your inbox and spam folder.';
 
 /**
  * @route   POST /api/auth/register
@@ -9,19 +13,9 @@ import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
  * @access  Public
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
+  const verificationRequired = req.app.locals.registrationMode === 'email_verification';
   try {
     const { fullName, email, password, role, studentProfile, providerProfile } = req.body;
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-
-    if (existingUser) {
-      res.status(400).json({
-        success: false,
-        message: 'A user with this email already exists',
-      });
-      return;
-    }
 
     // Only allow student and provider roles through registration
     const allowedRoles = ['student', 'provider'];
@@ -36,6 +30,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      if (!verificationRequired) {
+        res.status(400).json({ success: false, message: 'A user with this email already exists' });
+        return;
+      }
+      if (existingUser.requiresEmailVerification === true && !existingUser.emailVerifiedAt) await deliverAuthChallenge(existingUser, 'verify_email');
+      res.status(202).json({ success: true, message: registrationMessage });
+      return;
+    }
+
     // Creator discovery is always an explicit, post-registration opt-in.
     const safeStudentProfile = userRole === 'student' && studentProfile && typeof studentProfile === 'object'
       ? Object.fromEntries(Object.entries(studentProfile as Record<string, unknown>).filter(([key]) => key !== 'creatorProfile'))
@@ -47,6 +52,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email,
       password,
       role: userRole,
+      requiresEmailVerification: verificationRequired,
       ...(userRole === 'student'
         ? { studentProfile: safeStudentProfile }
         : {
@@ -54,35 +60,34 @@ export const register = async (req: Request, res: Response): Promise<void> => {
               ...providerProfile,
               verified: false,
               verificationStatus: 'PENDING',
+              verificationDocumentId: undefined,
+              verificationDocumentName: undefined,
+              rejectionReason: undefined,
             },
           }),
     });
 
-    // Providers must be reviewed before they can access the provider portal.
-    const isPendingProvider = user.role === 'provider' && !user.providerProfile?.verified;
-    const token = isPendingProvider ? undefined : generateToken(user._id.toString(), user.role);
-
-    res.status(201).json({
-      success: true,
-      message: isPendingProvider
-        ? 'Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.'
-        : 'Registration successful',
-      data: {
-        user: {
-          _id: user._id,
-          fullName: user.fullName,
-          email: user.email,
-          role: user.role,
-          accountStatus: user.accountStatus,
-          studentProfile: user.studentProfile,
-          providerProfile: user.providerProfile,
-          createdAt: user.createdAt,
-        },
-        ...(token ? { token } : {}),
-      },
-    });
+    if (verificationRequired) {
+      await deliverAuthChallenge(user, 'verify_email');
+      res.status(202).json({ success: true, message: registrationMessage });
+      return;
+    }
+    // Preserve the established student session and pending-provider envelope.
+    // Legacy mode never claims that an email has been independently verified.
+    const pendingProvider = user.role === 'provider' && !user.providerProfile?.verified;
+    const token = pendingProvider ? undefined : generateToken(String(user._id), user.role, user.tokenVersion || 0);
+    res.status(201).json({ success: true, message: pendingProvider
+      ? 'Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.'
+      : 'Registration successful', data: { user: {
+        _id: user._id, fullName: user.fullName, email: user.email, role: user.role,
+        accountStatus: user.accountStatus, studentProfile: user.studentProfile,
+        providerProfile: user.providerProfile, createdAt: user.createdAt,
+      }, ...(token ? { token } : {}) } });
   } catch (error) {
-    console.error('Registration error:', error);
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
+      res.status(verificationRequired ? 202 : 400).json(verificationRequired ? { success: true, message: registrationMessage } : { success: false, message: 'A user with this email already exists' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: 'Server error during registration',
@@ -101,7 +106,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Find user and explicitly include password field
     const user = await User.findOne({ email: email.toLowerCase() }).select(
-      '+password'
+      '+password +tokenVersion'
     );
 
     if (!user) {
@@ -128,6 +133,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (user.requiresEmailVerification === true && !user.emailVerifiedAt) {
+      res.status(403).json({ success: false, code: 'EMAIL_VERIFICATION_REQUIRED', message: 'Verify your email before signing in. You can request a new verification link.' });
+      return;
+    }
+
     if (user.role === 'provider' && user.providerProfile?.verificationStatus === 'REJECTED') {
       res.status(403).json({ success: false, message: user.providerProfile.rejectionReason || 'This provider account was not approved. Contact TechBridge support for details.' });
       return;
@@ -145,7 +155,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Generate token
-    const token = generateToken(user._id.toString(), user.role);
+    const token = generateToken(user._id.toString(), user.role, user.tokenVersion || 0);
 
     res.status(200).json({
       success: true,
@@ -165,11 +175,42 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error during login',
     });
+  }
+};
+
+/** Public requests deliberately reveal no account identity or challenge token. */
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = await User.findOne({ email: req.body.email.toLowerCase() });
+    if (user) await deliverAuthChallenge(user, 'password_reset');
+    res.status(202).json({ success: true, message: recoveryMessage });
+  } catch { res.status(503).json({ success: false, message: 'Account access is temporarily unavailable. Please try again.' }); }
+};
+export const resendVerification = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = await User.findOne({ email: req.body.email.toLowerCase(), requiresEmailVerification: true, emailVerifiedAt: { $exists: false } });
+    if (user) await deliverAuthChallenge(user, 'verify_email');
+    res.status(202).json({ success: true, message: recoveryMessage });
+  } catch { res.status(503).json({ success: false, message: 'Account access is temporarily unavailable. Please try again.' }); }
+};
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    await consumeAuthChallenge(req.body.token, 'password_reset', req.body.password);
+    res.status(200).json({ success: true, message: 'Password changed. Sign in with your new password. Previous sessions have been signed out.' });
+  } catch (error) {
+    res.status(error instanceof AuthChallengeError ? 400 : 503).json({ success: false, message: error instanceof AuthChallengeError ? error.message : 'Account access is temporarily unavailable. Please try again.' });
+  }
+};
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    await consumeAuthChallenge(req.body.token, 'verify_email');
+    res.status(200).json({ success: true, message: 'Email verified. You can now sign in. Provider organizations also require separate approval.' });
+  } catch (error) {
+    res.status(error instanceof AuthChallengeError ? 400 : 503).json({ success: false, message: error instanceof AuthChallengeError ? error.message : 'Account access is temporarily unavailable. Please try again.' });
   }
 };
 
@@ -242,7 +283,7 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
     if (profile.availabilityHours !== undefined && (!Number.isInteger(profile.availabilityHours) || (profile.availabilityHours as number) < 0 || (profile.availabilityHours as number) > 168)) { res.status(400).json({ success: false, message: 'Availability must be between 0 and 168 hours.' }); return; }
     if (profile.preferredWorkType !== undefined && !['remote', 'on-site', 'hybrid', 'flexible'].includes(profile.preferredWorkType as string)) { res.status(400).json({ success: false, message: 'Select a valid work preference.' }); return; }
 
-    student.studentProfile = {
+    const academicProfile = {
       institution,
       degree: profile.degree as 'ICT' | 'ET' | 'BST' | 'other',
       studyYear: profile.studyYear as number,
@@ -251,10 +292,18 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
       ...(careerGoal ? { careerGoal } : {}),
       ...(typeof profile.availabilityHours === 'number' ? { availabilityHours: profile.availabilityHours } : {}),
       ...(profile.preferredWorkType ? { preferredWorkType: profile.preferredWorkType as 'remote' | 'on-site' | 'hybrid' | 'flexible' } : {}),
-      ...(student.studentProfile.creatorProfile ? { creatorProfile: student.studentProfile.creatorProfile } : {}),
     };
-    await student.save();
-    res.status(200).json({ success: true, message: 'Student profile updated.', data: { user: student } });
+    // Update only academic fields: replacing the parent can erase or restore stale
+    // creator consent and also attempts to re-cast a live Mongoose nested object.
+    const fields = Object.fromEntries(Object.entries(academicProfile).map(([key, value]) => [`studentProfile.${key}`, value]));
+    const absent = ['location', 'careerGoal', 'availabilityHours', 'preferredWorkType'].filter((key) => !(key in academicProfile));
+    const updated = await User.findOneAndUpdate(
+      { _id: student._id, role: 'student', accountStatus: 'active' },
+      { $set: fields, ...(absent.length ? { $unset: Object.fromEntries(absent.map((key) => [`studentProfile.${key}`, ''])) } : {}), $inc: { __v: 1 } },
+      { new: true, runValidators: true }
+    );
+    if (!updated) { res.status(403).json({ success: false, message: 'An active student account is required.' }); return; }
+    res.status(200).json({ success: true, message: 'Student profile updated.', data: { user: updated } });
   } catch (error) {
     console.error('Update student profile error:', error);
     res.status(500).json({ success: false, message: 'Unable to update student profile.' });

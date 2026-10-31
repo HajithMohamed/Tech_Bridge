@@ -1,0 +1,3428 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TechBridge scholarship priority and human allocation",
+    "version": "2.0.0-phase-4",
+    "description": "Extends the existing application/award service. No score, waitlist or appeal automatically awards. Private financial evidence is scoped to the applicant and owning verified provider. See scholarship-priority.md for legacy compatibility, fairness limits, retention and coordinated rollout. Existing common success messages remain; no live credential or deployment target is included."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Local development"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/scholarships/{id}/policy": {
+      "get": {
+        "operationId": "readScholarshipPolicy",
+        "summary": "Read published/default programme policy",
+        "x-authorized-roles": [
+          "student",
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Authenticated student: open, unexpired scholarship only. Provider: own scholarship. Exposes exact rules, current policy revision, frozen/strict flags and student eligibility preview; no private applicant data.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read published/default programme policy",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyViewEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "put": {
+        "operationId": "configureScholarshipPolicy",
+        "summary": "Configure policy before the first application",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Owning currently verified provider only. Full normalized settings, expected revision and human reason. Initial revision 0; explicit configuration activates strict decisions. Frozen after first application. Policy history includes the full settings snapshot.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configure policy before the first application",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/scholarships/{id}/policy/history": {
+      "get": {
+        "operationId": "readScholarshipPolicyHistory",
+        "summary": "Read own programme configuration history",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Current verified programme owner only. Policy events sorted createdAt/ID descending. No private application evidence or appeals are included.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read own programme configuration history",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/scholarships/{id}/waitlist": {
+      "get": {
+        "operationId": "readScholarshipWaitlist",
+        "summary": "Read the persisted ranked waitlist",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Owning verified provider only. Actual status=waitlisted records, score/date/ID order, bounded page metadata. Read counts are not reservations; missing snapshots are labeled, never auto-awarded.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read the persisted ranked waitlist",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitlistEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/scholarships/{id}/waitlist/advance": {
+      "post": {
+        "operationId": "advanceScholarshipWaitlist",
+        "summary": "Record an explicit human waitlist award",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Requires a selected currently waitlisted application, current decision revision and reason. Non-first queue choices need a priority override reason. Uses the original student/opportunity locks and checks actual capacity, evidence, current eligibility and mutually compatible benefit policies. Never auto-selects or auto-fills a place.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record an explicit human waitlist award",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship": {
+      "get": {
+        "operationId": "readScholarshipAssessment",
+        "summary": "Read own scholarship assessment and decision metadata",
+        "x-authorized-roles": [
+          "student",
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Only the applicant or verified provider owning both application and listing. No admin override. Policy/score snapshots, current eligibility, evidence count/requirement, moderation and appeal flags; null assessment for legacy records not yet materialized. Reading does not mutate decisions.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read own scholarship assessment and decision metadata",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship/history": {
+      "get": {
+        "operationId": "readScholarshipApplicationHistory",
+        "summary": "Read scoped scholarship history",
+        "x-authorized-roles": [
+          "student",
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Applicant or owning verified provider only; links precise document/appeal IDs without exposing bytes or copied appeal statements. Stable reverse-date/ID pagination.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read scoped scholarship history",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship/evidence": {
+      "get": {
+        "operationId": "listScholarshipEvidence",
+        "summary": "List private evidence metadata",
+        "x-authorized-roles": [
+          "student",
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "ScholarshipEvidence"
+        ],
+        "description": "Applicant or owning verified provider; at most three metadata records. Data and fingerprints are excluded.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List private evidence metadata",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "uploadScholarshipEvidence",
+        "summary": "Attach confidential supporting evidence",
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipEvidence",
+          "ScholarshipEvent"
+        ],
+        "description": "Own scholarship only. Up to three unique fingerprinted PDF/PNG/JPEG files of 2 MiB each. Existing conservative validator is reused; bytes, metadata and audit linkage commit atomically. No external links/fetching or public file route.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Attach confidential supporting evidence",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship/evidence/{documentId}": {
+      "get": {
+        "operationId": "downloadOwnScholarshipEvidence",
+        "summary": "Download the applicant's own attachment",
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "ScholarshipEvidence"
+        ],
+        "description": "Applicant-owner only. No-store octet-stream attachment with nosniff and a generic safe filename. A provider cannot use this GET route to bypass access auditing.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Download the applicant's own attachment",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship/evidence/{documentId}/access": {
+      "post": {
+        "operationId": "reviewScholarshipEvidence",
+        "summary": "Audit and download one exact evidence document",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipEvidence",
+          "ScholarshipEvent"
+        ],
+        "description": "Current verified owner of both application and source listing only. Human access reason required. Exact document-ID audit commits before bytes are returned; audit failure denies download. No automatic admin access.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audit and download one exact evidence document",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship/appeals": {
+      "get": {
+        "operationId": "listScholarshipAppeals",
+        "summary": "List private appeals and outcomes",
+        "x-authorized-roles": [
+          "student",
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "ScholarshipAppeal"
+        ],
+        "description": "Applicant or owning verified provider only, reverse-date/ID order; at most three service-created appeals. Statements are confidential.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List private appeals and outcomes",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppealList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "submitScholarshipAppeal",
+        "summary": "Appeal a rejected or waitlisted decision",
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipAppeal",
+          "ScholarshipEvent"
+        ],
+        "description": "Applicant-owner only, matching current decision revision. One appeal per revision, three/application maximum. Does not change decision or award state. Pending appeal blocks other changed provider status decisions.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppealInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Appeal a rejected or waitlisted decision",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppealEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship/appeals/{appealId}/review": {
+      "post": {
+        "operationId": "reviewScholarshipAppeal",
+        "summary": "Uphold a decision or reopen human review",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipAppeal",
+          "ScholarshipEvent"
+        ],
+        "description": "Owning verified provider; current pending appeal/revision only. Reopened moves the application to reviewed, increments its revision and clears queue membership. Neither outcome awards automatically. Concurrent/repeated reviews conflict.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "appealId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppealReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Uphold a decision or reopen human review",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppealEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/scholarship/recalculate": {
+      "post": {
+        "operationId": "recalculateScholarshipPriority",
+        "summary": "Recalculate and audit an advisory score",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Owning verified provider; reason required. Reuses the frozen settings/original cohort timing window and current profile/accepted benefits. Logs the new score; status and capacity do not change.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recalculate and audit an advisory score",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecalculationEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications": {
+      "post": {
+        "operationId": "submitApplicationWithScholarshipAssessment",
+        "summary": "Submit an application with the existing 201 envelope",
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Existing opportunity eligibility/justification/need validation remains. Scholarship submissions serialize with policy freeze and create advisory snapshots. Configured programmes assign strict mode server-side; student-supplied actor/version/award metadata is ignored. Default unconfigured clients retain legacy decision compatibility. Duplicate application remains 409.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Submit an application with the existing 201 envelope",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/{id}/status": {
+      "patch": {
+        "operationId": "changeApplicationDecision",
+        "summary": "Record a human application decision",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Both recorded owners must match. Scholarship capacity/duplicate locks are preserved. Strict changed decisions require reason and valid transition; default legacy calls can omit reasons with explicit provenance. Optional revision detects stale changes; exact repeats are idempotent. Overrides do not bypass allocation or moderation restrictions. Non-scholarship waitlisting is rejected.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record a human application decision",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/mine": {
+      "get": {
+        "operationId": "readOwnApplications",
+        "summary": "Read own applications with additive scholarship metadata",
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Existing envelope and own-only filter preserved; source listing may be null for old orphan records. No evidence bytes or appeal statements are embedded.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Read own applications with additive scholarship metadata",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/provider": {
+      "get": {
+        "operationId": "readProviderApplications",
+        "summary": "Read owned applicant priority results",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Requires both recorded application owner and current listing owner; mismatched/orphaned listings are excluded. Persisted scholarship snapshots override legacy live scoring. Fixes string/ObjectId benefit aggregation and stable score/date/ID ties. No evidence bytes are embedded.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Read owned applicant priority results",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/applications/opportunity/{id}": {
+      "get": {
+        "operationId": "readOpportunityApplications",
+        "summary": "Read applicants for an owned opportunity",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Application",
+          "Opportunity",
+          "User",
+          "ScholarshipPolicy",
+          "ScholarshipReview",
+          "ScholarshipEvent"
+        ],
+        "description": "Both application and listing provider IDs must match. Priority order uses earliest application then ID on equal scores. Strict snapshots reflect actual waitlisted status; old live capacity flags do not create queue membership.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read applicants for an owned opportunity",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/opportunities/{id}": {
+      "put": {
+        "operationId": "editOpportunityWithScholarshipRetention",
+        "summary": "Edit an opportunity with scholarship guards",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Opportunity",
+          "Application",
+          "User"
+        ],
+        "description": "Existing validation/capability/ownership remains. Capacity cannot fall below accepted allocations; scholarship type cannot change after applications. Strict-programme published terms and earlier deadlines are frozen. Moderation-withdrawn scholarships cannot be republished.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpportunityEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Edit an opportunity with scholarship guards",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteOpportunityWithScholarshipRetention",
+        "summary": "Delete only when scholarship source history will not be orphaned",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "Opportunity",
+          "Application",
+          "User"
+        ],
+        "description": "Scholarships with applications return 409; close instead. No-application and non-scholarship deletion retain the existing success envelope. Serializes with new scholarship applications. No normal app/production deletion is performed by tests.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete only when scholarship source history will not be orphaned",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/admin/opportunities/{id}": {
+      "delete": {
+        "operationId": "removeOpportunityWithRetainedScholarshipHistory",
+        "summary": "Withdraw public content while retaining scholarship history",
+        "x-authorized-roles": [
+          "admin"
+        ],
+        "x-database-models": [
+          "Opportunity",
+          "Application",
+          "User",
+          "AuditLog"
+        ],
+        "description": "Existing moderation action: scholarships with applications are closed and permanently flagged, not physically deleted. Provider cannot reopen or grant new awards from them. Unapplied/non-scholarship listings retain removal behavior. Existing AuditLog action identifies retained closure; no private scholarship evidence access is granted.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionalModerationReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Withdraw public content while retaining scholarship history",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/admin/reports/{id}": {
+      "patch": {
+        "operationId": "resolveReportWithScholarshipRetention",
+        "summary": "Resolve a report with safe scholarship removal",
+        "x-authorized-roles": [
+          "admin"
+        ],
+        "x-database-models": [
+          "Opportunity",
+          "Application",
+          "User",
+          "Report",
+          "AuditLog"
+        ],
+        "description": "Existing report workflow; removeTarget on a scholarship with applications withdraws public content but preserves linked records. New scoped audit action records retained closure. Private-message handling and resource workflow remain unchanged.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModerationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolve a report with safe scholarship removal",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Full expiring HS256 session; persisted roles, suspension, provider verification and token-version revocation remain authoritative."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Weights": {
+        "type": "object",
+        "required": [
+          "need",
+          "fit",
+          "benefits",
+          "timing"
+        ],
+        "properties": {
+          "need": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "fit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "benefits": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "timing": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "description": "Whole percentages totaling exactly 100. Defaults 40/30/20/10. Components may be zero; these are not universally fair weights."
+      },
+      "Eligibility": {
+        "type": "object",
+        "required": [
+          "degrees",
+          "institutions",
+          "requiredSkills",
+          "minStudyYear",
+          "maxStudyYear",
+          "requireEvidence"
+        ],
+        "properties": {
+          "degrees": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "maxLength": 10
+            },
+            "description": "Case-insensitive ICT/ET/BST/other; empty permits any programme."
+          },
+          "institutions": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 150
+            },
+            "description": "Exact case-insensitive normalized labels, not independent affiliation verification."
+          },
+          "requiredSkills": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "minStudyYear": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "maxStudyYear": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "requireEvidence": {
+            "type": "boolean",
+            "description": "Evidence is required before award; an application can be submitted before attaching it."
+          }
+        },
+        "description": "minStudyYear <= maxStudyYear. Lists are normalized/deduplicated plain text. Free-text listing criteria remain human instructions."
+      },
+      "PolicySettings": {
+        "type": "object",
+        "required": [
+          "weights",
+          "eligibility",
+          "duplicateBenefitPolicy"
+        ],
+        "properties": {
+          "weights": {
+            "$ref": "#/components/schemas/Weights"
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/Eligibility"
+          },
+          "duplicateBenefitPolicy": {
+            "type": "string",
+            "enum": [
+              "application_year",
+              "lifetime",
+              "allow_multiple"
+            ],
+            "description": "Legacy server-local application-date calendar year, all currently accepted scholarship allocations, or mutual allow-multiple. Prior stricter commitments still apply."
+          }
+        }
+      },
+      "PolicyInput": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PolicySettings"
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason",
+              "revision"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 10,
+                "maxLength": 1000,
+                "description": "Trimmed plain text; markup/control characters are rejected."
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            }
+          }
+        ],
+        "description": "Provider-owner only, full settings replacement before the first application. Initial revision is 0. Unknown ownership/authority fields do not change the authenticated owner."
+      },
+      "PolicyRecord": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "opportunityId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "providerId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PolicySettings"
+          },
+          "timingStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timingEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Priority": {
+        "type": "object",
+        "properties": {
+          "priorityScore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "components": {
+            "type": "object",
+            "properties": {
+              "need": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "fit": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "benefits": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "timing": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          },
+          "weights": {
+            "$ref": "#/components/schemas/Weights"
+          },
+          "priorityReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Advisory snapshot only. Self-declared need is not verified income. Human decisions and allocation checks remain mandatory."
+      },
+      "EligibilityResult": {
+        "type": "object",
+        "required": [
+          "eligible",
+          "reasons"
+        ],
+        "properties": {
+          "eligible": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "studentId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "providerId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "opportunityId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "reviewed",
+              "waitlisted",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 800
+          },
+          "selfDeclaredNeed": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "scholarshipVersion": {
+            "type": "integer",
+            "enum": [
+              1
+            ],
+            "readOnly": true,
+            "description": "Server owned; activated by explicit provider policy. Applicant version fields are ignored."
+          },
+          "scholarshipRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "readOnly": true
+          },
+          "waitlistedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "awardedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "priorityScore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "priorityReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isWaitlisted": {
+            "type": "boolean",
+            "description": "On persisted reviews this reflects status=waitlisted. Legacy live results may still expose the old derived capacity flag."
+          }
+        },
+        "description": "Existing participant-owned application envelope, with additive read-only scholarship metadata. Populated student/listing fields retain the existing contract."
+      },
+      "Assessment": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/PolicySettings"
+          },
+          "policyRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decisionReason": {
+            "type": "string"
+          },
+          "priorityOverrideReason": {
+            "type": "string"
+          }
+        },
+        "description": "Null for a legacy record not yet materialized by an authorized mutation. Reads do not create decisions."
+      },
+      "AssessmentView": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "reviewed",
+              "waitlisted",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "strictDecisions": {
+            "type": "boolean"
+          },
+          "waitlistedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "awardedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "withdrawnByAdmin": {
+            "type": "boolean"
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/Assessment"
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/EligibilityResult"
+          },
+          "evidenceRequired": {
+            "type": "boolean"
+          },
+          "evidenceCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "appealPending": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DecisionInput": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "reviewed",
+              "waitlisted",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "priorityOverrideReason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          }
+        },
+        "description": "Strict programme changed decisions require reason; older unconfigured clients retain status-only calls with explicit missing-reason provenance. Supplied stale revisions conflict; identical decisions are idempotent. Scores never grant an award."
+      },
+      "SubmissionInput": {
+        "type": "object",
+        "required": [
+          "opportunityId",
+          "justification",
+          "selfDeclaredNeed"
+        ],
+        "properties": {
+          "opportunityId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 800
+          },
+          "selfDeclaredNeed": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "description": "Existing POST contract. The server chooses strict mode from provider policy; student/provider IDs, workflow markers and timestamps cannot be mass-assigned. A configured rule mismatch rejects before records are created."
+      },
+      "EvidenceUpload": {
+        "type": "object",
+        "required": [
+          "fileName",
+          "content"
+        ],
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Safe filename without paths or '..'; PDF/PNG/JPG/JPEG extension must match validated content."
+          },
+          "content": {
+            "type": "string",
+            "format": "byte",
+            "maxLength": 2796204,
+            "description": "Canonical base64, at most 2 MiB decoded. Conservative existing format validator; no active/encrypted PDF features, SVG, archive, external URL fetching or antivirus guarantee."
+          }
+        }
+      },
+      "EvidenceMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "application/pdf",
+              "image/png",
+              "image/jpeg"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2097152
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AppealInput": {
+        "type": "object",
+        "required": [
+          "statement",
+          "revision"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 2000
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "description": "Only own rejected/waitlisted decision. One appeal per revision, at most three/application. Pending appeals block changed decisions."
+      },
+      "AppealReview": {
+        "type": "object",
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "upheld",
+              "reopened"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          }
+        },
+        "description": "Provider-owner review. Reopened returns application to reviewed without awarding; upheld preserves decision/revision. Stale/repeated reviews conflict."
+      },
+      "Appeal": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "applicationId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "studentId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "providerId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "decisionRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "statement": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "upheld",
+              "reopened"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewerId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "applicationId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "opportunityId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "actorId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "documentId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "appealId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "policy_updated",
+              "submitted",
+              "decision",
+              "evidence_submitted",
+              "evidence_accessed",
+              "appeal_submitted",
+              "appeal_upheld",
+              "appeal_reopened",
+              "priority_recalculated"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "fromStatus": {
+            "type": "string"
+          },
+          "toStatus": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "priorityScore": {
+            "type": "integer"
+          },
+          "priorityOverrideReason": {
+            "type": "string"
+          },
+          "policySnapshot": {
+            "$ref": "#/components/schemas/PolicySettings"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Scoped immutable domain history; no evidence bytes, fingerprints or copied appeal statements."
+      },
+      "ReasonInput": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          }
+        }
+      },
+      "AdvanceInput": {
+        "type": "object",
+        "required": [
+          "applicationId",
+          "revision",
+          "reason"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          },
+          "priorityOverrideReason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Trimmed plain text; markup/control characters are rejected."
+          }
+        },
+        "description": "Explicit human award request for a still-waitlisted application. Non-first ranked choice through this endpoint needs priorityOverrideReason. No capacity/eligibility/benefit override."
+      },
+      "PolicyView": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/PolicySettings"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "timingStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timingEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "frozen": {
+            "type": "boolean"
+          },
+          "strictDecisions": {
+            "type": "boolean"
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/EligibilityResult"
+          }
+        }
+      },
+      "Opportunity": {
+        "type": "object",
+        "description": "Existing listing response. scholarshipWithdrawnByAdmin is server owned; closed retained records cannot be republished or award more places."
+      },
+      "OpportunityEdit": {
+        "type": "object",
+        "properties": {
+          "numberOfAwards": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "closed"
+            ]
+          }
+        },
+        "description": "Existing validated partial opportunity update. After strict applications, published title/description/skills/location/work mode/amount/currency/coverage/criteria/renewability are frozen. Capacity cannot fall below accepted count. Deadline extension keeps original scoring anchors; shortening is rejected. Withdrawn listings cannot be edited."
+      },
+      "ModerationInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "reviewed",
+              "dismissed"
+            ]
+          },
+          "resolutionNote": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "removeTarget": {
+            "type": "boolean"
+          }
+        },
+        "description": "Existing report contract. Removing a scholarship with applications closes/flags it and preserves source records; no private evidence permission is added.",
+        "required": [
+          "status"
+        ]
+      },
+      "PolicyEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "policy"
+            ],
+            "properties": {
+              "policy": {
+                "$ref": "#/components/schemas/PolicyRecord"
+              }
+            }
+          }
+        }
+      },
+      "PolicyViewEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "settings",
+              "revision",
+              "frozen",
+              "strictDecisions"
+            ],
+            "properties": {
+              "settings": {
+                "$ref": "#/components/schemas/PolicySettings"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "timingStart": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "timingEnd": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "frozen": {
+                "type": "boolean"
+              },
+              "strictDecisions": {
+                "type": "boolean"
+              },
+              "eligibility": {
+                "$ref": "#/components/schemas/EligibilityResult"
+              }
+            }
+          }
+        }
+      },
+      "ApplicationEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "application"
+            ],
+            "properties": {
+              "application": {
+                "$ref": "#/components/schemas/Application"
+              }
+            }
+          }
+        }
+      },
+      "ApplicationsEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "applications"
+            ],
+            "properties": {
+              "applications": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AssessmentEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssessmentView"
+          }
+        }
+      },
+      "EvidenceEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "document"
+            ],
+            "properties": {
+              "document": {
+                "$ref": "#/components/schemas/EvidenceMetadata"
+              }
+            }
+          }
+        }
+      },
+      "EvidenceList": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "documents"
+            ],
+            "properties": {
+              "documents": {
+                "type": "array",
+                "maxItems": 3,
+                "items": {
+                  "$ref": "#/components/schemas/EvidenceMetadata"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AppealEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "appeal"
+            ],
+            "properties": {
+              "appeal": {
+                "$ref": "#/components/schemas/Appeal"
+              }
+            }
+          }
+        }
+      },
+      "AppealList": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "appeals"
+            ],
+            "properties": {
+              "appeals": {
+                "type": "array",
+                "maxItems": 3,
+                "items": {
+                  "$ref": "#/components/schemas/Appeal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "EventList": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "events",
+              "page",
+              "limit",
+              "total",
+              "pages"
+            ],
+            "properties": {
+              "events": {
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      },
+      "WaitlistEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "applications",
+              "page",
+              "limit",
+              "total",
+              "pages",
+              "capacity",
+              "accepted",
+              "remaining",
+              "allocationBlocked"
+            ],
+            "properties": {
+              "applications": {
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "capacity": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "remaining": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "allocationBlocked": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "RecalculationEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "assessment"
+            ],
+            "properties": {
+              "assessment": {
+                "type": "object",
+                "description": "Authorized own-application review snapshot, with updated advisory priority/calculation time; does not change status."
+              }
+            }
+          }
+        }
+      },
+      "ActionSuccess": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "OpportunityEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "opportunity"
+            ],
+            "properties": {
+              "opportunity": {
+                "$ref": "#/components/schemas/Opportunity"
+              }
+            }
+          }
+        }
+      },
+      "OptionalModerationReason": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "description": "Existing optional moderation reason; this does not grant private scholarship review access."
+      }
+    },
+    "responses": {
+      "Invalid": {
+        "description": "Invalid ID, body, unsupported rule, revision, file format or missing human reason.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, invalid, revoked, expired or restricted bearer session.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Wrong persisted role, suspended actor, unverified provider or permanently withdrawn listing action.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Missing": {
+        "description": "Unknown/inaccessible application, scholarship, appeal or evidence; ownership of both records is checked.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Frozen policy/terms, stale decision/appeal, duplicate submission, queue mismatch, eligibility/evidence/capacity/benefit restriction or per-application limit.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooLarge": {
+        "description": "Decoded evidence exceeds 2 MiB or shared request body limit is exceeded.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "UnsupportedEncoding": {
+        "description": "Shared parser does not support the request encoding.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "Generic service failure; no raw database, submitted content or stack trace. On an uncertain write response, reload own data before retrying.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

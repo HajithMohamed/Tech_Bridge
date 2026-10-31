@@ -1,12 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
 import User, { IUser } from '../models/User';
+import { bearerToken } from '../utils/bearer';
 
 // Extend Express Request to include user
 declare global {
   namespace Express {
     interface Request {
       user?: IUser;
+      notificationVerificationOnly?: boolean;
     }
   }
 }
@@ -14,21 +16,15 @@ declare global {
 /**
  * Protect routes — verifies JWT Bearer token and attaches user to request
  */
-export const protect = async (
+const authenticate = (verificationOnly: boolean, notificationAccess = false) => async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  // Include authorization failures and every protected endpoint, including dashboards.
+  res.set('Cache-Control', 'no-store');
   try {
-    let token: string | undefined;
-
-    // Extract token from Authorization header
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer')
-    ) {
-      token = req.headers.authorization.split(' ')[1];
-    }
+    const token = bearerToken(req.headers.authorization);
 
     if (!token) {
       res.status(401).json({
@@ -40,9 +36,13 @@ export const protect = async (
 
     // Verify token
     const decoded = verifyToken(token);
+    if (decoded.scope !== undefined && ((!verificationOnly && !notificationAccess) || decoded.scope !== 'verification')) {
+      res.status(401).json({ success: false, message: 'This session is restricted to provider verification.' });
+      return;
+    }
 
     // Find user and attach to request
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).select('+tokenVersion');
 
     if (!user) {
       res.status(401).json({
@@ -52,6 +52,12 @@ export const protect = async (
       return;
     }
 
+    if ((decoded.version ?? 0) !== (user.tokenVersion ?? 0)) {
+      res.status(401).json({ success: false, message: 'Your session changed. Please sign in again.' });
+      return;
+    }
+    user.set('tokenVersion', undefined);
+
     if (user.accountStatus === 'suspended') {
       res.status(403).json({
         success: false,
@@ -60,7 +66,20 @@ export const protect = async (
       return;
     }
 
+    if ((verificationOnly || (notificationAccess && decoded.scope === 'verification')) && user.role !== 'provider') {
+      res.status(403).json({ success: false, message: 'A provider account is required.' });
+      return;
+    }
+    if (notificationAccess && user.requiresEmailVerification === true && !user.emailVerifiedAt) {
+      res.status(403).json({ success: false, message: 'Verify your email before accessing notifications.' }); return;
+    }
+    if (!verificationOnly && !notificationAccess && user.role === 'provider' && (user.providerProfile?.verified !== true || user.providerProfile.verificationStatus !== 'VERIFIED')) {
+      res.status(403).json({ success: false, message: 'Complete provider verification before accessing the platform.' });
+      return;
+    }
+
     req.user = user;
+    req.notificationVerificationOnly = notificationAccess && decoded.scope === 'verification';
     next();
   } catch (error) {
     res.status(401).json({
@@ -69,6 +88,10 @@ export const protect = async (
     });
   }
 };
+
+export const protect = authenticate(false);
+export const protectVerification = authenticate(true);
+export const protectNotifications = authenticate(false, true);
 
 /**
  * Authorize by role — checks if the user's role is in the allowed list
