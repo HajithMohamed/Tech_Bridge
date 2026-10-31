@@ -17,6 +17,7 @@ import { notificationKind, notificationRetry, notificationTemplate, type Notific
 import { mentorshipReminderAvailable } from './mentorship';
 import { SavedOpportunity } from '../models/OpportunityActivity';
 import { providerCurrentlyVerified } from './opportunityPolicy';
+import { campusEventNoticeAvailable } from './campusEventNotifications';
 
 async function savedReminderAvailable(sourceId: Types.ObjectId | undefined, ownerId: Types.ObjectId, scheduledFor: Date | undefined, now: Date, session: ClientSession) {
   if (!sourceId || !scheduledFor || scheduledFor <= now || scheduledFor.getTime() > now.getTime() + 86_400_000) return false;
@@ -70,6 +71,7 @@ export async function deliverClaimedNotification(id: Types.ObjectId, token: stri
     const categories = preferences?.toObject().categories as Record<string, boolean> | undefined;
     if (outcome === 'delivered' && (preferences?.inApp === false || categories?.[kind] === false)) outcome = 'preferences';
     if (outcome === 'delivered' && kind === 'message' && !await messageAvailable(job.sourceId ?? undefined, job.ownerId, session)) outcome = 'message_unavailable';
+    if (outcome === 'delivered' && kind === 'event' && !await campusEventNoticeAvailable(job, now, session)) outcome = 'stale_source';
     if (outcome === 'delivered' && job.sourceType === 'opportunity' && !await savedReminderAvailable(job.sourceId ?? undefined, job.ownerId, job.scheduledFor ?? undefined, now, session)) outcome = 'stale_source';
     if (outcome === 'delivered' && kind === 'mentorship' && action === 'due' && !await mentorshipReminderAvailable(job.sourceId ?? undefined, job.ownerId, job.scheduledFor ?? undefined, now, session)) outcome = 'stale_source';
     if (outcome === 'delivered' && kind === 'scholarship' && action === 'deadline') {
