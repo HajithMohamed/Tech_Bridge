@@ -75,6 +75,7 @@ const promotionRequestSchema = new Schema<IPromotionRequest>(
 promotionRequestSchema.index({ providerId: 1, studentId: 1, status: 1 });
 promotionRequestSchema.index({ providerId: 1, createdAt: -1, _id: -1 });
 promotionRequestSchema.index({ studentId: 1, createdAt: -1, _id: -1 });
+promotionRequestSchema.index({ createdAt: 1 });
 promotionRequestSchema.path('history').validate((rows: unknown[]) => rows.length <= 100, 'Campaign history is limited to 100 entries.');
 promotionRequestSchema.path('submissions').validate((rows: unknown[]) => rows.length <= 10, 'Campaigns support up to ten submissions.');
 

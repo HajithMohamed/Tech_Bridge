@@ -49,6 +49,7 @@ sessionSchema.index({ studentId: 1, status: 1, 'appointment.startAt': 1, 'appoin
 sessionSchema.index({ studentId: 1, createdAt: -1, _id: -1 });
 sessionSchema.index({ mentorId: 1, createdAt: -1, _id: -1 });
 sessionSchema.index({ status: 1, _id: 1 });
+sessionSchema.index({ createdAt: 1 });
 export const Mentorship = mongoose.model<MentorshipRecord>('Mentorship', sessionSchema);
 
 export interface MentorshipEventRecord {

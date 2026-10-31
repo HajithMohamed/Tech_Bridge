@@ -24,4 +24,5 @@ const disputeSchema = new Schema({
 }, { timestamps: true });
 disputeSchema.index({ requestId: 1 }, { unique: true, partialFilterExpression: { status: 'open' } });
 disputeSchema.index({ requestId: 1, createdAt: -1 });
+disputeSchema.index({ status: 1, createdAt: 1 });
 export const ResourceDispute = mongoose.model('ResourceDispute', disputeSchema);

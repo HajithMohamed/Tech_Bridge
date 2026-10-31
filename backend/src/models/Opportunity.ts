@@ -134,6 +134,7 @@ const opportunitySchema = new Schema<IOpportunity>(
 opportunitySchema.index({ status: 1, type: 1, applicationDeadline: 1 });
 opportunitySchema.index({ status: 1, createdAt: -1, _id: -1 });
 opportunitySchema.index({ providerId: 1, createdAt: -1, _id: -1 });
+opportunitySchema.index({ createdAt: 1 });
 
 const Opportunity = mongoose.model<IOpportunity>('Opportunity', opportunitySchema);
 
