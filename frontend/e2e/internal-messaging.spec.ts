@@ -15,8 +15,14 @@ test('permitted participants exchange live messages, review one complaint and wi
     await login(page, 'student@example.test', '/dashboard'); const token = await page.evaluate(() => localStorage.getItem('techbridge_token'));
     const conversation = await page.request.post('/api/messages/conversations', { headers: { Authorization: `Bearer ${token}` }, data: { recipientId: '000000000000000000000002' } }); expect(conversation.status()).toBe(201);
     await page.goto('/messages'); await page.getByRole('button', { name: /Synthetic Provider/ }).click();
-    await login(provider, 'provider@example.test', '/provider'); await provider.goto('/messages'); await provider.getByRole('button', { name: /Synthetic Student/ }).click();
+    await login(provider, 'provider@example.test', '/provider');
+    const streamReady = provider.waitForResponse(response => new URL(response.url()).pathname === '/api/messages/events');
+    await provider.goto('/messages'); expect((await streamReady).status()).toBe(200);
+    const historyReady = provider.waitForResponse(response => /^\/api\/messages\/conversations\/[a-f\d]{24}\/messages$/.test(new URL(response.url()).pathname) && response.request().method() === 'GET');
+    await provider.getByRole('button', { name: /Synthetic Student/ }).click(); expect((await historyReady).status()).toBe(200);
+    const typingSent = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/typing') && response.request().method() === 'POST');
     await page.getByLabel('Message', { exact: true }).fill('Synthetic live question, kept private from reviewers.');
+    expect((await typingSent).status()).toBe(200);
     await expect(provider.getByText('Your connection is typing…')).toBeVisible();
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(provider.getByRole('region', { name: 'Conversation', exact: true }).getByText('Synthetic live question, kept private from reviewers.', { exact: true })).toBeVisible();
