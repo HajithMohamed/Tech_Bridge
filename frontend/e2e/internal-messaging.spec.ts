@@ -32,8 +32,14 @@ test('permitted participants exchange live messages, review one complaint and wi
     await provider.getByLabel('Message', { exact: true }).fill('This reply should be blocked.'); await provider.getByRole('button', { name: 'Send', exact: true }).click(); await expect(provider.getByRole('alert')).toHaveText('Unable to send message.');
     await page.setViewportSize({ width: 390, height: 844 }); await page.screenshot({ path: '../output/playwright/internal-messaging-mobile.png', fullPage: true });
     await page.getByRole('button', { name: 'Unblock member', exact: true }).click(); await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
+    // The settings refresh may enable the composer before unblock's own reload finishes.
+    // Wait for the complete action before editing consent, which is saved separately.
+    await expect(page.getByRole('button', { name: 'Block member', exact: true })).toBeEnabled();
     await page.getByText('Communication preferences', { exact: true }).click(); await page.getByLabel('Accept messages from permitted connections').uncheck(); await page.getByLabel('Show in-app unread message notices').uncheck();
-    await page.getByRole('button', { name: 'Save messaging preferences' }).click(); await expect(page.getByRole('status').filter({ hasText: 'Messaging preferences saved.' })).toBeVisible();
+    const consentSaved = page.waitForResponse(response => new URL(response.url()).pathname === '/api/messages/settings' && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: 'Save messaging preferences' }).click();
+    const saved = await consentSaved; expect(saved.request().postDataJSON()).toEqual({ acceptsMessages: false, notifications: false }); expect(saved.status()).toBe(200);
+    await expect(page.getByRole('status').filter({ hasText: 'Messaging preferences saved.' })).toBeVisible();
     await provider.getByRole('button', { name: 'Send', exact: true }).click(); await expect(provider.getByRole('alert')).toHaveText('Unable to send message.');
     // Restore fixture preference to keep later browser cases independent.
     await page.getByLabel('Accept messages from permitted connections').check(); await page.getByLabel('Show in-app unread message notices').check(); await page.getByRole('button', { name: 'Save messaging preferences' }).click();
