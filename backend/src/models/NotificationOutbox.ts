@@ -11,7 +11,7 @@ const schema = new Schema({
   href: { type: String, required: true, enum: notificationHrefs },
   dedupeKey: { type: String, required: true, maxlength: 200 },
   status: { type: String, enum: ['pending', 'processing', 'delivered', 'suppressed', 'failed'], default: 'pending' },
-  sourceType: { type: String, enum: ['campaign', 'message', 'application', 'scholarship', 'resource', 'verification', 'community', 'mentorship'] },
+  sourceType: { type: String, enum: ['campaign', 'message', 'application', 'scholarship', 'resource', 'verification', 'community', 'mentorship', 'opportunity'] },
   sourceId: Schema.Types.ObjectId,
   scheduledFor: Date,
   attempts: { type: Number, default: 0, min: 0 }, nextAttemptAt: Date,

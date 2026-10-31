@@ -2,7 +2,7 @@ export const notificationKinds = ['campaign', 'message', 'application', 'scholar
 export type NotificationKind = typeof notificationKinds[number];
 export const notificationActions = ['updated', 'invited', 'decision', 'appeal', 'deadline', 'due', 'overdue', 'return', 'submitted'] as const;
 export type NotificationAction = typeof notificationActions[number];
-export const notificationHrefs = ['/', '/messages', '/my-applications', '/provider/applications', '/my-resource-requests', '/provider/resource-requests', '/my-activity', '/provider-verification', '/community-verification', '/my-promotion-requests', '/provider/promotion-requests', '/impact', '/admin'] as const;
+export const notificationHrefs = ['/', '/opportunities', '/messages', '/my-applications', '/provider/applications', '/my-resource-requests', '/provider/resource-requests', '/my-activity', '/provider-verification', '/community-verification', '/my-promotion-requests', '/provider/promotion-requests', '/impact', '/admin'] as const;
 export class NotificationError extends Error { constructor(public readonly statusCode: number, message: string) { super(message); } }
 export function notificationId(value: unknown): string {
   if (typeof value !== 'string' || !/^[a-f\d]{24}$/i.test(value)) throw new NotificationError(400, 'Invalid notification ID.'); return value.toLowerCase();
@@ -24,6 +24,7 @@ export function notificationPreferencesInput(body: unknown) {
   return { revision: values.revision as number, inApp: values.inApp, categories: categories as Record<NotificationKind, boolean> };
 }
 export function notificationTemplate(kind: NotificationKind, role: string, action: NotificationAction = 'updated', sourceType?: string) {
+  if (kind === 'application' && sourceType === 'opportunity') return { title: 'Saved opportunity deadline approaching', body: 'Review your saved opportunity and its current application deadline.', href: '/opportunities' };
   const provider = role === 'provider';
   const titles: Record<NotificationKind, string> = { campaign: action === 'invited' ? 'Collaboration invitation' : 'Collaboration update', message: 'New message', application: 'Application update', scholarship: action === 'deadline' ? 'Scholarship deadline approaching' : action === 'appeal' ? 'Scholarship appeal update' : 'Scholarship application update', resource: action === 'overdue' ? 'Resource return overdue' : action === 'due' ? 'Resource return reminder' : action === 'return' ? 'Resource return update' : 'Resource request update', verification: 'Verification update', mentorship: 'Mentorship update' };
   const hrefs: Record<NotificationKind, string> = { campaign: provider ? '/provider/promotion-requests' : '/my-promotion-requests', message: '/messages', application: provider ? '/provider/applications' : '/my-applications', scholarship: provider ? '/provider/applications' : '/my-applications', resource: provider ? '/provider/resource-requests' : '/my-activity', verification: sourceType === 'community' ? '/community-verification' : '/provider-verification', mentorship: '/impact' };

@@ -15,6 +15,19 @@ import { communityPair } from './communityMessaging';
 import { communityVisible } from './communityPolicy';
 import { notificationKind, notificationRetry, notificationTemplate, type NotificationAction, NotificationError } from './notificationPolicy';
 import { mentorshipReminderAvailable } from './mentorship';
+import { SavedOpportunity } from '../models/OpportunityActivity';
+import { providerCurrentlyVerified } from './opportunityPolicy';
+
+async function savedReminderAvailable(sourceId: Types.ObjectId | undefined, ownerId: Types.ObjectId, scheduledFor: Date | undefined, now: Date, session: ClientSession) {
+  if (!sourceId || !scheduledFor || scheduledFor <= now || scheduledFor.getTime() > now.getTime() + 86_400_000) return false;
+  const saved = await SavedOpportunity.findOne({ _id: sourceId, studentId: ownerId }).session(session); if (!saved) return false;
+  const student = await User.findOne({ _id: ownerId, role: 'student', accountStatus: { $ne: 'suspended' } }).session(session);
+  if (!student || (student.requiresEmailVerification && !student.emailVerifiedAt)) return false;
+  const listing = await Opportunity.findOne({ _id: saved.opportunityId, status: 'open', applicationDeadline: scheduledFor, scholarshipWithdrawnByAdmin: { $ne: true }, opportunityWithdrawnByAdmin: { $ne: true } }).session(session); if (!listing) return false;
+  const provider = await User.findOneAndUpdate({ _id: listing.providerId }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false });
+  if (!providerCurrentlyVerified(provider)) return false;
+  return !await Application.exists({ studentId: ownerId, opportunityId: listing._id }).session(session);
+}
 
 export const notificationTransactions = { readPreference: 'primary' as const, readConcern: { level: 'snapshot' as const }, writeConcern: { w: 'majority' as const }, maxCommitTimeMS: 5000 };
 async function messageAvailable(sourceId: Types.ObjectId | undefined, ownerId: Types.ObjectId, session: ClientSession) {
@@ -57,6 +70,7 @@ export async function deliverClaimedNotification(id: Types.ObjectId, token: stri
     const categories = preferences?.toObject().categories as Record<string, boolean> | undefined;
     if (outcome === 'delivered' && (preferences?.inApp === false || categories?.[kind] === false)) outcome = 'preferences';
     if (outcome === 'delivered' && kind === 'message' && !await messageAvailable(job.sourceId ?? undefined, job.ownerId, session)) outcome = 'message_unavailable';
+    if (outcome === 'delivered' && job.sourceType === 'opportunity' && !await savedReminderAvailable(job.sourceId ?? undefined, job.ownerId, job.scheduledFor ?? undefined, now, session)) outcome = 'stale_source';
     if (outcome === 'delivered' && kind === 'mentorship' && action === 'due' && !await mentorshipReminderAvailable(job.sourceId ?? undefined, job.ownerId, job.scheduledFor ?? undefined, now, session)) outcome = 'stale_source';
     if (outcome === 'delivered' && kind === 'scholarship' && action === 'deadline') {
       const application = await Application.findOne({ _id: job.sourceId, studentId: job.ownerId, status: { $in: ['applied', 'reviewed', 'waitlisted'] } }).session(session);

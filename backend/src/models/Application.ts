@@ -15,6 +15,7 @@ export interface IApplication extends Document {
   scholarshipVersion?: number;
   scholarshipRevision?: number;
   notificationRevision?: number;
+  statusHistoryVersion?: number;
   waitlistedAt?: Date;
   awardedAt?: Date;
   updatedAt: Date;
@@ -38,6 +39,7 @@ const applicationSchema = new Schema<IApplication>(
     scholarshipVersion: { type: Number, enum: [1] },
     scholarshipRevision: { type: Number, min: 0 },
     notificationRevision: { type: Number, min: 0 },
+    statusHistoryVersion: { type: Number, enum: [1] },
     waitlistedAt: Date,
     awardedAt: Date,
   },

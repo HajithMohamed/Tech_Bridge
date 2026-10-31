@@ -1,0 +1,2858 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TechBridge Phase 8 Opportunity Management",
+    "version": "1.0.0",
+    "description": "Backend-only additive saved/history/eligibility APIs and improvements to existing discovery/application contracts. Public result lists are now bounded; arrays and legacy score fields remain. Actual account/token/provider/email checks apply to protected routes. No production migration or frontend source change."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/opportunities": {
+      "get": {
+        "operationId": "searchCurrentOpportunities",
+        "description": "Public, literal search. Only open, unwithdrawn, strictly future-deadline listings owned by currently active verified providers. Identity filtering precedes pagination; no provider private fields. Logical expiration causes no global write.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "job",
+                "internship",
+                "scholarship",
+                "course",
+                "freelance",
+                "promotion",
+                "workshop",
+                "mentorship"
+              ]
+            }
+          },
+          {
+            "name": "skill",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "workMode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "on-site",
+                "hybrid"
+              ]
+            }
+          },
+          {
+            "name": "providerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "deadlineFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+            }
+          },
+          {
+            "name": "deadlineTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+            }
+          },
+          {
+            "name": "isPaid",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "isFree",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "deadline"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "opportunities": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Opportunity"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "opportunities",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "security": []
+      },
+      "post": {
+        "operationId": "publishVerifiedOpportunity",
+        "description": "Current verified provider only; supported current service rechecked under the provider lock. Creator-owned source, revision zero. Conditional type fields are mandatory. No implicit scholarship award.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "opportunity": {
+                          "$ref": "#/components/schemas/Opportunity"
+                        }
+                      },
+                      "required": [
+                        "opportunity"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Publish"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/opportunities/scholarships": {
+      "get": {
+        "operationId": "searchScholarships",
+        "description": "Public scholarship-only search using the same current-source and privacy checks; default earliest deadline.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "job",
+                "internship",
+                "scholarship",
+                "course",
+                "freelance",
+                "promotion",
+                "workshop",
+                "mentorship"
+              ]
+            }
+          },
+          {
+            "name": "skill",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "workMode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "on-site",
+                "hybrid"
+              ]
+            }
+          },
+          {
+            "name": "providerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "deadlineFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+            }
+          },
+          {
+            "name": "deadlineTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+            }
+          },
+          {
+            "name": "isPaid",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "isFree",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "deadline"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "opportunities": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Opportunity"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "opportunities",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "security": []
+      }
+    },
+    "/opportunities/mine": {
+      "get": {
+        "operationId": "getOwnedOpportunities",
+        "description": "Owning verified provider only. Effective expired status is computed without global writes. Batched application counts, including retained closed sources.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "open",
+                "closed",
+                "expired"
+              ]
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "job",
+                "internship",
+                "scholarship",
+                "course",
+                "freelance",
+                "promotion",
+                "workshop",
+                "mentorship"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "opportunities": {
+                          "type": "array",
+                          "items": {
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/Opportunity"
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "applicationCount": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "applicationCount"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "opportunities",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/opportunities/matched": {
+      "get": {
+        "operationId": "getRuleRankedOpportunities",
+        "description": "Student only, honoring enrolled email verification. Preserve 60/25/15 weights and original score fields; explicit aliases, distinct skill identity, blank/duplicate cleanup. Stream all filtered candidates in batches of 100 and retain only global top page*limit up to 5000; deterministic score/createdAt/ID order. Full candidate scoring remains O(catalogue), not AI.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "job",
+                "internship",
+                "scholarship",
+                "course",
+                "freelance",
+                "promotion",
+                "workshop",
+                "mentorship"
+              ]
+            }
+          },
+          {
+            "name": "skill",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "workMode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "on-site",
+                "hybrid"
+              ]
+            }
+          },
+          {
+            "name": "providerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "deadlineFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+            }
+          },
+          {
+            "name": "deadlineTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+            }
+          },
+          {
+            "name": "isPaid",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "isFree",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "opportunities": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/MatchedOpportunity"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        },
+                        "studentSkills": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "careerGoal": {
+                          "type": "string"
+                        },
+                        "matchingMethod": {
+                          "type": "string",
+                          "const": "rules"
+                        },
+                        "matchingVersion": {
+                          "type": "integer",
+                          "const": 2
+                        }
+                      },
+                      "required": [
+                        "opportunities",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages",
+                        "studentSkills",
+                        "careerGoal",
+                        "matchingMethod",
+                        "matchingVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/opportunities/saved": {
+      "get": {
+        "operationId": "getOwnSavedOpportunities",
+        "description": "Current student only. Saved rows remain paginated when sources expire/disappear/withdraw; unavailable opportunity is null and no private replacement terms are leaked. No peer saved counts.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "savedOpportunities": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SavedEntry"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "savedOpportunities",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/opportunities/{id}/saved": {
+      "put": {
+        "operationId": "saveCurrentOpportunity",
+        "description": "Current student only. Empty body; unique student/source, idempotent initial timestamp, max 500 saved entries. Transactional owner/source revalidation. Mandatory application eligibility need not be met to bookmark.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "saved": {
+                          "$ref": "#/components/schemas/Saved"
+                        }
+                      },
+                      "required": [
+                        "saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unsaveOwnOpportunity",
+        "description": "Current student only, empty body. Idempotent removal even after source deletion, using the same owner lock as pending reminder delivery.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "saved": {
+                          "type": "boolean",
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "saved"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/opportunities/{id}/eligibility": {
+      "get": {
+        "operationId": "explainCurrentOpportunityEligibility",
+        "description": "Current student only; source must be currently public. Formal listing requirements or existing scholarship policy, advisory rule match, alreadyApplied and canApply. Preferred skills alone never block applying. No decision, award, evidence disclosure or fake application is created.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "eligible": {
+                          "type": "boolean"
+                        },
+                        "canApply": {
+                          "type": "boolean"
+                        },
+                        "alreadyApplied": {
+                          "type": "boolean"
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "checks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "passed": {
+                                "type": "boolean"
+                              },
+                              "explanation": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "passed",
+                              "explanation"
+                            ]
+                          }
+                        },
+                        "policySource": {
+                          "type": "string",
+                          "enum": [
+                            "listing",
+                            "scholarship_policy"
+                          ]
+                        },
+                        "requirements": {
+                          "type": "object"
+                        },
+                        "matching": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/Match"
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "method": {
+                                  "type": "string",
+                                  "const": "rules"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "const": 2
+                                }
+                              },
+                              "required": [
+                                "method",
+                                "version"
+                              ]
+                            }
+                          ]
+                        },
+                        "advisory": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "eligible",
+                        "canApply",
+                        "alreadyApplied",
+                        "reasons",
+                        "policySource",
+                        "requirements",
+                        "matching",
+                        "advisory"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/opportunities/{id}": {
+      "get": {
+        "operationId": "getCurrentOpportunity",
+        "description": "Public currently visible source only; existing targeted views counter increments. Closed/draft/expired/withdrawn or inactive-provider sources return 404.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "opportunity": {
+                          "$ref": "#/components/schemas/Opportunity"
+                        }
+                      },
+                      "required": [
+                        "opportunity"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "security": []
+      },
+      "put": {
+        "operationId": "editOwnedOpportunity",
+        "description": "Current verified owner and supported service rechecked inside transaction. Optional expected revision, explicit deadline handling, frozen mandatory requirements/type after applications, and existing scholarship term/capacity guard.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "opportunity": {
+                          "$ref": "#/components/schemas/Opportunity"
+                        }
+                      },
+                      "required": [
+                        "opportunity"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Edit"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeOwnedOpportunity",
+        "description": "Verified owner only. Ordinary source with applications closes and remains reachable for history; retained true. Empty sources may be removed. Existing scholarship retention policy is preserved.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "retained": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "retained"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/applications": {
+      "post": {
+        "operationId": "submitOpportunityApplication",
+        "description": "Student's current data, source availability and provider authorization rechecked inside transaction. Enforces explicit ordinary eligibility, unique pair, actual initial history and outbox atomically. Scholarship submission uses its existing policy service.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "application": {
+                          "$ref": "#/components/schemas/Application"
+                        }
+                      },
+                      "required": [
+                        "application"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/applications/{id}/status": {
+      "patch": {
+        "operationId": "decideOwnedApplication",
+        "description": "Actual source owner only; current provider revalidated. Ordinary transition, optional expected revision, current student eligibility for acceptance, atomic real history and notice. No stale or repeated extra event. Scholarship policy/capacity restrictions preserved.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "application": {
+                          "$ref": "#/components/schemas/Application"
+                        }
+                      },
+                      "required": [
+                        "application"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/applications/{id}/history": {
+      "get": {
+        "operationId": "getParticipantApplicationStatusHistory",
+        "description": "Applicant or actual provider owner only; admins have no shortcut. Ordinary real journal or bounded scholarship status-event adapter. Incomplete legacy history is marked rather than reconstructed. Evidence references, private policy snapshots and override metadata are excluded.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "applicationId": {
+                          "type": "string",
+                          "pattern": "^[a-fA-F0-9]{24}$"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "applied",
+                            "reviewed",
+                            "accepted",
+                            "rejected",
+                            "waitlisted"
+                          ]
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        },
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Event"
+                          }
+                        },
+                        "historyComplete": {
+                          "type": "boolean"
+                        },
+                        "legacyNotice": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "applicationId",
+                        "status",
+                        "revision",
+                        "events",
+                        "historyComplete",
+                        "legacyNotice",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "Eligibility": {
+        "type": "object",
+        "properties": {
+          "degrees": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "enum": [
+                "ict",
+                "et",
+                "bst",
+                "other"
+              ]
+            }
+          },
+          "institutions": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 150
+            }
+          },
+          "requiredSkills": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "minStudyYear": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "maxStudyYear": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          }
+        },
+        "required": [
+          "degrees",
+          "institutions",
+          "requiredSkills",
+          "minStudyYear",
+          "maxStudyYear"
+        ],
+        "additionalProperties": false
+      },
+      "Publish": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 5000
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "job",
+              "internship",
+              "scholarship",
+              "course",
+              "freelance",
+              "promotion",
+              "workshop",
+              "mentorship"
+            ]
+          },
+          "requiredSkills": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workMode": {
+            "type": "string",
+            "enum": [
+              "remote",
+              "on-site",
+              "hybrid"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "closed",
+              "expired"
+            ]
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/Eligibility"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string"
+          },
+          "coverageType": {
+            "type": "string",
+            "enum": [
+              "full",
+              "partial",
+              "tuition_only",
+              "equipment_only",
+              "stipend"
+            ]
+          },
+          "eligibilityCriteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "numberOfAwards": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "renewable": {
+            "type": "boolean"
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "isPaid": {
+            "type": "boolean"
+          },
+          "preferredAcademicBackground": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "fee": {
+            "type": "number",
+            "minimum": 0
+          },
+          "isFree": {
+            "type": "boolean"
+          },
+          "mentorName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "professionalField": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "experience": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 120
+          },
+          "mentorshipType": {
+            "type": "string",
+            "enum": [
+              "Career guidance",
+              "Technical guidance",
+              "Internship guidance",
+              "Portfolio guidance"
+            ]
+          },
+          "availability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "paymentInfo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "contactMethod": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "type",
+          "requiredSkills",
+          "location",
+          "workMode",
+          "status",
+          "applicationDeadline"
+        ],
+        "description": "Conditional type fields are validated by the existing publication contract. Expired is server-derived and cannot be supplied. Scholarship eligibility uses the scholarship policy API. Unknown fields are ignored; providerId/revision cannot be supplied to creation."
+      },
+      "Edit": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 5000
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "job",
+              "internship",
+              "scholarship",
+              "course",
+              "freelance",
+              "promotion",
+              "workshop",
+              "mentorship"
+            ]
+          },
+          "requiredSkills": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workMode": {
+            "type": "string",
+            "enum": [
+              "remote",
+              "on-site",
+              "hybrid"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "closed",
+              "expired"
+            ]
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/Eligibility"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string"
+          },
+          "coverageType": {
+            "type": "string",
+            "enum": [
+              "full",
+              "partial",
+              "tuition_only",
+              "equipment_only",
+              "stipend"
+            ]
+          },
+          "eligibilityCriteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "numberOfAwards": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "renewable": {
+            "type": "boolean"
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "isPaid": {
+            "type": "boolean"
+          },
+          "preferredAcademicBackground": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "fee": {
+            "type": "number",
+            "minimum": 0
+          },
+          "isFree": {
+            "type": "boolean"
+          },
+          "mentorName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "professionalField": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "experience": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 120
+          },
+          "mentorshipType": {
+            "type": "string",
+            "enum": [
+              "Career guidance",
+              "Technical guidance",
+              "Internship guidance",
+              "Portfolio guidance"
+            ]
+          },
+          "availability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "paymentInfo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "contactMethod": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "required": [],
+        "description": "Partial owner edit. Optional expected revision detects stale writes. Type and mandatory eligibility freeze after the first application. Closing a past-deadline source is allowed; opening/draft requires future deadline. Scholarship award/term guards remain active."
+      },
+      "Provider": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "providerProfile": {
+            "type": "object",
+            "properties": {
+              "organizationName": {
+                "type": "string"
+              },
+              "organizationType": {
+                "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "organizationName",
+              "organizationType",
+              "verified"
+            ]
+          }
+        },
+        "required": [
+          "_id",
+          "fullName",
+          "providerProfile"
+        ]
+      },
+      "Opportunity": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 5000
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "job",
+              "internship",
+              "scholarship",
+              "course",
+              "freelance",
+              "promotion",
+              "workshop",
+              "mentorship"
+            ]
+          },
+          "requiredSkills": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workMode": {
+            "type": "string",
+            "enum": [
+              "remote",
+              "on-site",
+              "hybrid"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "closed",
+              "expired"
+            ]
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/Eligibility"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string"
+          },
+          "coverageType": {
+            "type": "string",
+            "enum": [
+              "full",
+              "partial",
+              "tuition_only",
+              "equipment_only",
+              "stipend"
+            ]
+          },
+          "eligibilityCriteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "numberOfAwards": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "renewable": {
+            "type": "boolean"
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "isPaid": {
+            "type": "boolean"
+          },
+          "preferredAcademicBackground": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Valid YYYY-MM-DD (UTC midnight), or UTC ISO timestamp with seconds and optional three milliseconds. No rollover dates, local times or numeric offsets."
+          },
+          "fee": {
+            "type": "number",
+            "minimum": 0
+          },
+          "isFree": {
+            "type": "boolean"
+          },
+          "mentorName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "professionalField": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "experience": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 120
+          },
+          "mentorshipType": {
+            "type": "string",
+            "enum": [
+              "Career guidance",
+              "Technical guidance",
+              "Internship guidance",
+              "Portfolio guidance"
+            ]
+          },
+          "availability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "paymentInfo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "contactMethod": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "providerId": {
+            "$ref": "#/components/schemas/Provider"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "views": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "providerCredibility": {
+            "type": "object",
+            "properties": {
+              "verification": {
+                "type": "string",
+                "const": "provider_verified"
+              }
+            },
+            "required": [
+              "verification"
+            ]
+          }
+        },
+        "required": [
+          "_id",
+          "title",
+          "description",
+          "type",
+          "requiredSkills",
+          "location",
+          "workMode",
+          "status",
+          "applicationDeadline"
+        ]
+      },
+      "Match": {
+        "type": "object",
+        "properties": {
+          "matchPercentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "matchedSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skillScore": {
+            "type": "integer"
+          },
+          "careerRelevanceScore": {
+            "type": "integer"
+          },
+          "locationScore": {
+            "type": "integer"
+          },
+          "breakdown": {
+            "type": "object",
+            "properties": {
+              "skillWeight": {
+                "type": "integer",
+                "const": 60
+              },
+              "careerWeight": {
+                "type": "integer",
+                "const": 25
+              },
+              "locationWeight": {
+                "type": "integer",
+                "const": 15
+              }
+            },
+            "required": [
+              "skillWeight",
+              "careerWeight",
+              "locationWeight"
+            ]
+          }
+        },
+        "required": [
+          "matchPercentage",
+          "matchedSkills",
+          "missingSkills",
+          "skillScore",
+          "careerRelevanceScore",
+          "locationScore",
+          "breakdown"
+        ]
+      },
+      "MatchedOpportunity": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Opportunity"
+          },
+          {
+            "$ref": "#/components/schemas/Match"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "matchingVersion": {
+                "type": "integer",
+                "const": 2
+              },
+              "matchingMethod": {
+                "type": "string",
+                "const": "rules"
+              },
+              "skillResources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "skill": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "skill",
+                    "label",
+                    "url"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "matchingVersion",
+              "matchingMethod",
+              "skillResources"
+            ]
+          }
+        ]
+      },
+      "Saved": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "opportunityId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "savedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "_id",
+          "opportunityId",
+          "savedAt"
+        ]
+      },
+      "SavedEntry": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Saved"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "availability": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "unavailable"
+                ]
+              },
+              "opportunity": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Opportunity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "availability",
+              "opportunity"
+            ]
+          }
+        ]
+      },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "studentId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "providerId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "opportunityId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "reviewed",
+              "accepted",
+              "rejected",
+              "waitlisted"
+            ]
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notificationRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "statusHistoryVersion": {
+            "type": "integer",
+            "const": 1
+          }
+        },
+        "required": [
+          "_id",
+          "status"
+        ]
+      },
+      "ApplicationInput": {
+        "type": "object",
+        "properties": {
+          "opportunityId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 30,
+            "maxLength": 800
+          },
+          "selfDeclaredNeed": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        "required": [
+          "opportunityId",
+          "justification",
+          "selfDeclaredNeed"
+        ],
+        "additionalProperties": false
+      },
+      "Decision": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "reviewed",
+              "accepted",
+              "rejected",
+              "waitlisted"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          },
+          "priorityOverrideReason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "Ordinary statuses: applied to reviewed/accepted/rejected; reviewed to accepted/rejected; accepted to reviewed/rejected; rejected to reviewed. Reopening a decided application requires reason. Repeats are idempotent; supplied stale revision is rejected. Scholarship-specific policy still applies and waitlisting is scholarship-only."
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "actorId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "action": {
+            "type": "string"
+          },
+          "fromStatus": {
+            "type": "string"
+          },
+          "toStatus": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "_id",
+          "actorId",
+          "action",
+          "reason",
+          "createdAt"
+        ]
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Invalid fields/filter/date/transition input",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Missing, revoked or restricted JWT",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Role, account, ownership or current verification restriction",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "No visible/owned source or application",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Duplicate, stale revision, eligibility, quota or frozen terms conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Infrastructure unavailable; no partial transactional domain change",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

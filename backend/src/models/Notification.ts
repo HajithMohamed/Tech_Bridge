@@ -7,7 +7,7 @@ const schema = new Schema({
   action: { type: String, enum: notificationActions, default: 'updated', required: true },
   title: { type: String, required: true, maxlength: 100 }, body: { type: String, required: true, maxlength: 500 },
   href: { type: String, enum: notificationHrefs, required: true }, dedupeKey: { type: String, required: true, maxlength: 200, select: false },
-  sourceType: { type: String, enum: ['campaign', 'message', 'application', 'scholarship', 'resource', 'verification', 'community', 'mentorship'] },
+  sourceType: { type: String, enum: ['campaign', 'message', 'application', 'scholarship', 'resource', 'verification', 'community', 'mentorship', 'opportunity'] },
   sourceId: { type: Schema.Types.ObjectId }, occurredAt: { type: Date, required: true }, readAt: Date,
 }, { timestamps: { createdAt: true, updatedAt: false } });
 schema.index({ ownerId: 1, dedupeKey: 1 }, { unique: true });
@@ -22,5 +22,5 @@ const preferenceSchema = new Schema({
 }, { timestamps: true });
 export const NotificationPreferences = mongoose.model('NotificationPreferences', preferenceSchema);
 
-const producerSchema = new Schema({ key: { type: String, enum: ['scholarship-reminders', 'resource-reminders', 'mentorship-reminders'], required: true, unique: true }, afterId: Schema.Types.ObjectId, revision: { type: Number, default: 0 } }, { timestamps: true });
+const producerSchema = new Schema({ key: { type: String, enum: ['scholarship-reminders', 'resource-reminders', 'mentorship-reminders', 'saved-opportunity-reminders'], required: true, unique: true }, afterId: Schema.Types.ObjectId, revision: { type: Number, default: 0 } }, { timestamps: true });
 export const NotificationProducer = mongoose.model('NotificationProducer', producerSchema);

@@ -3,7 +3,7 @@ import Application from '../models/Application';
 import Opportunity from '../models/Opportunity';
 import User from '../models/User';
 import mongoose, { Types } from 'mongoose';
-import { enqueueDomainNotification } from '../services/notifications';
+import { submitOrdinaryApplication } from '../services/opportunityApplications';
 import { ScholarshipReview } from '../models/Scholarship';
 import { submitScholarship } from '../services/scholarships';
 import { compareScholarshipCandidates, scholarshipId } from '../services/scholarshipPolicy';
@@ -72,15 +72,7 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const application = opportunity.type === 'scholarship' ? await submitScholarship(req.user!._id, req.body) : await mongoose.connection.transaction(async session => {
-      const student = await User.updateOne({ _id: req.user!._id, role: 'student', accountStatus: { $ne: 'suspended' } }, { $inc: { __v: 1 } }, { session, timestamps: false });
-      if (!student.matchedCount) throw new ScholarshipAwardError(403, 'An active student account is required.');
-      const current = await Opportunity.findOneAndUpdate({ _id: opportunity._id, providerId: opportunity.providerId, type: { $ne: 'scholarship' }, status: 'open', applicationDeadline: { $gt: new Date() } }, { $inc: { __v: 1 } }, { new: true, session, timestamps: false });
-      if (!current) throw new ScholarshipAwardError(404, 'This opportunity is no longer accepting applications.');
-      const [created] = await Application.create([{ studentId: req.user!._id, providerId: current.providerId, opportunityId: current._id, message: typeof message === 'string' ? message.trim() : undefined, justification: justification.trim(), selfDeclaredNeed }], { session });
-      await enqueueDomainNotification('application', current.providerId, `application-submitted:${created._id}`, created._id, session, 'submitted');
-      return created;
-    }, { readPreference: 'primary', readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, maxCommitTimeMS: 5000 });
+    const application = opportunity.type === 'scholarship' ? await submitScholarship(req.user!._id, req.body) : await submitOrdinaryApplication(req.user!._id, req.body);
     await application.populate('opportunityId', opportunitySelect);
 
     res.status(201).json({

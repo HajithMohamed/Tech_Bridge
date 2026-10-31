@@ -195,6 +195,11 @@ export async function removeScholarshipAwareListing(id: unknown, actorId: Types.
       listing.status = 'closed'; listing.scholarshipWithdrawnByAdmin = true;
       await Opportunity.updateOne({ _id: listing._id }, { $set: { status: 'closed', scholarshipWithdrawnByAdmin: true } }, { session, runValidators: true }); return { listing, retained: true };
     }
+    if (await Application.exists({ opportunityId: listing._id }).session(session)) {
+      listing.status = 'closed'; if (actorRole === 'admin') listing.opportunityWithdrawnByAdmin = true;
+      listing.revision = (listing.revision ?? 0) + 1;
+      await listing.save({ session }); return { listing, retained: true };
+    }
     await Opportunity.deleteOne({ _id: listing._id }, { session }); return { listing, retained: false };
   }, scholarshipTransactions);
 }

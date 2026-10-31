@@ -2,7 +2,7 @@ import { type ClientSession, Types } from 'mongoose';
 import NotificationOutbox from '../models/NotificationOutbox';
 import { notificationActions, notificationHrefs, notificationKind, notificationTemplate, type NotificationAction, type NotificationKind } from './notificationPolicy';
 
-export interface PendingNotification { ownerId: string; kind: NotificationKind; title: string; body: string; href: string; dedupeKey: string; action?: NotificationAction; sourceType?: 'campaign' | 'message' | 'application' | 'scholarship' | 'resource' | 'verification' | 'community' | 'mentorship'; sourceId?: Types.ObjectId; scheduledFor?: Date }
+export interface PendingNotification { ownerId: string; kind: NotificationKind; title: string; body: string; href: string; dedupeKey: string; action?: NotificationAction; sourceType?: 'campaign' | 'message' | 'application' | 'scholarship' | 'resource' | 'verification' | 'community' | 'mentorship' | 'opportunity'; sourceId?: Types.ObjectId; scheduledFor?: Date }
 /** Persist a pending notice in the caller's transaction; never imply delivery. */
 export async function enqueueNotification(notice: PendingNotification, session: ClientSession): Promise<void> {
   notificationKind(notice.kind);
