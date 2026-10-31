@@ -63,7 +63,8 @@
                 "scholarship",
                 "resource",
                 "verification",
-                "mentorship"
+                "mentorship",
+                "event"
               ]
             }
           },
@@ -748,7 +749,8 @@
               "scholarship",
               "resource",
               "verification",
-              "mentorship"
+              "mentorship",
+              "event"
             ]
           },
           "action": {
@@ -801,7 +803,10 @@
               "resource",
               "verification",
               "mentorship",
-              "community"
+              "community",
+              "opportunity",
+              "event",
+              "event_organizer"
             ]
           },
           "sourceId": {
@@ -861,6 +866,9 @@
               },
               "mentorship": {
                 "type": "boolean"
+              },
+              "event": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -870,7 +878,8 @@
               "scholarship",
               "resource",
               "verification",
-              "mentorship"
+              "mentorship",
+              "event"
             ]
           },
           "revision": {
@@ -914,6 +923,10 @@
               },
               "mentorship": {
                 "type": "boolean"
+              },
+              "event": {
+                "type": "boolean",
+                "description": "Optional for older seven-category clients. If omitted, preserves the stored event preference or defaults to true."
               }
             },
             "required": [
