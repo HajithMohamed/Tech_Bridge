@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { eligibilityInput, type OpportunityEligibility } from '../services/opportunityPolicy';
 
 export type OpportunityType =
   | 'job'
@@ -29,6 +30,9 @@ export interface IOpportunity extends Document {
   numberOfAwards?: number;
   renewable?: boolean;
   scholarshipWithdrawnByAdmin?: boolean;
+  opportunityWithdrawnByAdmin?: boolean;
+  eligibility?: OpportunityEligibility;
+  revision?: number;
   
   // Conditional fields
   duration?: string; // For internships, training
@@ -106,6 +110,9 @@ const opportunitySchema = new Schema<IOpportunity>(
       required: function (this: IOpportunity) { return this.type === 'scholarship'; },
     },
     scholarshipWithdrawnByAdmin: { type: Boolean },
+    opportunityWithdrawnByAdmin: { type: Boolean },
+    revision: { type: Number, min: 0 },
+    eligibility: { type: new Schema<OpportunityEligibility>({ degrees: [{ type: String, enum: ['ict', 'et', 'bst', 'other'] }], institutions: [{ type: String, maxlength: 150 }], requiredSkills: [{ type: String, maxlength: 60 }], minStudyYear: { type: Number, min: 1, max: 6 }, maxStudyYear: { type: Number, min: 1, max: 6 } }, { _id: false }), validate: { validator: (value: (OpportunityEligibility & { toObject?: () => OpportunityEligibility }) | undefined) => { if (value === undefined) return true; try { eligibilityInput(value.toObject?.() ?? value); return true; } catch { return false; } }, message: 'Invalid structured eligibility requirements.' } },
     duration: { type: String, trim: true, maxlength: 120 },
     isPaid: { type: Boolean },
     preferredAcademicBackground: { type: String, trim: true, maxlength: 250 },
@@ -125,6 +132,8 @@ const opportunitySchema = new Schema<IOpportunity>(
 );
 
 opportunitySchema.index({ status: 1, type: 1, applicationDeadline: 1 });
+opportunitySchema.index({ status: 1, createdAt: -1, _id: -1 });
+opportunitySchema.index({ providerId: 1, createdAt: -1, _id: -1 });
 
 const Opportunity = mongoose.model<IOpportunity>('Opportunity', opportunitySchema);
 

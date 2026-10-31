@@ -202,7 +202,7 @@ describe('bounded reminder production and stale-source checks', () => {
     const opportunities = await Opportunity.create([scholarshipFixture(), scholarshipFixture({ _id: new Types.ObjectId(), applicationDeadline: new Date(now.getTime() + 3600_000) }), scholarshipFixture({ _id: new Types.ObjectId(), applicationDeadline: new Date(now.getTime() + 7200_000) })]);
     await Application.create(opportunities.map(opportunity => applicationFixture({ opportunityId: opportunity._id })));
     for (let count = 0; count < 7; count++) await enqueueNotificationReminders(1, now);
-    expect(await NotificationOutbox.countDocuments({ action: 'deadline' })).toBe(2); expect(await NotificationProducer.countDocuments()).toBe(3); await drain(); expect(await Notification.countDocuments()).toBe(2);
+    expect(await NotificationOutbox.countDocuments({ action: 'deadline' })).toBe(2); expect(await NotificationProducer.countDocuments()).toBe(4); await drain(); expect(await Notification.countDocuments()).toBe(2);
   });
   it('suppresses a deadline reminder when the actual deadline is extended before delivery', async () => {
     await Opportunity.create(scholarshipFixture({ applicationDeadline: new Date(now.getTime() + 3600_000) })); await Application.create(applicationFixture()); await enqueueNotificationReminders(100, now);

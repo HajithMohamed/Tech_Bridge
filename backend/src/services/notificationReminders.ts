@@ -3,6 +3,7 @@ import Application from '../models/Application';
 import Opportunity from '../models/Opportunity';
 import ResourceRequest from '../models/ResourceRequest';
 import { Mentorship } from '../models/Mentorship';
+import { SavedOpportunity } from '../models/OpportunityActivity';
 import { NotificationProducer } from '../models/Notification';
 import { enqueueNotification } from './notifications';
 import { notificationTemplate, NotificationError } from './notificationPolicy';
@@ -51,5 +52,19 @@ export async function enqueueNotificationReminders(limit = 100, now = new Date()
     await NotificationProducer.updateOne({ _id: cursor._id }, rows.length ? { $set: { afterId: rows[rows.length - 1]._id } } : { $unset: { afterId: '' } }, { session });
     return { scanned: rows.length, considered };
   }, notificationTransactions);
-  return { scholarships, resources, mentorships };
+  const savedOpportunities = await mongoose.connection.transaction(async session => {
+    const cursor = await NotificationProducer.findOneAndUpdate({ key: 'saved-opportunity-reminders' }, { $inc: { revision: 1 } }, { upsert: true, new: true, session });
+    let rows = await SavedOpportunity.find(cursor.afterId ? { _id: { $gt: cursor.afterId } } : {}).sort({ _id: 1 }).limit(limit).session(session);
+    if (!rows.length && cursor.afterId) rows = await SavedOpportunity.find({}).sort({ _id: 1 }).limit(limit).session(session);
+    const listings = await Opportunity.find({ _id: { $in: rows.map(row => row.opportunityId) }, status: 'open', scholarshipWithdrawnByAdmin: { $ne: true }, opportunityWithdrawnByAdmin: { $ne: true }, applicationDeadline: { $gt: now, $lte: end } }).select('applicationDeadline').session(session);
+    const byId = new Map(listings.map(row => [String(row._id), row])); let considered = 0;
+    for (const row of rows) {
+      const listing = byId.get(String(row.opportunityId)); if (!listing) continue; considered++;
+      const safe = notificationTemplate('application', 'student', 'deadline', 'opportunity');
+      await enqueueNotification({ ownerId: String(row.studentId), kind: 'application', action: 'deadline', ...safe, sourceType: 'opportunity', sourceId: row._id, scheduledFor: listing.applicationDeadline, dedupeKey: `saved-deadline:${row._id}:${listing.applicationDeadline.toISOString()}` }, session);
+    }
+    await NotificationProducer.updateOne({ _id: cursor._id }, rows.length ? { $set: { afterId: rows[rows.length - 1]._id } } : { $unset: { afterId: '' } }, { session });
+    return { scanned: rows.length, considered };
+  }, notificationTransactions);
+  return { scholarships, resources, mentorships, savedOpportunities };
 }

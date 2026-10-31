@@ -7,6 +7,7 @@ import {
   updateApplicationStatus,
 } from '../controllers/applicationController';
 import { authorize, protect } from '../middleware/auth';
+import { getApplicationHistory } from '../controllers/opportunityActivityController';
 import { addScholarshipEvidence, createScholarshipAppeal, decideScholarshipAppeal, downloadScholarshipEvidence, getScholarshipAssessment, listScholarshipAppeals, listScholarshipEvidence, refreshScholarshipPriority, scholarshipHistory } from '../controllers/scholarshipController';
 
 const router = Router();
@@ -16,6 +17,7 @@ router.get('/mine', protect, authorize('student'), listMyApplications);
 router.get('/provider', protect, authorize('provider'), listProviderApplications);
 router.get('/opportunity/:id', protect, authorize('provider'), listOpportunityApplications);
 router.patch('/:id/status', protect, authorize('provider'), updateApplicationStatus);
+router.get('/:id/history', protect, authorize('student', 'provider'), getApplicationHistory);
 router.get('/:id/scholarship', protect, authorize('student', 'provider'), getScholarshipAssessment);
 router.get('/:id/scholarship/history', protect, authorize('student', 'provider'), scholarshipHistory());
 router.get('/:id/scholarship/evidence', protect, authorize('student', 'provider'), listScholarshipEvidence);

@@ -9,22 +9,17 @@ import { publicProviderProfileSelect, toPublicProviderDetails } from '../utils/p
 import { saveVerifiedProviderProfile } from '../services/providerVerification';
 import { AdminActionError } from '../services/adminUsers';
 import mongoose from 'mongoose';
+import { effectiveOpportunityStatus } from '../services/opportunityPolicy';
 
 const providerServices = ['jobs', 'internships', 'scholarships', 'training', 'mentorship', 'technical_resources'];
 
-const expireOpportunities = async (): Promise<void> => {
-  await Opportunity.updateMany(
-    { status: 'open', applicationDeadline: { $lt: new Date() } },
-    { $set: { status: 'expired' } }
-  );
-};
 
 /** GET /api/provider/dashboard */
 export const getProviderDashboard = async (req: Request, res: Response): Promise<void> => {
   try {
-    await expireOpportunities();
     const providerId = req.user!._id;
     const opportunities = await Opportunity.find({ providerId }).select('_id title type status applicationDeadline createdAt views');
+    opportunities.forEach(row => { row.status = effectiveOpportunityStatus(row); });
     const ids = opportunities.map((opportunity) => opportunity._id);
     const [applicationsReceived, acceptedApplications, connectedStudentIds, resourceCount, resourceRequestsReceived, pendingResourceRequests, acceptedResourceRequests, resourceRequestsAccepted, resourceStudentIds, recentApplications, recentResourceRequests] = await Promise.all([
       Application.countDocuments({ providerId }),
@@ -168,9 +163,9 @@ export const getPublicProviderProfile = async (req: Request, res: Response): Pro
       res.status(404).json({ success: false, message: 'Provider profile not found.' });
       return;
     }
-
+    const publishedOwner = await User.exists({ _id: provider._id, role: 'provider', accountStatus: { $ne: 'suspended' }, 'providerProfile.verified': true, 'providerProfile.verificationStatus': 'VERIFIED', $or: [{ requiresEmailVerification: { $ne: true } }, { emailVerifiedAt: { $type: 'date' } }] });
     const [opportunities, resources] = await Promise.all([
-      Opportunity.find({ providerId: provider._id, status: 'open' })
+      Opportunity.find({ providerId: provider._id, ...(!publishedOwner ? { _id: { $exists: false } } : {}), status: 'open', applicationDeadline: { $gt: new Date() }, scholarshipWithdrawnByAdmin: { $ne: true }, opportunityWithdrawnByAdmin: { $ne: true } })
         .select('title type description location workMode applicationDeadline status requiredSkills createdAt')
         .sort({ createdAt: -1 }),
       Resource.find({ listedBy: provider._id, status: 'available' })
