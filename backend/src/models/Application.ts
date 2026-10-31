@@ -50,6 +50,8 @@ const applicationSchema = new Schema<IApplication>(
 applicationSchema.index({ studentId: 1, opportunityId: 1 }, { unique: true });
 applicationSchema.index({ opportunityId: 1, status: 1, appliedAt: 1, _id: 1 });
 applicationSchema.index({ status: 1, _id: 1 });
+applicationSchema.index({ studentId: 1, appliedAt: 1 });
+applicationSchema.index({ providerId: 1, appliedAt: 1 });
 
 const Application = mongoose.model<IApplication>('Application', applicationSchema);
 

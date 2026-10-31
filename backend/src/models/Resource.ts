@@ -257,6 +257,8 @@ const resourceSchema = new Schema<IResourceListing>(
 );
 
 resourceSchema.index({ status: 1, accessType: 1, category: 1, createdAt: -1 });
+resourceSchema.index({ listedBy: 1, createdAt: 1 });
+resourceSchema.index({ createdAt: 1 });
 
 const Resource = mongoose.model<IResourceListing>('Resource', resourceSchema);
 
