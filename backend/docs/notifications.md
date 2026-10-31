@@ -4,6 +4,11 @@ Branch: `feature/notification-system`. Base: approved development
 `fdb911decf0fcbf23c3e271eeaf483d0e76f5ba2` after PRs #24, #29 and #23 merged.
 Backend-only phase; the existing frontend design and normal app data are preserved.
 
+Phase 7 now extends this foundation with actual mentorship lifecycle events and
+appointment reminders. See [the mentorship module](mentorship.md) for its current
+permissions, source revalidation and the worker rollback boundary. Statements below
+about mentorship being deferred describe the scope of the original Phase 6 change.
+
 ## Audit and acceptance criteria
 
 | Area | Existing implementation | Phase 6 acceptance |

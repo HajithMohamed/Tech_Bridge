@@ -14,6 +14,7 @@ import Resource from '../models/Resource';
 import { communityPair } from './communityMessaging';
 import { communityVisible } from './communityPolicy';
 import { notificationKind, notificationRetry, notificationTemplate, type NotificationAction, NotificationError } from './notificationPolicy';
+import { mentorshipReminderAvailable } from './mentorship';
 
 export const notificationTransactions = { readPreference: 'primary' as const, readConcern: { level: 'snapshot' as const }, writeConcern: { w: 'majority' as const }, maxCommitTimeMS: 5000 };
 async function messageAvailable(sourceId: Types.ObjectId | undefined, ownerId: Types.ObjectId, session: ClientSession) {
@@ -56,6 +57,7 @@ export async function deliverClaimedNotification(id: Types.ObjectId, token: stri
     const categories = preferences?.toObject().categories as Record<string, boolean> | undefined;
     if (outcome === 'delivered' && (preferences?.inApp === false || categories?.[kind] === false)) outcome = 'preferences';
     if (outcome === 'delivered' && kind === 'message' && !await messageAvailable(job.sourceId ?? undefined, job.ownerId, session)) outcome = 'message_unavailable';
+    if (outcome === 'delivered' && kind === 'mentorship' && action === 'due' && !await mentorshipReminderAvailable(job.sourceId ?? undefined, job.ownerId, job.scheduledFor ?? undefined, now, session)) outcome = 'stale_source';
     if (outcome === 'delivered' && kind === 'scholarship' && action === 'deadline') {
       const application = await Application.findOne({ _id: job.sourceId, studentId: job.ownerId, status: { $in: ['applied', 'reviewed', 'waitlisted'] } }).session(session);
       const opportunity = application ? await Opportunity.findOne({ _id: application.opportunityId, type: 'scholarship', status: 'open', scholarshipWithdrawnByAdmin: { $ne: true } }).session(session) : null;
