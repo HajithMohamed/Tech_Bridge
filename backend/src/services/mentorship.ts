@@ -52,8 +52,10 @@ async function acceptingMentor(mentorId: Types.ObjectId, studentId: Types.Object
 export async function ownMentorProfile(ownerId: Types.ObjectId) {
   const current = await identity(ownerId);
   const profile = await MentorProfile.findOne({ ownerId }).select('+identityKey');
+  const settings = await MessagingSettings.findOne({ ownerId });
+  const contactEnabled = current.user?.providerProfile?.organizationType === 'individual' || current.claim?.profile.acceptsStudentMessages === true;
   const safe = profile?.toObject(); if (safe) delete safe.identityKey;
-  return { profile: safe ?? null, acceptingRequests: Boolean(profile?.enabled && current.eligible && profile.identityKey === identityKey(current)), identityEligible: current.eligible, approval: current.approval ? { status: current.approval.status, revision: current.approval.revision, documentId: current.approval.documentId } : null };
+  return { profile: safe ?? null, acceptingRequests: Boolean(profile?.enabled && current.eligible && profile.identityKey === identityKey(current) && contactEnabled && settings?.acceptsMessages !== false), identityEligible: current.eligible, approval: current.approval ? { status: current.approval.status, revision: current.approval.revision, documentId: current.approval.documentId } : null };
 }
 export async function updateMentorProfile(ownerId: Types.ObjectId, value: unknown, now = new Date()) {
   const values = mentorProfileInput(value, now);

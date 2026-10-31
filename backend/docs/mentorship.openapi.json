@@ -19,7 +19,7 @@
     "/mentorship/profile": {
       "get": {
         "operationId": "getOwnMentorProfile",
-        "description": "Provider only. Draft/profile and current identity eligibility; acceptingRequests also checks the opt-in identity binding. Internal identityKey never leaves the service.",
+        "description": "Provider only. Draft/profile and current identity eligibility; acceptingRequests also checks the opt-in identity binding and global/community contact consent. Pair-specific blocks are evaluated for each student. Internal identityKey never leaves the service.",
         "parameters": [],
         "responses": {
           "200": {

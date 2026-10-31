@@ -74,6 +74,8 @@ opt in through their mentor profile. Discovery and new mentoring activity honor
 community student-contact consent, both global contact settings and both users'
 block lists. Self-entered faculty names never replace the verified directory name.
 No publicly listed directory contact or demo account is automatically enrolled.
+The owner's `acceptingRequests` status also reflects global and community contact
+consent; student-specific block restrictions are evaluated for each connection.
 
 Industry mentors use existing **individual** provider accounts. A verified company
 or NGO is not a verified person. The approving admin must review the individual's

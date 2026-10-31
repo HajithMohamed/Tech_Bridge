@@ -113,10 +113,12 @@ describe('mentor consent, discovery and independent approval', () => {
     await enable();
     for (const settings of [{ ownerId: ids.lecturer, blockedIds: [ids.student] }, { ownerId: ids.student, blockedIds: [ids.lecturer] }, { ownerId: ids.lecturer, acceptsMessages: false }, { ownerId: ids.student, acceptsMessages: false }]) {
       await MessagingSettings.create(settings); expect((await api('get', '/mentors')).body.data.total).toBe(0);
+      if (settings.ownerId.equals(ids.lecturer) && 'acceptsMessages' in settings && settings.acceptsMessages === false) expect((await api('get', '/profile', ids.lecturer)).body.data.acceptingRequests).toBe(false);
       expect((await api('get', `/mentors/${ids.lecturer}/availability`)).status).toBe(404);
       expect((await api('post', '/sessions').send({ mentorId: String(ids.lecturer), topic: 'Test mentoring', message: 'Synthetic mentoring request explanation.' })).status).toBeGreaterThanOrEqual(400); await MessagingSettings.deleteMany({});
     }
     await CommunityClaim.updateOne({ providerId: ids.lecturer }, { 'profile.acceptsStudentMessages': false }); expect((await api('get', '/mentors')).body.data.total).toBe(0);
+    expect((await api('get', '/profile', ids.lecturer)).body.data.acceptingRequests).toBe(false);
   });
   it('requires independent admin approval and review of current industry evidence', async () => {
     expect((await api('put', '/profile', ids.provider).send(profile())).status).toBe(403);
