@@ -53,7 +53,8 @@ export const updateNotificationPreferences = async (req: Request, res: Response)
       if (!actor.matchedCount) throw new NotificationError(403, 'An active account is required.');
       const current = await NotificationPreferences.findOne({ ownerId: req.user!._id }).session(session);
       if ((current?.revision ?? 0) !== values.revision) throw new NotificationError(409, 'Notification preferences changed. Reload before updating.');
-      return NotificationPreferences.findOneAndUpdate({ ownerId: req.user!._id }, { $set: { inApp: values.inApp, categories: values.categories, revision: values.revision + 1 } }, { new: true, upsert: true, runValidators: true, session });
+      const categories = { ...defaultNotificationPreferences().categories, ...(current?.toObject().categories ?? {}), ...values.categories };
+      return NotificationPreferences.findOneAndUpdate({ ownerId: req.user!._id }, { $set: { inApp: values.inApp, categories, revision: values.revision + 1 } }, { new: true, upsert: true, runValidators: true, session });
     }, { readPreference: 'primary', readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
     res.json({ success: true, data: { preferences: { inApp: row!.inApp, categories: row!.categories, revision: row!.revision }, supportedChannels: ['in_app'] } });
   } catch (error) { failure(res, error); }

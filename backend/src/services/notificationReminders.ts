@@ -8,6 +8,7 @@ import { NotificationProducer } from '../models/Notification';
 import { enqueueNotification } from './notifications';
 import { notificationTemplate, NotificationError } from './notificationPolicy';
 import { notificationTransactions } from './notificationDelivery';
+import { enqueueCampusEventWork } from './campusEventNotifications';
 
 /** Bounded rotating scans: progress over source rows, including non-due rows. */
 export async function enqueueNotificationReminders(limit = 100, now = new Date()) {
@@ -66,5 +67,6 @@ export async function enqueueNotificationReminders(limit = 100, now = new Date()
     await NotificationProducer.updateOne({ _id: cursor._id }, rows.length ? { $set: { afterId: rows[rows.length - 1]._id } } : { $unset: { afterId: '' } }, { session });
     return { scanned: rows.length, considered };
   }, notificationTransactions);
-  return { scholarships, resources, mentorships, savedOpportunities };
+  const campusEvents = await enqueueCampusEventWork(limit, now);
+  return { scholarships, resources, mentorships, savedOpportunities, campusEvents };
 }

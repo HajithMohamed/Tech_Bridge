@@ -9,6 +9,15 @@ appointment reminders. See [the mentorship module](mentorship.md) for its curren
 permissions, source revalidation and the worker rollback boundary. Statements below
 about mentorship being deferred describe the scope of the original Phase 6 change.
 
+Phase 9 adds campus event lifecycle updates, organizer decisions and bounded event
+reminders. See [campus events](campus-events.md) for authorization and rollout rules.
+The shared OpenAPI contract includes the eighth `event` category and
+`event`/`event_organizer` sources (and the saved-opportunity source from Phase 8).
+Preference reads include event=true by default. Updates still accept the original
+seven required category booleans; event is optional for older clients, and omission
+preserves an existing event opt-out. The worker now maintains five rotating producer
+cursors. Pause workers before rollback to code without these source checks.
+
 ## Audit and acceptance criteria
 
 | Area | Existing implementation | Phase 6 acceptance |
@@ -46,8 +55,8 @@ NotificationProducer stores reminder scan cursors. No API exposes raw outbox,
 lease tokens, retries, dedupe keys or another user's inbox. Administrators have
 no general private-inbox override and cannot create notices through a public API.
 
-Kinds: campaign, message, application, scholarship, resource, verification and
-mentorship. All rendered titles/bodies come from static templates. Legacy outbox
+Kinds: campaign, message, application, scholarship, resource, verification,
+mentorship and event. All rendered titles/bodies come from static templates. Legacy outbox
 text is not blindly copied. No message content, application justification, score,
 award amount, evidence filename/bytes, decision reason, appeal/dispute statement
 or external link is placed in a notification. Links use a fixed internal allowlist
