@@ -153,7 +153,7 @@ export function personalizedScore(profile: IUser['studentProfile'], row: Recomme
   if (studentSkills.size && requiredSkills.length) factors.skills = matchedSkills.length / requiredSkills.length * 100;
   const level: number[] = [];
   const stage = row.recommendationMetadata?.careerStage ?? (row.type === 'internship' ? 'internship' : containsPhrase(row.title, 'graduate') ? 'graduate' : containsPhrase(row.title, 'entry level') || containsPhrase(row.title, 'entry-level') || containsPhrase(row.title, 'junior') ? 'entry' : undefined);
-  if (preferences?.careerStagePreference && stage) level.push(preferences.careerStagePreference === 'either' || preferences.careerStagePreference === stage || (preferences.careerStagePreference === 'graduate' && stage === 'entry') ? 100 : 0);
+  if (preferences?.careerStagePreference && stage) level.push((preferences.careerStagePreference === 'either' && ['internship', 'entry', 'graduate'].includes(stage)) || preferences.careerStagePreference === stage || (preferences.careerStagePreference === 'graduate' && stage === 'entry') ? 100 : 0);
   if (profile?.studyYear && row.recommendationMetadata?.studyYears?.length) level.push(row.recommendationMetadata.studyYears.includes(profile.studyYear) ? 100 : 0);
   if (level.length) factors.level = level.reduce((a, b) => a + b, 0) / level.length;
   const preferenceScores: number[] = [];

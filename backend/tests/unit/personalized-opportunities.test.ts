@@ -60,6 +60,9 @@ describe('recommendation relevance and missing-information policy', () => {
     const value = score(p, listing({ recommendationMetadata: { careerStage: 'entry', employmentArrangement: 'part-time', studyYears: [1] } }));
     expect(value.factors.level).toBe(50); expect(value.factors.preferences).toBe(100);
   });
+  it.each([['internship', 100], ['entry', 100], ['graduate', 100], ['experienced', 0]])('treats either student career preference as internship/graduate work, not all levels: %s', (careerStage, expected) => {
+    expect(score(profile({ recommendationPreferences: { careerStagePreference: 'either' } }), listing({ recommendationMetadata: { careerStage } })).factors.level).toBe(expected);
+  });
   it('recognizes recent internship and entry-level opportunities for cold starts', () => {
     for (const row of [listing({ type: 'internship' }), listing({ title: 'Junior software developer' }), listing({ title: 'Graduate trainee' })]) expect(personalizedScore(undefined, row, now).entryLevel).toBe(true);
   });
