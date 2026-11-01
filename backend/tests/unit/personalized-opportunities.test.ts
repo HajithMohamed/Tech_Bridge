@@ -87,6 +87,11 @@ describe('recommendation relevance and missing-information policy', () => {
   it('has safe explanations without eligibility or acceptance promises', () => {
     const value = score(); expect(value.explanations.join(' ')).not.toMatch(/guaranteed|you are eligible|will be accepted/i); expect(value.explanations.some(item => item.includes('Java'))).toBe(true);
   });
+  it('bounds readable explanations for maximum-length interest/activity lists without changing their score', () => {
+    const labels = Array.from({ length: 40 }, (_, index) => `Selected creative topic ${index}`.padEnd(80, 'x'));
+    const value = score(profile({ careerInterests: labels.slice(0, 20), extracurricularActivities: labels.slice(20) }), listing({ recommendationMetadata: { interests: labels.slice(0, 20), activities: labels.slice(20) } }));
+    expect(value.factors.interests).toBe(100); expect(value.explanations[0].length).toBeLessThan(600); expect(value.explanations[0]).toContain('35 more');
+  });
   it('uses only explicit non-sensitive profile signals', () => {
     const regular = score(); const modified = score(profile({ gender: 'private', religion: 'private', ethnicity: 'private', fullName: 'Different person' }));
     expect(modified).toEqual(regular);

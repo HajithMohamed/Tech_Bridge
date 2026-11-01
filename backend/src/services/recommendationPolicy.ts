@@ -57,6 +57,10 @@ function containsPhrase(text: string, phrase: string) {
 function detectedInterests(text: string) {
   return Object.entries(aliases).filter(([, values]) => values.some(value => containsPhrase(text, value))).map(([key]) => key);
 }
+function explainMatches(values: string[]) {
+  const summary = values.slice(0, 5).join(', ');
+  return values.length > 5 ? `${summary} (+${values.length - 5} more)` : summary;
+}
 export function recommendationTags(value: unknown, max = 20, length = 80): string[] {
   if (!Array.isArray(value) || value.length > max) throw new ScholarshipError(400, `Provide at most ${max} recommendation values.`);
   const result = new Map<string, string>();
@@ -178,9 +182,9 @@ export function personalizedScore(profile: IUser['studentProfile'], row: Recomme
   const tier = hasInterest && ownDepartment ? 1 : hasInterest || hasSkill ? 2 : ownDepartment ? 3 : classification.interdisciplinary ? 4 : 5;
   const coldStart = !interests.length && !studentSkills.size;
   const explanations: string[] = [];
-  if (hasInterest) explanations.push(`Relevant to your selected interests or activities: ${matchedInterests.join(', ')}.`);
+  if (hasInterest) explanations.push(`Relevant to your selected interests or activities: ${explainMatches(matchedInterests)}.`);
   if (ownDepartment) explanations.push(`Relevant to your ${profile!.degree} programme; this is not an eligibility check.`);
-  if (hasSkill) explanations.push(`Matches your skills: ${matchedSkills.join(', ')}.`);
+  if (hasSkill) explanations.push(`Matches your skills: ${explainMatches(matchedSkills)}.`);
   if (stage === 'internship' || stage === 'entry' || stage === 'graduate') explanations.push(`Listed for ${stage === 'entry' ? 'entry-level' : stage} opportunities, subject to the provider's requirements.`);
   if (!explanations.length) explanations.push('Available for discovery; add interests, activities and skills to improve recommendations.');
   return {

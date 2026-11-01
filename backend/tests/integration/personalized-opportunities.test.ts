@@ -164,8 +164,10 @@ describe('ranked discovery, extracurricular interests and manual browsing', () =
     const response = await feed(); expect(response.status).toBe(503); expect(response.body.data).toBeUndefined(); expect(JSON.stringify(response.body)).not.toContain('PRIVATE-');
   });
   it('enforces a shared per-student feed limit and returns a retry interval without blocking peers', async () => {
-    const bucket = authBucket('recommendations:student', String(ids.student), 60_000);
-    await AuthRateLimit.create({ _id: bucket.key, attempts: 60, expiresAt: bucket.expiresAt });
+    // Cover a minute-boundary crossing without sleeping or freezing DB clocks.
+    const now = Date.now();
+    const buckets = [now, now + 60_000].map(time => authBucket('recommendations:student', String(ids.student), 60_000, time));
+    await AuthRateLimit.create(buckets.map(bucket => ({ _id: bucket.key, attempts: 60, expiresAt: bucket.expiresAt })));
     const response = await feed(); expect(response.status).toBe(429); expect(Number(response.headers['retry-after'])).toBeGreaterThan(0); expect((await feed('', ids.outsider)).status).toBe(200);
   });
   it('fails closed when shared abuse protection is unavailable', async () => {
