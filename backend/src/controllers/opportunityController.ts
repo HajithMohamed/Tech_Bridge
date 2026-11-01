@@ -10,6 +10,7 @@ import type { IUser } from '../models/User';
 import { discoverOpportunities, visibleOpportunity } from '../services/opportunityDiscovery';
 import { effectiveOpportunityStatus, eligibilityInput, opportunityDate, opportunityObject, opportunitySearch, opportunityText, opportunityTypes } from '../services/opportunityPolicy';
 import { lockScholarshipActor } from '../services/scholarships';
+import { recommendationMetadataInput } from '../services/recommendationPolicy';
 
 const workModes = ['remote', 'on-site', 'hybrid'];
 const coverageTypes = ['full', 'partial', 'tuition_only', 'equipment_only', 'stipend'];
@@ -44,7 +45,8 @@ const editableFields = [
   'availability',
   'paymentInfo',
   'contactMethod',
-  'eligibility'
+  'eligibility',
+  'recommendationMetadata'
 ] as const;
 const scholarshipFields = ['amount', 'currency', 'coverageType', 'eligibilityCriteria', 'numberOfAwards', 'renewable'] as const;
 
@@ -87,6 +89,7 @@ const validateOpportunity = (values: Record<string, unknown>): string | null => 
     if ((values.requiredSkills as unknown[]).length > 40) return 'Provide up to 40 preferred skills.';
     (values.requiredSkills as unknown[]).forEach(skill => opportunityText(skill, 1, 60));
     if (values.eligibility !== undefined) { if (values.type === 'scholarship') return 'Configure scholarship eligibility through the existing scholarship policy API.'; eligibilityInput(values.eligibility); }
+    if (values.recommendationMetadata !== undefined) recommendationMetadataInput(values.recommendationMetadata);
     for (const field of ['startDate', 'endDate']) if (values[field] !== undefined) opportunityDate(values[field]);
   } catch (error) { return error instanceof Error ? error.message : 'Invalid opportunity fields.'; }
 
@@ -132,6 +135,7 @@ const opportunityPayload = (body: Record<string, unknown>): Record<string, unkno
     if (body[field] !== undefined) payload[field] = body[field];
   });
   if (payload.eligibility !== undefined) payload.eligibility = eligibilityInput(payload.eligibility);
+  if (payload.recommendationMetadata !== undefined) payload.recommendationMetadata = recommendationMetadataInput(payload.recommendationMetadata);
   for (const field of ['applicationDeadline', 'startDate', 'endDate']) if (payload[field] !== undefined) payload[field] = opportunityDate(payload[field]);
   return payload;
 };

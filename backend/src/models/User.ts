@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import type { RecommendationPreferences } from '../services/recommendationPolicy';
 
 export type OrganizationType =
   | 'company'
@@ -55,6 +56,10 @@ export interface IUser extends Document {
     location?: string;
     skills: string[];
     careerGoal?: string;
+    specialization?: string;
+    careerInterests?: string[];
+    extracurricularActivities?: string[];
+    recommendationPreferences?: RecommendationPreferences;
     availabilityHours?: number;
     preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
     creatorProfile?: ICreatorProfile;
@@ -123,6 +128,18 @@ const userSchema = new Schema<IUser>(
       location: { type: String, trim: true, maxlength: 100 },
       skills: [{ type: String, trim: true, maxlength: 50 }],
       careerGoal: { type: String, trim: true, maxlength: 150 },
+      specialization: { type: String, trim: true, maxlength: 150, select: false },
+      careerInterests: { type: [{ type: String, trim: true, minlength: 1, maxlength: 80, match: /^[^<>\u0000-\u001f\u007f]+$/ }], default: undefined, select: false, validate: (value: string[]) => !value || value.length <= 20 },
+      extracurricularActivities: { type: [{ type: String, trim: true, minlength: 1, maxlength: 80, match: /^[^<>\u0000-\u001f\u007f]+$/ }], default: undefined, select: false, validate: (value: string[]) => !value || value.length <= 20 },
+      recommendationPreferences: { type: new Schema<RecommendationPreferences>({
+        personalizationEnabled: { type: Boolean },
+        preferredOpportunityTypes: { type: [{ type: String, enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'promotion', 'workshop', 'mentorship'] }], default: undefined, validate: (value: string[]) => !value || value.length <= 8 },
+        preferredWorkArrangements: { type: [{ type: String, enum: ['remote', 'on-site', 'hybrid'] }], default: undefined, validate: (value: string[]) => !value || value.length <= 3 },
+        preferredEmploymentArrangements: { type: [{ type: String, enum: ['full-time', 'part-time', 'contract', 'freelance', 'volunteer'] }], default: undefined, validate: (value: string[]) => !value || value.length <= 5 },
+        preferredLocations: { type: [{ type: String, trim: true, minlength: 1, maxlength: 100 }], default: undefined, validate: (value: string[]) => !value || value.length <= 10 },
+        careerStagePreference: { type: String, enum: ['internship', 'graduate', 'either'] },
+        revision: { type: Number, min: 0, default: 0 },
+      }, { _id: false }), default: undefined, select: false },
       availabilityHours: { type: Number, min: 0, max: 168 },
       preferredWorkType: { type: String, enum: ['remote', 'on-site', 'hybrid', 'flexible'] },
       creatorProfile: {

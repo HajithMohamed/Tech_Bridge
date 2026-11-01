@@ -20,12 +20,14 @@ import scholarshipRoutes from './routes/scholarshipRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import mentorshipRoutes from './routes/mentorshipRoutes';
 import campusEventRoutes from './routes/campusEventRoutes';
+import { recommendationWeights } from './services/recommendationPolicy';
 
 
 /** Build the API without connecting to MongoDB or opening a listener. */
 export const createApp = () => {
   const app = express();
   const configuration = securityConfiguration();
+  recommendationWeights();
   app.locals.registrationMode = configuration.registrationMode;
   app.disable('x-powered-by');
   // Never infer trusted proxy hops from user-controlled forwarding headers.

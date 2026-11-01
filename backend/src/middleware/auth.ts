@@ -8,6 +8,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: IUser;
+      sessionVersion?: number;
       notificationVerificationOnly?: boolean;
     }
   }
@@ -78,6 +79,7 @@ const authenticate = (verificationOnly: boolean, notificationAccess = false) => 
       return;
     }
 
+    req.sessionVersion = decoded.version ?? 0;
     req.user = user;
     req.notificationVerificationOnly = notificationAccess && decoded.scope === 'verification';
     next();
