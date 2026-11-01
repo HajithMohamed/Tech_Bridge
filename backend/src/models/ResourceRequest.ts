@@ -67,6 +67,9 @@ resourceRequestSchema.index(
 resourceRequestSchema.index({ resourceId: 1, status: 1, createdAt: 1, _id: 1 });
 resourceRequestSchema.index({ status: 1, 'allocation.dueAt': 1 });
 resourceRequestSchema.index({ status: 1, _id: 1 });
+resourceRequestSchema.index({ studentId: 1, createdAt: 1 });
+resourceRequestSchema.index({ providerId: 1, createdAt: 1 });
+resourceRequestSchema.index({ createdAt: 1 });
 
 const ResourceRequest = mongoose.model<IResourceRequest>('ResourceRequest', resourceRequestSchema);
 

@@ -100,9 +100,9 @@ TechBridge organizes student growth around four key pillars:
 - See [community verification, API contracts and review evidence](docs/community-verification-review.md). Existing directory entries do not establish account ownership.
 
 ### 6. Impact & Analytics Dashboard
-- Live platform statistics displaying registered students, open opportunities, applications submitted, and hardware resources accessed.
-- Distribution breakdowns of application statuses and resource access methods.
-- Provider-specific views and metrics on listing performance.
+- Database-driven student, provider and administrator metrics with role-scoped private distributions.
+- UTC creation-cohort filters summarized by current status, with confirmed support separated from unconfirmed legacy records.
+- Aggregated provider listing performance, bounded recent activity, and administrator account, queue and moderation counts.
 
 ### 7. Student Creator Marketplace
 - **Explicit student opt-in**: A creator profile is hidden by default. Students can choose public social-platform handles, public profile URLs, self-reported follower counts, niches, content types, compensation preferences, and sample-work links.
@@ -375,11 +375,20 @@ erDiagram
 ### 📊 Dashboard & Public Providers (`/api/dashboard`, `/api/providers`, `/api/provider`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/dashboard/stats` | Private | Aggregate platform impact metrics |
-| `GET` | `/api/provider/dashboard` | Provider | Provider metrics (total listings, views, applicant counts) |
+| `GET` | `/api/dashboard/stats` | Private | Legacy impact fields with role-scoped private distributions |
+| `GET` | `/api/dashboard/analytics` | Private | Current account's student/provider/admin summary; optional UTC creation cohort |
+| `GET` | `/api/dashboard/analytics/student` | Student | Own applications, scholarships, resource use, mentorship and visible campaigns |
+| `GET` | `/api/dashboard/analytics/provider` | Provider | Owned listings, applications, allocations and campaigns |
+| `GET` | `/api/dashboard/analytics/admin` | Admin | Platform accounts, recorded support, pending queues and moderation counts |
+| `GET` | `/api/provider/dashboard` | Provider | Aggregated provider metrics and bounded recent owned activity |
 | `PUT` | `/api/provider/profile` | Provider | Update provider details and verification info |
 | `GET` | `/api/providers/:id` | Public | Public organization profile page |
 | `GET` | `/api/health` | Public | API health check endpoint |
+
+Analytics definitions, source-proof rules, authorized scope and date filtering are
+documented in [the Phase 10 backend guide](backend/docs/platform-analytics.md) and
+[its OpenAPI contract](backend/docs/platform-analytics.openapi.json). Date filters
+summarize creation cohorts by current status; they do not reconstruct past states.
 
 ---
 
