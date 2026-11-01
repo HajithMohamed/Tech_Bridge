@@ -80,7 +80,7 @@ outbox records. Derived opportunity expiry/withdrawal never saves back to a list
 | resourceRequests.returnsConfirmed | Confirmed completed allocations with returnedAt and inventoryRestoredAt |
 | resourceRequests.overdue | Confirmed accepted returnable allocations with an un-restored, past dueAt; not inferred from every accepted request |
 | resourceRequests.acceptedWithoutAllocationRecord | Accepted/completed rows without confirmation, reported separately from actual inventory allocations |
-| resources.availableListings / availableUnits | Accepting, unpaused/unwithdrawn listings versus the sum of their remaining stock; zero stock and past donation/sponsorship deadlines are excluded; current owner verification is required |
+| resources.availableListings / availableUnits | Accepting, unpaused/unwithdrawn listings versus the sum of their remaining stock; zero stock and past donation/sponsorship deadlines are excluded; current eligible owners include active student sharing and administrator inventory, while provider owners must remain verified |
 | opportunities.byStatus | Effective current draft/open/closed/expired; admin withdrawal yields closed, and an elapsed open deadline yields expired without a database write |
 | opportunities.discoverableOpen | Open before the deadline, unwithdrawn, under a currently verified/active provider; distinct from an open status on an inaccessible source |
 | opportunities.expiringSoon | Unwithdrawn open records closing in the next seven days; a provider's owned subset or admin operational status count |
@@ -116,6 +116,10 @@ expose stronger outcome evidence. No legacy records are backfilled into fake pro
 History may be incomplete: absence of confirmation means unconfirmed, not necessarily
 that no real-world support occurred. Cancellation/reopening can remove current
 confirmed-award eligibility; these counts are not an immutable lifetime award ledger.
+Resource owner eligibility preserves the existing peer-sharing and admin listing
+workflows. Suspending a student owner withdraws their accepting stock, while an
+already recorded borrower allocation remains historical support. A regression test
+executes a student-owned share reservation through the real decision API.
 
 ## Query efficiency and database compatibility
 

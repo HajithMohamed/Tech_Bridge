@@ -23,12 +23,19 @@ export const numeric = (facets: Facets, key: string, field: 'count' | 'units' = 
 };
 const acceptedStudents: PipelineStage.FacetPipelineStage[] = [{ $match: { status: 'accepted', studentId: { $type: 'objectId' } } }, { $group: { _id: '$studentId' } }, { $count: 'count' }];
 const verifiedOwner = { role: 'provider', accountStatus: { $ne: 'suspended' }, 'providerProfile.verified': true, 'providerProfile.verificationStatus': 'VERIFIED', $or: [{ requiresEmailVerification: { $ne: true } }, { emailVerifiedAt: { $type: 'date' } }] };
-export function publicOwnerStages(field: string): PipelineStage[] {
+function eligibleOwnerStages(field: string, match: Record<string, unknown>): PipelineStage[] {
   return [
-    { $lookup: { from: User.collection.name, localField: field, foreignField: '_id', pipeline: [{ $match: verifiedOwner }, { $project: { _id: 1 } }], as: 'publishedOwner' } },
+    { $lookup: { from: User.collection.name, localField: field, foreignField: '_id', pipeline: [{ $match: match }, { $project: { _id: 1 } }], as: 'publishedOwner' } },
     { $match: { 'publishedOwner.0': { $exists: true } } },
   ];
 }
+export const publicOwnerStages = (field: string) => eligibleOwnerStages(field, verifiedOwner);
+export const resourceOwnerStages = () => eligibleOwnerStages('listedBy', {
+  accountStatus: { $ne: 'suspended' }, $and: [
+    { $or: [{ requiresEmailVerification: { $ne: true } }, { emailVerifiedAt: { $type: 'date' } }] },
+    { $or: [{ role: { $in: ['student', 'admin'] } }, { role: 'provider', 'providerProfile.verified': true, 'providerProfile.verificationStatus': 'VERIFIED' }] },
+  ],
+});
 export const openOpportunityMatch = (now: Date) => ({ status: 'open', applicationDeadline: { $gt: now }, scholarshipWithdrawnByAdmin: { $ne: true }, opportunityWithdrawnByAdmin: { $ne: true } });
 export const availableResourceMatch = (now: Date) => ({ status: 'available', quantityAvailable: { $gt: 0 }, availabilityPaused: { $ne: true }, withdrawnByAdmin: { $ne: true }, $and: [
   { $or: [{ accessType: { $ne: 'donation' } }, { 'accessDetails.donation.claimDeadline': null }, { 'accessDetails.donation.claimDeadline': { $gt: now } }] },
@@ -90,7 +97,7 @@ export async function opportunityMetrics(role: AnalyticsRole, id: Types.ObjectId
 export async function resourceListingMetrics(role: AnalyticsRole, id: Types.ObjectId, window: AnalyticsWindow, now: Date, session: ClientSession) {
   const [result] = await aggregateAnalytics<Facets>(Resource, [
     { $match: { ...cohortMatch(window), ...(role === 'provider' ? { listedBy: id } : {}) } },
-    { $facet: { accessTypes: grouped('accessType'), available: [{ $match: availableResourceMatch(now) }, ...(role === 'admin' ? publicOwnerStages('listedBy') as PipelineStage.FacetPipelineStage[] : []), { $group: { _id: null, count: { $sum: 1 }, units: { $sum: '$quantityAvailable' } } }] } },
+    { $facet: { accessTypes: grouped('accessType'), available: [{ $match: availableResourceMatch(now) }, ...(role === 'admin' ? resourceOwnerStages() as PipelineStage.FacetPipelineStage[] : []), { $group: { _id: null, count: { $sum: 1 }, units: { $sum: '$quantityAvailable' } } }] } },
   ], session); return result;
 }
 export async function mentorshipMetrics(role: AnalyticsRole, id: Types.ObjectId, window: AnalyticsWindow, now: Date, session: ClientSession) {
@@ -108,6 +115,6 @@ export async function campaignMetrics(role: AnalyticsRole, id: Types.ObjectId, w
 }
 export async function discoveryMetrics(window: AnalyticsWindow, now: Date, session: ClientSession) {
   const [opportunities] = await aggregateAnalytics<{ count: number }>(Opportunity, [{ $match: { ...cohortMatch(window), ...openOpportunityMatch(now) } }, ...publicOwnerStages('providerId'), { $count: 'count' }], session);
-  const resources = await aggregateAnalytics<{ _id: string; count: number }>(Resource, [{ $match: { ...cohortMatch(window), ...availableResourceMatch(now) } }, ...publicOwnerStages('listedBy'), ...grouped('accessType')], session);
+  const resources = await aggregateAnalytics<{ _id: string; count: number }>(Resource, [{ $match: { ...cohortMatch(window), ...availableResourceMatch(now) } }, ...resourceOwnerStages(), ...grouped('accessType')], session);
   return { openOpportunities: opportunities?.count ?? 0, resources };
 }

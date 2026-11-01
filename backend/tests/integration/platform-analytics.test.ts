@@ -140,6 +140,15 @@ describe('resource use, inventory and confirmed allocation history', () => {
     expect((await summary(ids.provider)).resourceRequests.total).toBe(1); expect((await summary(ids.admin)).resourceRequests.unavailableSources).toBe(1);
     expect(JSON.stringify((await get(ids.provider, '/api/provider/dashboard')).body)).not.toContain('Other private equipment');
   });
+  it('preserves student sharing and administrator inventory and recognizes a real peer reservation', async () => {
+    const peer = await resource({ accessType: 'share', providerOrgVerified: false, accessDetails: { borrowShare: { borrowDurationDays: 7, pickupLocation: 'Synthetic campus', returnCondition: 'Return in its original condition.' } } }, ids.outsider);
+    await resource({}, ids.admin);
+    const row = await resourceRequest(peer, { requestedAccessType: 'share' });
+    const accepted = await request(app).patch(`/api/resource-requests/${row._id}/status`).auth(token(ids.outsider), { type: 'bearer' }).send({ status: 'accepted', startAt: new Date(Date.now() + 3600000).toISOString(), dueAt: new Date(Date.now() + 86400000).toISOString() }); expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+    const data = await summary(); expect(data.discovery).toMatchObject({ availableResourceListings: 2, resourceListingsByAccessType: { share: 1, donation: 1 } }); expect(data.resourceRequests.confirmedAllocations).toBe(1);
+    expect((await summary(ids.admin)).resources).toMatchObject({ availableListings: 2, availableUnits: 9 });
+    await User.updateOne({ _id: ids.outsider }, { accountStatus: 'suspended' }); expect((await summary()).discovery.availableResourceListings).toBe(1); expect((await summary()).resourceRequests.confirmedAllocations).toBe(1);
+  });
   it('uses actual reserved return deadlines for overdue counts', async () => {
     const source = await resource(); const row = await resourceRequest(source, { status: 'accepted', allocation: { accessType: 'donation', inventoryReserved: true, returnRequired: true, dueAt: middle } });
     await ResourceEvent.create({ requestId: row._id, resourceId: source._id, actorId: ids.provider, action: 'accepted', toStatus: 'accepted' });
