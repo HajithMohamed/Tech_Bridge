@@ -1,0 +1,2241 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TechBridge Platform Analytics",
+    "version": "1.0.0",
+    "description": "Phase 10 read-only role analytics. Current status of creation cohorts; not historical state, online users, payments or inferred support. Existing dashboard field names are retained with explicit authorized scope."
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/dashboard/analytics": {
+      "get": {
+        "operationId": "getRoleSummary",
+        "summary": "Current account's authorized analytics",
+        "description": "Requires a normal current full session. No role/owner override, grouping, timezone or arbitrary filter fields are accepted. See platform-analytics.md for source-proof and legacy metric definitions.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role-authorized analytics from one read-only database snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RoleSummary"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidSession"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/dashboard/analytics/student": {
+      "get": {
+        "operationId": "getStudentSummary",
+        "summary": "Student's own activity and current public discovery",
+        "description": "Requires a normal current full session. No role/owner override, grouping, timezone or arbitrary filter fields are accepted. See platform-analytics.md for source-proof and legacy metric definitions.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role-authorized analytics from one read-only database snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/StudentSummary"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidSession"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/dashboard/analytics/provider": {
+      "get": {
+        "operationId": "getProviderSummary",
+        "summary": "Verified provider's owned activity",
+        "description": "Requires a normal current full session. No role/owner override, grouping, timezone or arbitrary filter fields are accepted. See platform-analytics.md for source-proof and legacy metric definitions.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role-authorized analytics from one read-only database snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ProviderSummary"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidSession"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/dashboard/analytics/admin": {
+      "get": {
+        "operationId": "getAdminSummary",
+        "summary": "Administrator's platform aggregates without private source contents",
+        "description": "Requires a normal current full session. No role/owner override, grouping, timezone or arbitrary filter fields are accepted. See platform-analytics.md for source-proof and legacy metric definitions.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role-authorized analytics from one read-only database snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AdminSummary"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidSession"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/dashboard/stats": {
+      "get": {
+        "operationId": "getLegacyImpact",
+        "summary": "Legacy impact fields with role-scoped private counts",
+        "description": "Requires a normal current full session. No role/owner override, grouping, timezone or arbitrary filter fields are accepted. See platform-analytics.md for source-proof and legacy metric definitions.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role-authorized analytics from one read-only database snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LegacyImpact"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidSession"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/provider/dashboard": {
+      "get": {
+        "operationId": "getProviderDashboard",
+        "summary": "Legacy provider dashboard with bounded activity and computed stats",
+        "description": "Requires a normal current full session. No role/owner override, grouping, timezone or arbitrary filter fields are accepted. See platform-analytics.md for source-proof and legacy metric definitions.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Optional only when both bounds are omitted. Canonical UTC timestamp; from inclusive, to exclusive; maximum interval 366 days. Counts creation cohorts by current status, not historical states.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role-authorized analytics from one read-only database snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ProviderDashboard"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidSession"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT full session"
+      }
+    },
+    "responses": {
+      "InvalidInput": {
+        "description": "Unsupported or malformed cohort filters.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InvalidSession": {
+        "description": "Missing, restricted, expired or revoked session.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Ineligible account, role, email or provider verification.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "Aggregate unavailable or invalid numeric result. No partial dashboard or private infrastructure detail is returned.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": false
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "Filter": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "basis": {
+            "const": "record_creation"
+          },
+          "endExclusive": {
+            "const": true
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "basis",
+          "endExclusive"
+        ],
+        "additionalProperties": false
+      },
+      "StudentApplications": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "applied": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reviewed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "waitlisted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "applied",
+              "reviewed",
+              "accepted",
+              "rejected",
+              "waitlisted",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "accepted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unavailableSources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byStatus",
+          "accepted",
+          "unavailableSources"
+        ],
+        "additionalProperties": false
+      },
+      "OwnedApplications": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "applied": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reviewed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "waitlisted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "applied",
+              "reviewed",
+              "accepted",
+              "rejected",
+              "waitlisted",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "accepted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unavailableSources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "acceptedStudents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byStatus",
+          "accepted",
+          "unavailableSources",
+          "acceptedStudents"
+        ],
+        "additionalProperties": false
+      },
+      "Scholarships": {
+        "type": "object",
+        "properties": {
+          "applications": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "applied": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reviewed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "waitlisted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "applied",
+              "reviewed",
+              "accepted",
+              "rejected",
+              "waitlisted",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "confirmedAwards": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "acceptedWithoutAwardRecord": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "applications",
+          "byStatus",
+          "confirmedAwards",
+          "acceptedWithoutAwardRecord"
+        ],
+        "additionalProperties": false
+      },
+      "StudentRequests": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "pending": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "waitlisted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cancelled": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "pending",
+              "accepted",
+              "rejected",
+              "completed",
+              "waitlisted",
+              "cancelled",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "confirmedAllocations": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currentAllocations": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "returnsConfirmed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "overdue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "acceptedWithoutAllocationRecord": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unavailableSources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byStatus",
+          "active",
+          "confirmedAllocations",
+          "currentAllocations",
+          "returnsConfirmed",
+          "overdue",
+          "acceptedWithoutAllocationRecord",
+          "unavailableSources"
+        ],
+        "additionalProperties": false
+      },
+      "OwnedRequests": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "pending": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "waitlisted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cancelled": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "pending",
+              "accepted",
+              "rejected",
+              "completed",
+              "waitlisted",
+              "cancelled",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "confirmedAllocations": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currentAllocations": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "returnsConfirmed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "overdue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "acceptedWithoutAllocationRecord": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unavailableSources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "acceptedStudents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "allocatedStudents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byStatus",
+          "active",
+          "confirmedAllocations",
+          "currentAllocations",
+          "returnsConfirmed",
+          "overdue",
+          "acceptedWithoutAllocationRecord",
+          "unavailableSources",
+          "acceptedStudents",
+          "allocatedStudents"
+        ],
+        "additionalProperties": false
+      },
+      "Mentorship": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "pending": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "approved": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "scheduled": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cancelled": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "pending",
+              "approved",
+              "scheduled",
+              "completed",
+              "rejected",
+              "cancelled",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "upcomingAppointments": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byStatus",
+          "active",
+          "upcomingAppointments"
+        ],
+        "additionalProperties": false
+      },
+      "Campaigns": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStage": {
+            "type": "object",
+            "properties": {
+              "draft": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "pending": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "in_progress": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "submitted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "changes_requested": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reviewed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "declined": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cancelled": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "draft",
+              "pending",
+              "accepted",
+              "in_progress",
+              "submitted",
+              "changes_requested",
+              "reviewed",
+              "completed",
+              "declined",
+              "cancelled",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byStage",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "Opportunities": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "draft": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "open": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "closed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "expired": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "draft",
+              "open",
+              "closed",
+              "expired",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "byType": {
+            "type": "object",
+            "properties": {
+              "job": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "internship": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "scholarship": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "course": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "freelance": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "promotion": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "workshop": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "mentorship": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "job",
+              "internship",
+              "scholarship",
+              "course",
+              "freelance",
+              "promotion",
+              "workshop",
+              "mentorship",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "open": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "discoverableOpen": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "expiringSoon": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "views": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byStatus",
+          "byType",
+          "open",
+          "discoverableOpen",
+          "expiringSoon",
+          "views"
+        ],
+        "additionalProperties": false
+      },
+      "Resources": {
+        "type": "object",
+        "properties": {
+          "totalListings": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byAccessType": {
+            "type": "object",
+            "properties": {
+              "borrow": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "share": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "installment": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "interest_free": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sponsorship": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "donation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "borrow",
+              "share",
+              "rent",
+              "installment",
+              "interest_free",
+              "sponsorship",
+              "donation",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "availableListings": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "availableUnits": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "totalListings",
+          "byAccessType",
+          "availableListings",
+          "availableUnits"
+        ],
+        "additionalProperties": false
+      },
+      "Discovery": {
+        "type": "object",
+        "properties": {
+          "openOpportunities": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "availableResourceListings": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resourceListingsByAccessType": {
+            "type": "object",
+            "properties": {
+              "borrow": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "share": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "installment": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "interest_free": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sponsorship": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "donation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "borrow",
+              "share",
+              "rent",
+              "installment",
+              "interest_free",
+              "sponsorship",
+              "donation",
+              "unknown"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "openOpportunities",
+          "availableResourceListings",
+          "resourceListingsByAccessType"
+        ],
+        "additionalProperties": false
+      },
+      "Accounts": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byRole": {
+            "type": "object",
+            "properties": {
+              "student": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "provider": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "admin": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "student",
+              "provider",
+              "admin",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "activeAccounts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "suspendedAccounts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "verifiedProviders": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "providersAwaitingVerification": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total",
+          "byRole",
+          "activeAccounts",
+          "suspendedAccounts",
+          "verifiedProviders",
+          "providersAwaitingVerification"
+        ],
+        "additionalProperties": false
+      },
+      "PendingReviews": {
+        "type": "object",
+        "properties": {
+          "communityClaims": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "scholarshipAppeals": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resourceDisputes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "communityClaims",
+          "scholarshipAppeals",
+          "resourceDisputes"
+        ],
+        "additionalProperties": false
+      },
+      "PendingRequests": {
+        "type": "object",
+        "properties": {
+          "applications": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resourceRequests": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "mentorshipRequests": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "creatorInvitations": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "providerVerifications": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "communityClaims": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "scholarshipAppeals": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resourceDisputes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "applications",
+          "resourceRequests",
+          "mentorshipRequests",
+          "creatorInvitations",
+          "providerVerifications",
+          "communityClaims",
+          "scholarshipAppeals",
+          "resourceDisputes"
+        ],
+        "additionalProperties": false
+      },
+      "Moderation": {
+        "type": "object",
+        "properties": {
+          "reports": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byStatus": {
+            "type": "object",
+            "properties": {
+              "open": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reviewed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "dismissed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "open",
+              "reviewed",
+              "dismissed",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "byTarget": {
+            "type": "object",
+            "properties": {
+              "opportunity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "resource": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "user": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "message": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "promotion_request": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "opportunity",
+              "resource",
+              "user",
+              "message",
+              "promotion_request",
+              "unknown"
+            ],
+            "additionalProperties": false
+          },
+          "administrativeActions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "reports",
+          "byStatus",
+          "byTarget",
+          "administrativeActions"
+        ],
+        "additionalProperties": false
+      },
+      "StudentSummary": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "scholarships": {
+            "$ref": "#/components/schemas/Scholarships"
+          },
+          "mentorship": {
+            "$ref": "#/components/schemas/Mentorship"
+          },
+          "campaigns": {
+            "$ref": "#/components/schemas/Campaigns"
+          },
+          "role": {
+            "const": "student"
+          },
+          "scope": {
+            "const": "self"
+          },
+          "applications": {
+            "$ref": "#/components/schemas/StudentApplications"
+          },
+          "resourceRequests": {
+            "$ref": "#/components/schemas/StudentRequests"
+          },
+          "discovery": {
+            "$ref": "#/components/schemas/Discovery"
+          },
+          "selfAccount": {
+            "type": "object",
+            "properties": {
+              "registeredInCohort": {
+                "type": "integer",
+                "enum": [
+                  0,
+                  1
+                ]
+              }
+            },
+            "required": [
+              "registeredInCohort"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "generatedAt",
+          "filter",
+          "scholarships",
+          "mentorship",
+          "campaigns",
+          "role",
+          "scope",
+          "applications",
+          "resourceRequests",
+          "discovery",
+          "selfAccount"
+        ],
+        "additionalProperties": false
+      },
+      "ProviderSummary": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "scholarships": {
+            "$ref": "#/components/schemas/Scholarships"
+          },
+          "mentorship": {
+            "$ref": "#/components/schemas/Mentorship"
+          },
+          "campaigns": {
+            "$ref": "#/components/schemas/Campaigns"
+          },
+          "applications": {
+            "$ref": "#/components/schemas/OwnedApplications"
+          },
+          "resourceRequests": {
+            "$ref": "#/components/schemas/OwnedRequests"
+          },
+          "opportunities": {
+            "$ref": "#/components/schemas/Opportunities"
+          },
+          "resources": {
+            "$ref": "#/components/schemas/Resources"
+          },
+          "role": {
+            "const": "provider"
+          },
+          "scope": {
+            "const": "owned"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "generatedAt",
+          "filter",
+          "scholarships",
+          "mentorship",
+          "campaigns",
+          "applications",
+          "resourceRequests",
+          "opportunities",
+          "resources",
+          "role",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "AdminSummary": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "scholarships": {
+            "$ref": "#/components/schemas/Scholarships"
+          },
+          "mentorship": {
+            "$ref": "#/components/schemas/Mentorship"
+          },
+          "campaigns": {
+            "$ref": "#/components/schemas/Campaigns"
+          },
+          "applications": {
+            "$ref": "#/components/schemas/OwnedApplications"
+          },
+          "resourceRequests": {
+            "$ref": "#/components/schemas/OwnedRequests"
+          },
+          "opportunities": {
+            "$ref": "#/components/schemas/Opportunities"
+          },
+          "resources": {
+            "$ref": "#/components/schemas/Resources"
+          },
+          "role": {
+            "const": "admin"
+          },
+          "scope": {
+            "const": "platform"
+          },
+          "accounts": {
+            "$ref": "#/components/schemas/Accounts"
+          },
+          "pendingReviews": {
+            "$ref": "#/components/schemas/PendingReviews"
+          },
+          "pendingRequests": {
+            "$ref": "#/components/schemas/PendingRequests"
+          },
+          "moderation": {
+            "$ref": "#/components/schemas/Moderation"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "generatedAt",
+          "filter",
+          "scholarships",
+          "mentorship",
+          "campaigns",
+          "applications",
+          "resourceRequests",
+          "opportunities",
+          "resources",
+          "role",
+          "scope",
+          "accounts",
+          "pendingReviews",
+          "pendingRequests",
+          "moderation"
+        ],
+        "additionalProperties": false
+      },
+      "RoleSummary": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StudentSummary"
+          },
+          {
+            "$ref": "#/components/schemas/ProviderSummary"
+          },
+          {
+            "$ref": "#/components/schemas/AdminSummary"
+          }
+        ]
+      },
+      "LegacyImpact": {
+        "type": "object",
+        "properties": {
+          "totalStudents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "totalOpenOpportunities": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "totalApplications": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "totalResourceListings": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "applicationsByStatus": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "resourceListingsByAccessType": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "student",
+              "provider",
+              "admin"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "self",
+              "owned",
+              "platform"
+            ]
+          },
+          "filter": {
+            "$ref": "#/components/schemas/Filter"
+          }
+        },
+        "required": [
+          "totalStudents",
+          "totalOpenOpportunities",
+          "totalApplications",
+          "totalResourceListings",
+          "applicationsByStatus",
+          "resourceListingsByAccessType",
+          "role",
+          "scope",
+          "filter"
+        ],
+        "additionalProperties": false
+      },
+      "RecentOpportunity": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "job",
+              "internship",
+              "scholarship",
+              "course",
+              "freelance",
+              "promotion",
+              "workshop",
+              "mentorship"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "closed",
+              "expired"
+            ]
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "views": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "_id",
+          "title",
+          "type",
+          "status",
+          "applicationDeadline",
+          "createdAt",
+          "views"
+        ],
+        "additionalProperties": false
+      },
+      "Activity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "opportunity",
+              "application",
+              "resource_request"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "detail",
+          "status",
+          "occurredAt"
+        ],
+        "additionalProperties": false
+      },
+      "ProviderDashboard": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "object",
+            "properties": {
+              "totalOpportunities": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "scholarships": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "paidProjects": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "internships": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "trainingPrograms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "mentorshipListings": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "applicationsReceived": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "acceptedApplications": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "studentsConnected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "resourceRequestsReceived": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "pendingRequests": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "acceptedRequests": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "activeListings": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "resourceCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "resourceRequestsAccepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "resourceStudentsConnected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "expiringSoon": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "views": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "confirmedResourceAllocations": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "confirmedScholarshipAwards": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "creatorCampaigns": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "activeCreatorCampaigns": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "totalOpportunities",
+              "scholarships",
+              "paidProjects",
+              "internships",
+              "trainingPrograms",
+              "mentorshipListings",
+              "applicationsReceived",
+              "acceptedApplications",
+              "studentsConnected",
+              "resourceRequestsReceived",
+              "pendingRequests",
+              "acceptedRequests",
+              "activeListings",
+              "resourceCount",
+              "resourceRequestsAccepted",
+              "resourceStudentsConnected",
+              "expiringSoon",
+              "views",
+              "confirmedResourceAllocations",
+              "confirmedScholarshipAwards",
+              "creatorCampaigns",
+              "activeCreatorCampaigns"
+            ],
+            "additionalProperties": false
+          },
+          "recentOpportunities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentOpportunity"
+            },
+            "maxItems": 4
+          },
+          "recentActivity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Activity"
+            },
+            "maxItems": 6
+          },
+          "scope": {
+            "const": "owned"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/Filter"
+          }
+        },
+        "required": [
+          "stats",
+          "recentOpportunities",
+          "recentActivity",
+          "scope",
+          "filter"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

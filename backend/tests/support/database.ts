@@ -59,6 +59,11 @@ export class TestDatabase {
     await Promise.all(Object.values(mongoose.connection.collections).map((collection) => collection.deleteMany({})));
   }
 
+  getUri(): string {
+    this.assertOwnership();
+    return this.uri!;
+  }
+
   async stop(): Promise<void> {
     if (this.uri && mongoose.connection.readyState !== 0) {
       this.assertOwnership();

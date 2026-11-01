@@ -3,7 +3,10 @@ export interface User {
   fullName: string;
   email: string;
   role: 'student' | 'provider' | 'admin';
+  adminBaseRole?: 'student' | 'provider';
   accountStatus?: 'active' | 'suspended';
+  emailVerifiedAt?: string;
+  requiresEmailVerification?: boolean;
   studentProfile?: StudentProfile;
   providerProfile?: ProviderProfile;
   providerVerificationStatus?: 'pending' | 'verified' | 'rejected';
@@ -60,6 +63,8 @@ export interface CreatorPlatformProfile {
 
 export interface CreatorProfile {
   isDiscoverable: boolean;
+  displayName?: string;
+  availability?: 'available' | 'busy' | 'unavailable';
   platforms: CreatorPlatformProfile[];
   niches: string[];
   contentTypes: string[];
@@ -73,7 +78,8 @@ export interface ProviderProfile {
   organizationName: string;
   organizationType: OrganizationType;
   verified?: boolean;
-  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NEEDS_INFO';
+  verificationDocumentId?: string;
   rejectionReason?: string;
   contactEmail: string;
   contactPerson: string;
@@ -95,8 +101,7 @@ export type CoverageType = 'full' | 'partial' | 'tuition_only' | 'equipment_only
 export interface OpportunityProvider {
   _id: string;
   fullName: string;
-  email: string;
-  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'verificationStatus'>;
+  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified'>;
 }
 
 export interface Opportunity {
@@ -162,9 +167,8 @@ export type ResourceStatus = 'available' | 'claimed';
 export interface ResourceListingOwner {
   _id: string;
   fullName: string;
-  email: string;
   role: User['role'];
-  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified' | 'verificationStatus' | 'contactEmail' | 'phone'>;
+  providerProfile?: Pick<ProviderProfile, 'organizationName' | 'organizationType' | 'verified'>;
 }
 
 export interface ResourceAccessDetails {
@@ -224,7 +228,7 @@ export interface ResourceListing {
   category: ResourceCategory;
   condition?: ResourceCondition;
   accessType: ResourceAccessType;
-  listedBy: string | ResourceListingOwner;
+  listedBy: string | ResourceListingOwner | null;
   providerOrgVerified: boolean;
   quantityAvailable: number;
   status: ResourceStatus;
@@ -263,12 +267,14 @@ export interface ApplicationOpportunity {
   workMode: WorkMode;
   applicationDeadline: string;
   status: OpportunityStatus;
+  providerId?: string | OpportunityProvider | null;
 }
 
 export interface OpportunityApplication {
   _id: string;
-  opportunityId: string | ApplicationOpportunity;
+  opportunityId: string | ApplicationOpportunity | null;
   studentId: string | ApplicationApplicant;
+  providerId?: string | OpportunityProvider | null;
   message?: string;
   justification: string;
   selfDeclaredNeed: 'low' | 'medium' | 'high';
@@ -372,9 +378,9 @@ export type ResourceRequestStatus = 'pending' | 'accepted' | 'rejected' | 'compl
 
 export interface ResourceRequest {
   _id: string;
-  studentId: string | User | ApplicationApplicant;
-  providerId: string | User;
-  resourceId: string | ResourceListing;
+  studentId: string | User | ApplicationApplicant | null;
+  providerId: string | User | null;
+  resourceId: string | ResourceListing | null;
   requestedAccessType: ResourceAccessType;
   resourceCategory?: ResourceCategory;
   durationOrTerms?: string;
@@ -411,10 +417,14 @@ export interface PromotionRequest {
   updatedAt: string;
 }
 
+export type PublicProviderDetails = Pick<ProviderProfile,
+  'organizationName' | 'organizationType' | 'verified' | 'location' | 'website' |
+  'logoUrl' | 'description' | 'opportunityCategories' | 'resourceAccessMethods'>;
+
 export interface PublicProviderProfile {
   _id: string;
   fullName: string;
-  providerProfile: ProviderProfile;
+  providerProfile: PublicProviderDetails;
   createdAt: string;
 }
 

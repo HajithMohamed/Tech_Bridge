@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { protectNotifications } from '../middleware/auth';
+import { getNotificationPreferences, listNotifications, setNotificationRead, unreadNotifications, updateNotificationPreferences } from '../controllers/notificationController';
+const router = Router();
+router.use(protectNotifications);
+router.get('/', listNotifications);
+router.get('/unread-count', unreadNotifications);
+router.get('/preferences', getNotificationPreferences);
+router.put('/preferences', updateNotificationPreferences);
+router.patch('/:id/read', setNotificationRead);
+export default router;

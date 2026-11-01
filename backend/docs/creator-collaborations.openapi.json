@@ -1,0 +1,1526 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TechBridge creator collaboration backend",
+    "version": "2.0.0-phase-3",
+    "description": "Versioned participant-only campaign workflow. No payments, scraping or notification delivery. Pending outbox records are stored events, not delivered notices. See creator-collaborations.md for lifecycle, legacy compatibility, index rollout, coordinated-writer requirements and rollback limits."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Local development"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/promotion-requests": {
+      "post": {
+        "operationId": "createCreatorCampaign",
+        "summary": "Create a private draft or send an invitation",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User",
+          "NotificationOutbox",
+          "MessagingSettings"
+        ],
+        "description": "Currently verified provider, active opted-in available creator, no blocks. Published duplicate pair returns 409; drafts may coexist within the rolling 20-creation cap. Actor/status/history fields cannot be mass-assigned. Only sent invitations queue a pending generic notice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Proposal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created draft or published invitation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/promotion-requests/mine": {
+      "get": {
+        "operationId": "listOwnCreatorCampaigns",
+        "summary": "List the student's own published campaigns; unpublished drafts remain hidden after cancellation.",
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User"
+        ],
+        "description": "Owner only. Status filter uses the legacy summary. Stable createdAt/_id descending sort; no cross-request snapshot. Full audit/submission arrays are omitted; GET /{id} returns detail.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined",
+                "completed",
+                "cancelled"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List the student's own published campaigns; unpublished drafts remain hidden after cancellation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/promotion-requests/provider": {
+      "get": {
+        "operationId": "listOwnProviderCampaigns",
+        "summary": "List the currently verified provider's own campaigns, including private drafts.",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User"
+        ],
+        "description": "Owner only. Status filter uses the legacy summary. Stable createdAt/_id descending sort; no cross-request snapshot. Full audit/submission arrays are omitted; GET /{id} returns detail.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined",
+                "completed",
+                "cancelled"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List the currently verified provider's own campaigns, including private drafts.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/promotion-requests/{id}": {
+      "get": {
+        "operationId": "readCreatorCampaign",
+        "summary": "Read full campaign detail",
+        "x-authorized-roles": [
+          "student",
+          "provider"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User",
+          "NotificationOutbox",
+          "MessagingSettings"
+        ],
+        "description": "Only an owning participant. Administrators have no override. Unknown/unrelated and unpublished student targets return 404. Current actor authentication/verification still applies.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full owner-scoped campaign.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/promotion-requests/{id}/terms": {
+      "patch": {
+        "operationId": "editDraftCampaignTerms",
+        "summary": "Replace a private draft's proposal",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User",
+          "NotificationOutbox",
+          "MessagingSettings"
+        ],
+        "description": "Provider-owner only, version-2 draft only. Full validated replacement is audited with a terms snapshot. Publishing freezes terms; cancel and create a revised offer instead of silently changing published/accepted terms.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Full owner-scoped campaign.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/promotion-requests/{id}/status": {
+      "patch": {
+        "operationId": "changeCreatorCampaignStage",
+        "summary": "Perform a permitted status-stage action",
+        "x-authorized-roles": [
+          "student",
+          "provider"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User",
+          "NotificationOutbox",
+          "MessagingSettings"
+        ],
+        "description": "Version 2: provider draft->pending; student pending->accepted/declined; either accepted->in_progress; provider reviewed->completed; either may cancel nonterminal published stages with a reason. Drafts remain provider-only. Expired terms cannot publish/accept. Active students may exit when counterparties become inactive/deleted/unverified. Legacy pre-workflow direct completion and version-1 behavior remain documented.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Full owner-scoped campaign.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/promotion-requests/{id}/submissions": {
+      "post": {
+        "operationId": "submitCreatorDeliverables",
+        "summary": "Submit or resubmit deliverables",
+        "x-authorized-roles": [
+          "student"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User",
+          "NotificationOutbox",
+          "MessagingSettings"
+        ],
+        "description": "Owning student only. Version 2 requires in_progress or changes_requested. Up to ten submissions; supplied links are references, not uploaded/fetched content. Agreed deadline lateness is flagged for human review, never auto-completed. Version 1 retains submission after acceptance.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Full owner-scoped campaign.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/promotion-requests/{id}/review": {
+      "post": {
+        "operationId": "reviewCreatorDeliverables",
+        "summary": "Review the current submission",
+        "x-authorized-roles": [
+          "provider"
+        ],
+        "x-database-models": [
+          "PromotionRequest",
+          "User",
+          "NotificationOutbox",
+          "MessagingSettings"
+        ],
+        "description": "Owning currently verified provider only, submitted work required. Version 2 requires the current submissionId; approval moves to reviewed and requires a separate completion action. Changes_requested requires a reason and permits resubmission. Version 1 retains approval-driven completion. Revision/history/outbox changes commit together.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Full owner-scoped campaign.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/Missing"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedEncoding"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Full expiring HS256 session; persisted roles, current account/provider verification and token-version revocation remain authoritative."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Revision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 1000,
+        "description": "Optional expected revision; stale values return 409. Omission preserves legacy calls; clients should send it."
+      },
+      "Terms": {
+        "type": "object",
+        "required": [
+          "campaignBrief",
+          "deliverables",
+          "compensationType"
+        ],
+        "properties": {
+          "campaignBrief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "deliverables": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "compensationType": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "product_exchange",
+              "experience",
+              "affiliate"
+            ]
+          },
+          "compensationDetails": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "deadline": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              }
+            ],
+            "description": "Optional future calendar date (UTC midnight) or ISO timestamp with timezone. Empty clears it in draft replacement."
+          }
+        },
+        "description": "Plain text; no markup/control characters (newlines permitted). Published offers are immutable. Proposal text describes compensation only; no payment processing or payment credentials."
+      },
+      "Proposal": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Terms"
+          },
+          {
+            "type": "object",
+            "required": [
+              "studentId"
+            ],
+            "properties": {
+              "studentId": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              "saveAsDraft": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        ],
+        "description": "Server owns actor, status, workflow version, revision and history. Drafts require valid complete terms and an opted-in available creator."
+      },
+      "CreatorParticipant": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Public alias preferred. Relationship label remains visible after discovery withdrawal."
+          },
+          "studentProfile": {
+            "type": "object",
+            "properties": {
+              "institution": {
+                "type": "string",
+                "description": "Only when separately consented on a discoverable profile."
+              },
+              "institutionSource": {
+                "type": "string",
+                "enum": [
+                  "self_reported"
+                ]
+              },
+              "creatorProfile": {
+                "type": "object",
+                "description": "Phase 2 public profile allowlist while discoverable. Hidden profiles expose only isDiscoverable:false and empty niches/platforms arrays."
+              }
+            }
+          }
+        },
+        "description": "No email, password, token version or private academic fields."
+      },
+      "ProviderParticipant": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "providerProfile": {
+            "type": "object",
+            "properties": {
+              "organizationName": {
+                "type": "string"
+              },
+              "organizationType": {
+                "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "description": "Existing safe provider name/type/verification projection; no private contact data."
+      },
+      "Submission": {
+        "type": "object",
+        "required": [
+          "_id",
+          "text",
+          "urls",
+          "submittedAt"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "urls": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 500
+            }
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isLate": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "review": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "changes_requested"
+            ]
+          },
+          "reviewNote": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "History": {
+        "type": "object",
+        "required": [
+          "action",
+          "actorId",
+          "actorRole",
+          "at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "drafted",
+              "terms_updated",
+              "sent",
+              "started",
+              "created",
+              "accepted",
+              "declined",
+              "cancelled",
+              "submitted",
+              "changes_requested",
+              "approved",
+              "completed"
+            ]
+          },
+          "actorId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "actorRole": {
+            "type": "string",
+            "enum": [
+              "student",
+              "provider"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "terms": {
+            "$ref": "#/components/schemas/Terms"
+          }
+        }
+      },
+      "Campaign": {
+        "type": "object",
+        "required": [
+          "_id",
+          "studentId",
+          "providerId",
+          "campaignBrief",
+          "deliverables",
+          "compensationType",
+          "status",
+          "stage"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "studentId": {
+            "$ref": "#/components/schemas/CreatorParticipant"
+          },
+          "providerId": {
+            "$ref": "#/components/schemas/ProviderParticipant"
+          },
+          "campaignBrief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "deliverables": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "compensationType": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "product_exchange",
+              "experience",
+              "affiliate"
+            ]
+          },
+          "compensationDetails": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "deadline": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              }
+            ],
+            "description": "Optional future calendar date (UTC midnight) or ISO timestamp with timezone. Empty clears it in draft replacement."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "declined",
+              "completed",
+              "cancelled"
+            ],
+            "description": "Compatibility summary only. Draft/pending map to pending; work/review stages map to accepted."
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "pending",
+              "accepted",
+              "in_progress",
+              "submitted",
+              "changes_requested",
+              "reviewed",
+              "completed",
+              "declined",
+              "cancelled"
+            ],
+            "readOnly": true
+          },
+          "workflowVersion": {
+            "type": "integer",
+            "enum": [
+              1,
+              2
+            ],
+            "description": "Absent for pre-workflow legacy records. New records use 2."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "deliveryStatus": {
+            "type": "string",
+            "enum": [
+              "not_submitted",
+              "submitted",
+              "changes_requested",
+              "approved"
+            ]
+          },
+          "agreedTerms": {
+            "$ref": "#/components/schemas/Terms"
+          },
+          "cancellationReason": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "submissions": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/Submission"
+            }
+          },
+          "history": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/History"
+            }
+          }
+        }
+      },
+      "CampaignSummary": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "studentId": {
+            "$ref": "#/components/schemas/CreatorParticipant"
+          },
+          "providerId": {
+            "$ref": "#/components/schemas/ProviderParticipant"
+          },
+          "campaignBrief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "deliverables": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "compensationType": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "product_exchange",
+              "experience",
+              "affiliate"
+            ]
+          },
+          "compensationDetails": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "deadline": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              }
+            ],
+            "description": "Optional future calendar date (UTC midnight) or ISO timestamp with timezone. Empty clears it in draft replacement."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "declined",
+              "completed",
+              "cancelled"
+            ],
+            "description": "Compatibility summary only. Draft/pending map to pending; work/review stages map to accepted."
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "pending",
+              "accepted",
+              "in_progress",
+              "submitted",
+              "changes_requested",
+              "reviewed",
+              "completed",
+              "declined",
+              "cancelled"
+            ],
+            "readOnly": true
+          },
+          "workflowVersion": {
+            "type": "integer",
+            "enum": [
+              1,
+              2
+            ],
+            "description": "Absent for pre-workflow legacy records. New records use 2."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "deliveryStatus": {
+            "type": "string",
+            "enum": [
+              "not_submitted",
+              "submitted",
+              "changes_requested",
+              "approved"
+            ]
+          },
+          "agreedTerms": {
+            "$ref": "#/components/schemas/Terms"
+          },
+          "cancellationReason": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Same owner-scoped record summary, with full submissions/history arrays omitted. Use the detail endpoint for those arrays."
+      },
+      "CampaignEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "request"
+            ],
+            "properties": {
+              "request": {
+                "$ref": "#/components/schemas/Campaign"
+              }
+            }
+          }
+        }
+      },
+      "ListEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "requests",
+              "page",
+              "limit",
+              "total",
+              "pages"
+            ],
+            "properties": {
+              "requests": {
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "$ref": "#/components/schemas/CampaignSummary"
+                }
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pages": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      },
+      "StatusInput": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "declined",
+              "in_progress",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000,
+            "description": "Required plain-text cancellation reason; ignored for other status actions."
+          }
+        }
+      },
+      "TermsInput": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Terms"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "revision": {
+                "$ref": "#/components/schemas/Revision"
+              },
+              "studentId": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$",
+                "description": "Optional, but must match the existing target; retargeting is forbidden."
+              }
+            }
+          }
+        ]
+      },
+      "SubmissionInput": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "urls": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 500,
+              "description": "Public HTTP(S) references only; no IP literals, credentials, custom ports, local/private suffixes or active schemes. Not fetched by the server."
+            }
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision"
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "required": [
+              "urls"
+            ],
+            "properties": {
+              "urls": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          }
+        ]
+      },
+      "ReviewInput": {
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "changes_requested"
+            ]
+          },
+          "submissionId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$",
+            "description": "Required for version 2; must identify the current latest submission. Optional for version 1 compatibility."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Changes requested requires 10-1000 plain-text characters; optional approval note is 1-1000 when nonempty."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Invalid": {
+        "description": "Invalid fields, dates, ID, revision, list bounds, current-submission reference or request body.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, expired, revoked or restricted session.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Wrong role, unverified/suspended actor, unrelated mutation or blocked invitation.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Missing": {
+        "description": "Missing or inaccessible campaign/creator. Unpublished drafts are invisible to students, including after cancellation.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Illegal stage, stale revision/submission, expired acceptance, duplicate active invitation or activity/submission limit.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Provider has created 20 records in the rolling 24-hour window.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooLarge": {
+        "description": "Request body exceeds shared parser limit.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "UnsupportedEncoding": {
+        "description": "Unsupported request encoding.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "Generic service failure; no database/stack details. If the response is uncertain after commit, retrieve own records before retrying.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

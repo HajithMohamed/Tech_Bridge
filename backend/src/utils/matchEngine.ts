@@ -55,14 +55,17 @@ const CAREER_TYPE_MAP: Record<string, string[]> = {
 const normalise = (s: string): string =>
   s.toLowerCase().replace(/[.\-_]/g, '').replace(/\s+/g, ' ').trim();
 
-/**
- * Check if two skill strings are a "fuzzy match".
- * Returns true when one string contains the other after normalisation.
- */
+/** Explicit aliases avoid substring matches such as Java/JavaScript and C/C++. */
+export function canonicalSkill(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const label = value.toLowerCase().replace(/\s+/g, ' ').trim();
+  const key = label.replace(/[.\s_-]/g, '');
+  const aliases: Record<string, string> = { reactjs: 'react', react: 'react', nodejs: 'nodejs', node: 'nodejs', javascript: 'javascript', js: 'javascript', typescript: 'typescript', ts: 'typescript', vuejs: 'vue', vue: 'vue', dotnet: 'dotnet', net: 'dotnet' };
+  return aliases[key] ?? label;
+}
 const fuzzyMatch = (studentSkill: string, requiredSkill: string): boolean => {
-  const a = normalise(studentSkill);
-  const b = normalise(requiredSkill);
-  return a === b || a.includes(b) || b.includes(a);
+  const a = canonicalSkill(studentSkill);
+  return Boolean(a && a === canonicalSkill(requiredSkill));
 };
 
 /**
@@ -74,8 +77,11 @@ export function matchScore(
   studentProfile: IUser['studentProfile'],
   opportunity: IOpportunity
 ): MatchBreakdown {
-  const studentSkills = studentProfile?.skills ?? [];
-  const requiredSkills = opportunity.requiredSkills ?? [];
+  const studentSkills = (studentProfile?.skills ?? []).filter(skill => canonicalSkill(skill));
+  const seen = new Set<string>();
+  const requiredSkills = (opportunity.requiredSkills ?? []).filter(skill => {
+    const key = canonicalSkill(skill); if (!key || seen.has(key)) return false; seen.add(key); return true;
+  });
 
   // ── 1. SKILL MATCH (60 % weight) ──────────────────────
   const matchedSkills: string[] = [];
@@ -131,7 +137,7 @@ export function matchScore(
   if (opportunity.workMode === 'remote') {
     // Remote opportunities are universally accessible
     locationScore = 90;
-  } else if (studentProfile?.location && opportunity.location) {
+  } else if (studentProfile?.location?.trim() && opportunity.location?.trim()) {
     const studentLoc = normalise(studentProfile.location);
     const oppLoc = normalise(opportunity.location);
 
@@ -208,9 +214,9 @@ export const SKILL_RESOURCES: Record<string, { label: string; url: string }> = {
  * Falls back to a Google search if no curated entry exists.
  */
 export function getResourceForSkill(skill: string): { label: string; url: string } {
-  const key = normalise(skill);
+  const key = canonicalSkill(skill);
   for (const [mapKey, resource] of Object.entries(SKILL_RESOURCES)) {
-    if (key === normalise(mapKey) || key.includes(normalise(mapKey)) || normalise(mapKey).includes(key)) {
+    if (key && key === canonicalSkill(mapKey)) {
       return resource;
     }
   }

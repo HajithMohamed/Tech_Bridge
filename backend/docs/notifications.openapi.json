@@ -1,0 +1,970 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TechBridge centralized in-app notifications",
+    "version": "1.0.0",
+    "description": "Backend-only inbox, consent and read-state contract. Active, non-revoked JWT required. New notification auth requires email-gated accounts to verify first. Provider-verification scoped sessions may read their own verification notices/preferences without gaining normal platform access. No public creation, retry, worker state, cross-user inbox, email or admin override. See notifications.md for transactional source hooks, leased worker, reminders, migrations and rollback. Verification-scoped sessions remain limited even for an approved provider and cannot update global notification preferences."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000"
+    }
+  ],
+  "paths": {
+    "/api/notifications": {
+      "get": {
+        "operationId": "listOwnNotifications",
+        "summary": "Read own notification history",
+        "description": "Stable occurredAt descending then ID descending. Defaults page 1/limit 20; unknown filters reject. Total follows filters; unread is global own visible count. No queue/lease/dedupe/recipient authority fields are returned. Pending providers see only verification notices. Disabling future notices does not erase history.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student (own)",
+          "provider (own; unverified/restricted scope verification category only)",
+          "admin (own only)"
+        ],
+        "x-database-models": [
+          "Notification",
+          "User"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "campaign",
+                "message",
+                "application",
+                "scholarship",
+                "resource",
+                "verification",
+                "mentorship",
+                "event"
+              ]
+            }
+          },
+          {
+            "name": "unread",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "notifications": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Notification"
+                          }
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10000
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        },
+                        "pages": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        },
+                        "unread": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "notifications",
+                        "page",
+                        "limit",
+                        "total",
+                        "pages",
+                        "unread"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed ID, unsupported filter, nonboolean state/consent or invalid page/revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Suspended/email-gated account, changed provider scope or unavailable category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing/inaccessible notification; no administrator ownership override",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized database/transaction failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "countOwnUnreadNotifications",
+        "summary": "Count own unread notifications",
+        "description": "Unverified providers count only verification notices; no global administrator count.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student (own)",
+          "provider (own; unverified/restricted scope verification category only)",
+          "admin (own only)"
+        ],
+        "x-database-models": [
+          "Notification",
+          "User"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "unread": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "unread"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed ID, unsupported filter, nonboolean state/consent or invalid page/revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Suspended/email-gated account, changed provider scope or unavailable category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing/inaccessible notification; no administrator ownership override",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized database/transaction failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "patch": {
+        "operationId": "setOwnNotificationRead",
+        "summary": "Mark own notification read or unread",
+        "description": "Body must contain only read:boolean. True preserves the original timestamp on repeats; false removes readAt. Another recipient/admin receives 404. Does not change occurrence time or preferences.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student (own)",
+          "provider (own; unverified/restricted scope verification category only)",
+          "admin (own only)"
+        ],
+        "x-database-models": [
+          "Notification",
+          "User"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "notification": {
+                          "$ref": "#/components/schemas/Notification"
+                        }
+                      },
+                      "required": [
+                        "notification"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed ID, unsupported filter, nonboolean state/consent or invalid page/revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Suspended/email-gated account, changed provider scope or unavailable category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing/inaccessible notification; no administrator ownership override",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized database/transaction failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/preferences": {
+      "get": {
+        "operationId": "readOwnNotificationPreferences",
+        "summary": "Read own central preferences",
+        "description": "Defaults all in-app categories true at revision 0, without a database write. Existing messaging notification/communication preferences also apply at delivery. Email is not offered.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student (own)",
+          "provider (own; unverified/restricted scope verification category only)",
+          "admin (own only)"
+        ],
+        "x-database-models": [
+          "NotificationPreferences",
+          "User"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "preferences": {
+                          "$ref": "#/components/schemas/Preferences"
+                        },
+                        "supportedChannels": {
+                          "type": "array",
+                          "items": {
+                            "const": "in_app"
+                          },
+                          "minItems": 1,
+                          "maxItems": 1
+                        }
+                      },
+                      "required": [
+                        "preferences",
+                        "supportedChannels"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed ID, unsupported filter, nonboolean state/consent or invalid page/revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Suspended/email-gated account, changed provider scope or unavailable category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing/inaccessible notification; no administrator ownership override",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized database/transaction failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateOwnNotificationPreferences",
+        "summary": "Update central notification consent",
+        "description": "All supported category booleans, inApp and current nonnegative whole revision required. Unknown/owner/email fields reject. User coordination lock serializes with delivery; only one concurrent edit at a revision wins. Opt-out suppresses pending/future notices, retains history and does not replay suppressed notices after later opt-in. A full session is required; provider-verification-scoped tokens may read preferences but cannot modify global consent.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student (own full session)",
+          "provider (own full session)",
+          "admin (own full session)"
+        ],
+        "x-database-models": [
+          "NotificationPreferences",
+          "User"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "preferences": {
+                          "$ref": "#/components/schemas/Preferences"
+                        },
+                        "supportedChannels": {
+                          "type": "array",
+                          "items": {
+                            "const": "in_app"
+                          },
+                          "minItems": 1,
+                          "maxItems": 1
+                        }
+                      },
+                      "required": [
+                        "preferences",
+                        "supportedChannels"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed ID, unsupported filter, nonboolean state/consent or invalid page/revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Suspended/email-gated account, changed provider scope or unavailable category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing/inaccessible notification; no administrator ownership override",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized database/transaction failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": false
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "campaign",
+              "message",
+              "application",
+              "scholarship",
+              "resource",
+              "verification",
+              "mentorship",
+              "event"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "updated",
+              "invited",
+              "decision",
+              "appeal",
+              "deadline",
+              "due",
+              "overdue",
+              "return",
+              "submitted"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "href": {
+            "type": "string",
+            "enum": [
+              "/",
+              "/messages",
+              "/my-applications",
+              "/provider/applications",
+              "/my-resource-requests",
+              "/provider/resource-requests",
+              "/my-activity",
+              "/provider-verification",
+              "/community-verification",
+              "/my-promotion-requests",
+              "/provider/promotion-requests",
+              "/impact",
+              "/admin"
+            ]
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "campaign",
+              "message",
+              "application",
+              "scholarship",
+              "resource",
+              "verification",
+              "mentorship",
+              "community",
+              "opportunity",
+              "event",
+              "event_organizer"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "_id",
+          "kind",
+          "action",
+          "title",
+          "body",
+          "href",
+          "occurredAt",
+          "createdAt"
+        ]
+      },
+      "Preferences": {
+        "type": "object",
+        "properties": {
+          "inApp": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "object",
+            "properties": {
+              "campaign": {
+                "type": "boolean"
+              },
+              "message": {
+                "type": "boolean"
+              },
+              "application": {
+                "type": "boolean"
+              },
+              "scholarship": {
+                "type": "boolean"
+              },
+              "resource": {
+                "type": "boolean"
+              },
+              "verification": {
+                "type": "boolean"
+              },
+              "mentorship": {
+                "type": "boolean"
+              },
+              "event": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "campaign",
+              "message",
+              "application",
+              "scholarship",
+              "resource",
+              "verification",
+              "mentorship",
+              "event"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "inApp",
+          "categories",
+          "revision"
+        ]
+      },
+      "PreferencesUpdate": {
+        "type": "object",
+        "properties": {
+          "inApp": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "object",
+            "properties": {
+              "campaign": {
+                "type": "boolean"
+              },
+              "message": {
+                "type": "boolean"
+              },
+              "application": {
+                "type": "boolean"
+              },
+              "scholarship": {
+                "type": "boolean"
+              },
+              "resource": {
+                "type": "boolean"
+              },
+              "verification": {
+                "type": "boolean"
+              },
+              "mentorship": {
+                "type": "boolean"
+              },
+              "event": {
+                "type": "boolean",
+                "description": "Optional for older seven-category clients. If omitted, preserves the stored event preference or defaults to true."
+              }
+            },
+            "required": [
+              "campaign",
+              "message",
+              "application",
+              "scholarship",
+              "resource",
+              "verification",
+              "mentorship"
+            ],
+            "additionalProperties": false
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "inApp",
+          "categories",
+          "revision"
+        ],
+        "additionalProperties": false
+      },
+      "ReadUpdate": {
+        "type": "object",
+        "properties": {
+          "read": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "read"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

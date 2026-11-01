@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { protect, authorize } from '../middleware/auth';
+import { advanceScholarshipWaitlist, getScholarshipPolicy, listScholarshipWaitlist, scholarshipHistory, updateScholarshipPolicy } from '../controllers/scholarshipController';
+const router = Router();
+router.use(protect);
+router.get('/:id/policy', authorize('student', 'provider'), getScholarshipPolicy);
+router.put('/:id/policy', authorize('provider'), updateScholarshipPolicy);
+router.get('/:id/policy/history', authorize('provider'), scholarshipHistory(true));
+router.get('/:id/waitlist', authorize('provider'), listScholarshipWaitlist);
+router.post('/:id/waitlist/advance', authorize('provider'), advanceScholarshipWaitlist);
+export default router;

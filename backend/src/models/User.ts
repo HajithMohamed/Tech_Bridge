@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import type { RecommendationPreferences } from '../services/recommendationPolicy';
 
 export type OrganizationType =
   | 'company'
@@ -24,6 +25,11 @@ export interface ICreatorPlatformProfile {
 
 export interface ICreatorProfile {
   isDiscoverable: boolean;
+  displayName?: string;
+  availability?: 'available' | 'busy' | 'unavailable';
+  profileImageUrl?: string;
+  showInstitution?: boolean;
+  revision?: number;
   platforms: ICreatorPlatformProfile[];
   niches: string[];
   contentTypes: string[];
@@ -37,6 +43,11 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'student' | 'provider' | 'admin';
+  adminBaseRole?: 'student' | 'provider';
+  tokenVersion?: number;
+  lastTypingAt?: Date;
+  emailVerifiedAt?: Date;
+  requiresEmailVerification?: boolean;
   accountStatus: 'active' | 'suspended';
   studentProfile?: {
     institution: string;
@@ -45,6 +56,10 @@ export interface IUser extends Document {
     location?: string;
     skills: string[];
     careerGoal?: string;
+    specialization?: string;
+    careerInterests?: string[];
+    extracurricularActivities?: string[];
+    recommendationPreferences?: RecommendationPreferences;
     availabilityHours?: number;
     preferredWorkType?: 'remote' | 'on-site' | 'hybrid' | 'flexible';
     creatorProfile?: ICreatorProfile;
@@ -53,7 +68,8 @@ export interface IUser extends Document {
     organizationName: string;
     organizationType: OrganizationType;
     verified: boolean;
-    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NEEDS_INFO';
+    verificationDocumentId?: mongoose.Types.ObjectId;
     rejectionReason?: string;
     contactEmail: string;
     contactPerson: string;
@@ -99,6 +115,11 @@ const userSchema = new Schema<IUser>(
       enum: ['student', 'provider', 'admin'],
       default: 'student',
     },
+    adminBaseRole: { type: String, enum: ['student', 'provider'] },
+    tokenVersion: { type: Number, default: 0, min: 0, select: false },
+    lastTypingAt: { type: Date, select: false },
+    emailVerifiedAt: { type: Date },
+    requiresEmailVerification: { type: Boolean },
     accountStatus: { type: String, enum: ['active', 'suspended'], default: 'active', index: true },
     studentProfile: {
       institution: { type: String, trim: true },
@@ -107,10 +128,27 @@ const userSchema = new Schema<IUser>(
       location: { type: String, trim: true, maxlength: 100 },
       skills: [{ type: String, trim: true, maxlength: 50 }],
       careerGoal: { type: String, trim: true, maxlength: 150 },
+      specialization: { type: String, trim: true, maxlength: 150, select: false },
+      careerInterests: { type: [{ type: String, trim: true, minlength: 1, maxlength: 80, match: /^[^<>\u0000-\u001f\u007f]+$/ }], default: undefined, select: false, validate: (value: string[]) => !value || value.length <= 20 },
+      extracurricularActivities: { type: [{ type: String, trim: true, minlength: 1, maxlength: 80, match: /^[^<>\u0000-\u001f\u007f]+$/ }], default: undefined, select: false, validate: (value: string[]) => !value || value.length <= 20 },
+      recommendationPreferences: { type: new Schema<RecommendationPreferences>({
+        personalizationEnabled: { type: Boolean },
+        preferredOpportunityTypes: { type: [{ type: String, enum: ['job', 'internship', 'scholarship', 'course', 'freelance', 'promotion', 'workshop', 'mentorship'] }], default: undefined, validate: (value: string[]) => !value || value.length <= 8 },
+        preferredWorkArrangements: { type: [{ type: String, enum: ['remote', 'on-site', 'hybrid'] }], default: undefined, validate: (value: string[]) => !value || value.length <= 3 },
+        preferredEmploymentArrangements: { type: [{ type: String, enum: ['full-time', 'part-time', 'contract', 'freelance', 'volunteer'] }], default: undefined, validate: (value: string[]) => !value || value.length <= 5 },
+        preferredLocations: { type: [{ type: String, trim: true, minlength: 1, maxlength: 100 }], default: undefined, validate: (value: string[]) => !value || value.length <= 10 },
+        careerStagePreference: { type: String, enum: ['internship', 'graduate', 'either'] },
+        revision: { type: Number, min: 0, default: 0 },
+      }, { _id: false }), default: undefined, select: false },
       availabilityHours: { type: Number, min: 0, max: 168 },
       preferredWorkType: { type: String, enum: ['remote', 'on-site', 'hybrid', 'flexible'] },
       creatorProfile: {
         isDiscoverable: { type: Boolean, default: false },
+        displayName: { type: String, trim: true, minlength: 2, maxlength: 80 },
+        availability: { type: String, enum: ['available', 'busy', 'unavailable'] },
+        profileImageUrl: { type: String, trim: true, maxlength: 500 },
+        showInstitution: { type: Boolean, default: false },
+        revision: { type: Number, min: 0, default: 0 },
         platforms: [{
           platform: { type: String, enum: ['instagram', 'tiktok', 'youtube', 'facebook', 'other'] },
           handle: { type: String, trim: true, maxlength: 100 },
@@ -130,7 +168,8 @@ const userSchema = new Schema<IUser>(
         enum: ['company', 'training_org', 'scholarship_org', 'resource_provider', 'local_business', 'alumni', 'faculty', 'ngo', 'individual'],
       },
       verified: { type: Boolean, default: false },
-      verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING' },
+      verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED', 'NEEDS_INFO'], default: 'PENDING' },
+      verificationDocumentId: { type: Schema.Types.ObjectId, ref: 'VerificationDocument' },
       rejectionReason: { type: String, trim: true, maxlength: 1000 },
       contactEmail: {
         type: String,
@@ -151,6 +190,8 @@ const userSchema = new Schema<IUser>(
   },
   { timestamps: true }
 );
+
+userSchema.index({ createdAt: 1 });
 
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;

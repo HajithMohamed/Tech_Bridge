@@ -7,7 +7,7 @@ import type { Opportunity, ResourceListing } from '../../types';
 
 const typeLabel = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 const providerName = (opportunity: Opportunity) => typeof opportunity.providerId === 'string' ? 'Verified provider' : opportunity.providerId.providerProfile?.organizationName || opportunity.providerId.fullName;
-const resourceOwner = (resource: ResourceListing) => typeof resource.listedBy === 'string' ? 'TechBridge member' : resource.listedBy.providerProfile?.organizationName || resource.listedBy.fullName;
+const resourceOwner = (resource: ResourceListing) => typeof resource.listedBy === 'string' ? 'TechBridge member' : resource.listedBy?.providerProfile?.organizationName || resource.listedBy?.fullName || 'Member unavailable';
 
 const LiveProviderOfferings = () => {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -20,7 +20,7 @@ const LiveProviderOfferings = () => {
       .then(([latestOpportunities, latestResources]) => {
         if (cancelled) return;
         setOpportunities(latestOpportunities.slice(0, 3));
-        setResources(latestResources.filter((resource) => typeof resource.listedBy !== 'string' && resource.listedBy.role === 'provider').slice(0, 3));
+        setResources(latestResources.filter((resource) => typeof resource.listedBy !== 'string' && resource.listedBy?.role === 'provider').slice(0, 3));
       })
       .catch(() => undefined)
       .finally(() => { if (!cancelled) setLoading(false); });

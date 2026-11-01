@@ -1,0 +1,30 @@
+import { test, expect } from './fixtures';
+
+test('an administrator searches, manages account status and roles, and reads the real history', async ({ page }) => {
+  await page.goto('/login'); await page.getByLabel('Email Address').fill('admin@example.test');
+  await page.getByLabel('Password', { exact: true }).fill('Synthetic-Test-Password-42!');
+  await page.getByRole('button', { name: /^sign in$/i }).click(); await expect(page).toHaveURL('/admin');
+  await page.getByRole('button', { name: 'users', exact: true }).click();
+  await page.getByLabel('Search users').fill('student@example.test'); await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Suspend Synthetic Student' }).click(); await page.getByLabel('Action reason').fill('Synthetic administrative review');
+  await page.getByRole('button', { name: 'Confirm account change' }).click();
+  await page.getByRole('button', { name: 'Reinstate Synthetic Student' }).click(); await page.getByLabel('Action reason').fill('Synthetic review resolved');
+  await page.getByRole('button', { name: 'Confirm account change' }).click();
+  await expect(page.getByRole('button', { name: 'Suspend Synthetic Student' })).toBeVisible();
+  await page.getByRole('button', { name: 'Change role for Synthetic Student' }).click();
+  await page.getByLabel('Action reason').fill('Synthetic admin appointment');
+  await page.getByRole('button', { name: 'Confirm account change' }).click();
+  await expect(page.getByText('student@example.test · admin · active', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Change role for Synthetic Student' }).click();
+  await page.getByLabel('New role').selectOption('student');
+  await page.getByLabel('Action reason').fill('Synthetic appointment completed');
+  await page.getByRole('button', { name: 'Confirm account change' }).click();
+  await expect(page.getByText('student@example.test · student · active', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'History for Synthetic Student' }).click();
+  await expect(page.getByText('Synthetic administrative review', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic review resolved', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic admin appointment', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic appointment completed', { exact: true })).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: '../output/playwright/admin-management.png', fullPage: true });
+});

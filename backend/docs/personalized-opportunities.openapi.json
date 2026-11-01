@@ -1,0 +1,1397 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TechBridge personalized opportunities",
+    "version": "3.0.0",
+    "description": "Backend-only rule-based relevance, including extracurricular activities. Full active student sessions only; own preferences and saves. No external aggregation or frontend implementation. Scores never establish eligibility. Existing enabled-mode legacy matched contract remains version 2."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/opportunities/recommendation-preferences": {
+      "get": {
+        "operationId": "getOwnRecommendationPreferences",
+        "summary": "Read own recommendation profile and defaults",
+        "responses": {
+          "200": {
+            "description": "Private own preferences; Cache-Control no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, restricted or revoked session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active student / required email verification needed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable, query deadline or candidate budget exceeded; no partial feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateOwnRecommendationPreferences",
+        "summary": "Update explicit interests, activities and preferences atomically",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated own preferences with incremented revision; Cache-Control no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, restricted or revoked session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active student / required email verification needed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable, query deadline or candidate budget exceeded; no partial feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/opportunities/recommendations": {
+      "get": {
+        "operationId": "getPersonalizedOpportunities",
+        "summary": "Browse recommended, manually filtered, saved or unpersonalized open opportunities",
+        "description": "60 requests per student per minute using shared database state. Candidate cap 10,000; no partial feed on timeout/overflow. All view and opt-out omit personalization and default to newest. Newest and deadline sorts can be selected explicitly.",
+        "parameters": [
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recommended",
+                "all",
+                "ICT",
+                "ET",
+                "BST",
+                "interdisciplinary",
+                "saved"
+              ]
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ICT",
+                "ET",
+                "BST"
+              ]
+            }
+          },
+          {
+            "name": "interest",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "activity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "techbridge"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recommended",
+                "newest",
+                "deadline"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "asOf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Reuse the returned UTC anchor across pages; at most 24 hours old and never in the future. New inserts are excluded; live edits/expiry can still change membership."
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Reuse the returned preference revision; mismatch returns 409."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "job",
+                "internship",
+                "scholarship",
+                "course",
+                "freelance",
+                "promotion",
+                "workshop",
+                "mentorship"
+              ]
+            }
+          },
+          {
+            "name": "skill",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "workMode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "on-site",
+                "hybrid"
+              ]
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "providerId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          },
+          {
+            "name": "deadlineFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deadlineTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isPaid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isFree",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded feed; Cache-Control no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, restricted or revoked session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active student / required email verification needed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale preference revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Shared per-student quota exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "description": "Seconds until the current request window ends"
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable, query deadline or candidate budget exceeded; no partial feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "PreferencePatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740990
+          },
+          "degree": {
+            "type": "string",
+            "enum": [
+              "ICT",
+              "ET",
+              "BST",
+              "other"
+            ]
+          },
+          "studyYear": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 50,
+              "minLength": 1
+            },
+            "maxItems": 25
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "careerGoal": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "specialization": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "careerInterests": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "extracurricularActivities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "personalizationEnabled": {
+            "type": "boolean"
+          },
+          "preferredOpportunityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "job",
+                "internship",
+                "scholarship",
+                "course",
+                "freelance",
+                "promotion",
+                "workshop",
+                "mentorship"
+              ]
+            },
+            "maxItems": 8
+          },
+          "preferredWorkArrangements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "on-site",
+                "hybrid"
+              ]
+            },
+            "maxItems": 3
+          },
+          "preferredEmploymentArrangements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "full-time",
+                "part-time",
+                "contract",
+                "freelance",
+                "volunteer"
+              ]
+            },
+            "maxItems": 5
+          },
+          "preferredLocations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "maxItems": 10
+          },
+          "careerStagePreference": {
+            "type": "string",
+            "enum": [
+              "internship",
+              "graduate",
+              "either"
+            ]
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "minProperties": 2,
+        "description": "Partial own-profile update. Revision is required. Unknown fields, markup, control characters and unsafe shapes are rejected. Empty arrays clear choices."
+      },
+      "Preferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "degree": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ICT",
+                  "ET",
+                  "BST",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "studyYear": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 50,
+              "minLength": 1
+            },
+            "maxItems": 25
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "careerGoal": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "specialization": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "careerInterests": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "extracurricularActivities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "personalizationEnabled": {
+            "type": "boolean"
+          },
+          "preferredOpportunityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "job",
+                "internship",
+                "scholarship",
+                "course",
+                "freelance",
+                "promotion",
+                "workshop",
+                "mentorship"
+              ]
+            },
+            "maxItems": 8
+          },
+          "preferredWorkArrangements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "on-site",
+                "hybrid"
+              ]
+            },
+            "maxItems": 3
+          },
+          "preferredEmploymentArrangements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "full-time",
+                "part-time",
+                "contract",
+                "freelance",
+                "volunteer"
+              ]
+            },
+            "maxItems": 5
+          },
+          "preferredLocations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "maxItems": 10
+          },
+          "careerStagePreference": {
+            "type": "string",
+            "enum": [
+              "internship",
+              "graduate",
+              "either"
+            ]
+          }
+        },
+        "required": [
+          "revision",
+          "degree",
+          "studyYear",
+          "skills",
+          "location",
+          "careerGoal",
+          "specialization",
+          "careerInterests",
+          "extracurricularActivities",
+          "personalizationEnabled",
+          "preferredOpportunityTypes",
+          "preferredWorkArrangements",
+          "preferredEmploymentArrangements",
+          "preferredLocations",
+          "careerStagePreference"
+        ]
+      },
+      "PreferenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/Preferences"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "RecommendationMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ICT",
+                "ET",
+                "BST"
+              ]
+            },
+            "maxItems": 3
+          },
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "studyYears": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "maxItems": 6
+          },
+          "careerStage": {
+            "type": "string",
+            "enum": [
+              "internship",
+              "entry",
+              "graduate",
+              "experienced"
+            ]
+          },
+          "employmentArrangement": {
+            "type": "string",
+            "enum": [
+              "full-time",
+              "part-time",
+              "contract",
+              "freelance",
+              "volunteer"
+            ]
+          }
+        },
+        "required": []
+      },
+      "Classification": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ICT",
+                "ET",
+                "BST"
+              ]
+            },
+            "maxItems": 3
+          },
+          "interdisciplinary": {
+            "type": "boolean"
+          },
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "maxItems": 100
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "provider_metadata",
+              "keyword_rules",
+              "unclassified"
+            ]
+          }
+        },
+        "required": [
+          "departments",
+          "interdisciplinary",
+          "interests",
+          "method"
+        ]
+      },
+      "Recommendation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scoreStatus": {
+            "type": "string",
+            "enum": [
+              "available",
+              "insufficient_information"
+            ]
+          },
+          "observedWeight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "factors": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "interests": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "department": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "skills": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "level": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "preferences": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "freshness": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "interests",
+              "department",
+              "skills",
+              "level",
+              "preferences",
+              "freshness"
+            ]
+          },
+          "weights": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "interests": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "department": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "skills": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "level": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "preferences": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "freshness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "interests",
+              "department",
+              "skills",
+              "level",
+              "preferences",
+              "freshness"
+            ]
+          },
+          "tier": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "explanations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 3000
+            },
+            "maxItems": 8
+          }
+        },
+        "required": [
+          "score",
+          "scoreStatus",
+          "observedWeight",
+          "factors",
+          "weights",
+          "tier",
+          "explanations"
+        ]
+      },
+      "Provider": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{24}$"
+          },
+          "fullName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "providerProfile": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "organizationName": {
+                "type": "string",
+                "maxLength": 150
+              },
+              "organizationType": {
+                "type": "string",
+                "maxLength": 50
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "verified"
+            ]
+          }
+        },
+        "required": [
+          "_id",
+          "providerProfile"
+        ]
+      },
+      "FeedOpportunity": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{24}$"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "job",
+              "internship",
+              "scholarship",
+              "course",
+              "freelance",
+              "promotion",
+              "workshop",
+              "mentorship"
+            ]
+          },
+          "requiredSkills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 40
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "workMode": {
+            "type": "string",
+            "enum": [
+              "remote",
+              "on-site",
+              "hybrid"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "const": "open"
+          },
+          "providerId": {
+            "$ref": "#/components/schemas/Provider"
+          },
+          "providerCredibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "verification": {
+                "const": "provider_verified"
+              }
+            },
+            "required": [
+              "verification"
+            ]
+          },
+          "recommendationMetadata": {
+            "$ref": "#/components/schemas/RecommendationMetadata"
+          },
+          "preferredAcademicBackground": {
+            "type": "string",
+            "maxLength": 250
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recommendation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "saved": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "techbridge"
+              },
+              "name": {
+                "const": "TechBridge"
+              },
+              "detailPath": {
+                "type": "string",
+                "pattern": "^/opportunities/[a-f0-9]{24}$"
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "detailPath"
+            ]
+          },
+          "eligibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "const": "not_evaluated"
+              },
+              "checkPath": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "advisory": {
+                "type": "string",
+                "maxLength": 150
+              }
+            },
+            "required": [
+              "status",
+              "checkPath",
+              "advisory"
+            ]
+          }
+        },
+        "required": [
+          "_id",
+          "title",
+          "description",
+          "type",
+          "location",
+          "workMode",
+          "createdAt",
+          "applicationDeadline",
+          "status",
+          "providerId",
+          "providerCredibility",
+          "recommendation",
+          "classification",
+          "saved",
+          "source",
+          "eligibility"
+        ]
+      },
+      "Feed": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "opportunities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedOpportunity"
+            },
+            "maxItems": 50
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "personalized": {
+            "type": "boolean"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "recommended",
+              "newest",
+              "deadline"
+            ]
+          },
+          "method": {
+            "const": "rules"
+          },
+          "version": {
+            "const": 3
+          },
+          "profileCompletion": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "suggested": {
+                "type": "boolean"
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "suggested",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "opportunities",
+          "total",
+          "page",
+          "limit",
+          "pages",
+          "asOf",
+          "revision",
+          "personalized",
+          "sort",
+          "method",
+          "version",
+          "profileCompletion"
+        ]
+      },
+      "FeedResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/Feed"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      }
+    }
+  }
+}

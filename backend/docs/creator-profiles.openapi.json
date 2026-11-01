@@ -1,0 +1,274 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TechBridge creator profile backend",
+    "version": "2.0.0-phase-2",
+    "description": "Creator profile, discovery, consent and academic-profile compatibility API. No scraping, verified audience claims or payment processing. All operations use User records and return Cache-Control: no-store. Full expiring HS256 bearer sessions, current account status and persisted roles are authoritative. Provider marketplace access requires verified=true and verificationStatus=VERIFIED. See creator-profiles.md for rollout, compatibility and remaining UI work."
+  },
+  "servers": [{ "url": "http://localhost:5000", "description": "Local development" }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/api/creators/profile": {
+      "put": {
+        "operationId": "replaceOwnCreatorProfile",
+        "summary": "Create or replace the authenticated student's creator profile",
+        "x-authorized-roles": ["student"],
+        "x-database-models": ["User"],
+        "description": "Ownership always comes from the authenticated account. Body IDs/roles/verification labels are ignored. Discovery requires at least one platform, niche, content type and compensation preference. A missing expected revision preserves legacy last-write-wins behavior; a supplied stale revision returns 409. Successful updates increment the server-owned revision. Omitted showInstitution defaults false; omitted optional images/aliases are removed by replacement.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreatorProfileInput" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/OwnerUpdated" },
+          "400": { "$ref": "#/components/responses/InvalidInput" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/MissingOwner" },
+          "409": { "$ref": "#/components/responses/RevisionConflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedEncoding" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/api/creators/profile/visibility": {
+      "patch": {
+        "operationId": "setOwnCreatorVisibility",
+        "summary": "Withdraw or re-enable creator discovery consent",
+        "x-authorized-roles": ["student"],
+        "x-database-models": ["User"],
+        "description": "False hides the profile without requiring or deleting portfolio fields, including incomplete legacy profiles. True revalidates the stored profile using the current completeness and link rules. Body IDs cannot target another student. Optional expected revision follows the same conflict policy as full replacement.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["isDiscoverable"],
+                "properties": {
+                  "isDiscoverable": { "type": "boolean" },
+                  "revision": { "$ref": "#/components/schemas/ExpectedRevision" }
+                }
+              },
+              "example": { "isDiscoverable": false, "revision": 3 }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/OwnerUpdated" },
+          "400": { "$ref": "#/components/responses/InvalidInput" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/MissingOwner" },
+          "409": { "$ref": "#/components/responses/RevisionConflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedEncoding" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/api/creators": {
+      "get": {
+        "operationId": "discoverCreators",
+        "summary": "Discover opted-in, active student creators",
+        "x-authorized-roles": ["provider"],
+        "x-database-models": ["User"],
+        "description": "Only currently verified providers may discover creators. Literal case-insensitive public-name, niche and content filters; legal names are searched only when no public alias exists. All filters combine. Unknown keys are ignored. Stable sort for unchanged data uses displayName, fullName and unique ID. Legacy missing availability means available. Counts and pages are not a cross-request database snapshot.",
+        "parameters": [
+          { "in": "query", "name": "q", "schema": { "type": "string", "maxLength": 80 } },
+          { "in": "query", "name": "niche", "schema": { "type": "string", "maxLength": 80 } },
+          { "in": "query", "name": "contentType", "schema": { "type": "string", "maxLength": 80 } },
+          { "in": "query", "name": "platform", "schema": { "$ref": "#/components/schemas/PlatformName" } },
+          { "in": "query", "name": "compensationPreference", "schema": { "$ref": "#/components/schemas/Compensation" } },
+          { "in": "query", "name": "availability", "schema": { "$ref": "#/components/schemas/Availability" } },
+          { "in": "query", "name": "page", "schema": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 1 } },
+          { "in": "query", "name": "limit", "schema": { "type": "integer", "minimum": 1, "maximum": 24, "default": 12 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public allowlisted results; empty results retain page metadata.",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "enum": ["no-store"] } } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "data"],
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "required": ["creators", "page", "limit", "total", "pages"],
+                      "properties": {
+                        "creators": { "type": "array", "maxItems": 24, "items": { "$ref": "#/components/schemas/PublicCreator" } },
+                        "page": { "type": "integer", "minimum": 1 },
+                        "limit": { "type": "integer", "minimum": 1, "maximum": 24 },
+                        "total": { "type": "integer", "minimum": 0 },
+                        "pages": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidInput" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/api/creators/{studentId}": {
+      "get": {
+        "operationId": "readPublicCreator",
+        "summary": "Read a discoverable creator's public profile",
+        "x-authorized-roles": ["provider"],
+        "x-database-models": ["User"],
+        "description": "Current provider verification is mandatory. Hidden, suspended, nonstudent and nonexistent targets share a 404 response. No administrator override or private account fields are exposed.",
+        "parameters": [{ "name": "studentId", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[a-fA-F0-9]{24}$" } }],
+        "responses": {
+          "200": {
+            "description": "The same public creator shape returned by discovery.",
+            "content": { "application/json": { "schema": { "type": "object", "required": ["success", "data"], "properties": { "success": { "type": "boolean", "enum": [true] }, "data": { "type": "object", "required": ["creator"], "properties": { "creator": { "$ref": "#/components/schemas/PublicCreator" } } } } } } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidInput" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/MissingPublicCreator" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/api/auth/student-profile": {
+      "put": {
+        "operationId": "replaceOwnAcademicProfile",
+        "summary": "Update academic fields while preserving creator consent",
+        "x-authorized-roles": ["student"],
+        "x-database-models": ["User"],
+        "description": "Existing endpoint and 200 contract. Only academic leaf fields are updated atomically; creatorProfile input is ignored and persisted creator fields/revision are preserved, including concurrent consent withdrawal. Omitted optional academic values are cleared as before.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AcademicProfileInput" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/OwnerUpdated" },
+          "400": { "$ref": "#/components/responses/InvalidInput" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/MissingOwner" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedEncoding" },
+          "500": { "description": "Academic-profile update failure, with a generic message.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Full HS256 session, integer expiry, recognized claims, current account/token version; verification-only provider sessions cannot access these routes." } },
+    "schemas": {
+      "ExpectedRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740990, "description": "Optional expected owner revision. Missing legacy stored revision is zero. Stale mutations return 409; a successful mutation increments the server-owned value." },
+      "PlatformName": { "type": "string", "enum": ["instagram", "tiktok", "youtube", "facebook", "other"] },
+      "Compensation": { "type": "string", "enum": ["paid", "product_exchange", "experience", "affiliate"] },
+      "Availability": { "type": "string", "enum": ["available", "busy", "unavailable"], "default": "available" },
+      "PublicLink": { "type": "string", "format": "uri", "maxLength": 500, "description": "Complete HTTP(S) reference, with no credentials, custom ports, IP literals, private/local suffixes, whitespace, control characters or markup. Platform links require an allowlisted official host. The server does not fetch or verify the destination." },
+      "Platform": {
+        "type": "object",
+        "required": ["platform", "handle", "profileUrl"],
+        "properties": {
+          "platform": { "$ref": "#/components/schemas/PlatformName" },
+          "handle": { "type": "string", "minLength": 1, "maxLength": 100, "description": "Plain single-line public handle." },
+          "profileUrl": { "$ref": "#/components/schemas/PublicLink" },
+          "followerCount": { "type": "integer", "minimum": 0, "maximum": 1000000000, "description": "Optional owner-supplied audience metric, never independently verified by this API." }
+        }
+      },
+      "CreatorProfileInput": {
+        "type": "object",
+        "required": ["isDiscoverable", "platforms", "niches", "contentTypes", "compensationPreference"],
+        "properties": {
+          "isDiscoverable": { "type": "boolean" },
+          "displayName": { "type": "string", "maxLength": 80, "description": "Optional public alias; empty removes it, otherwise 2-80 trimmed plain single-line characters." },
+          "availability": { "$ref": "#/components/schemas/Availability" },
+          "profileImageUrl": { "oneOf": [{ "$ref": "#/components/schemas/PublicLink" }, { "type": "string", "enum": [""] }] },
+          "showInstitution": { "type": "boolean", "default": false },
+          "revision": { "$ref": "#/components/schemas/ExpectedRevision" },
+          "platforms": { "type": "array", "maxItems": 6, "items": { "$ref": "#/components/schemas/Platform" } },
+          "niches": { "type": "array", "maxItems": 12, "items": { "type": "string", "minLength": 1, "maxLength": 80 } },
+          "contentTypes": { "type": "array", "maxItems": 12, "items": { "type": "string", "minLength": 1, "maxLength": 80 } },
+          "compensationPreference": { "type": "array", "maxItems": 4, "items": { "$ref": "#/components/schemas/Compensation" } },
+          "sampleWorkLinks": { "type": "array", "maxItems": 8, "items": { "$ref": "#/components/schemas/PublicLink" } }
+        },
+        "description": "Opted-in profiles require nonempty platforms, niches, contentTypes and compensationPreference. Text labels are trimmed, deduplicated and reject markup/control characters. Unknown ownership/verification/metrics fields are ignored. Image URL may also be the empty string to remove it."
+      },
+      "PublicCreator": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["_id", "fullName", "studentProfile"],
+        "properties": {
+          "_id": { "type": "string" },
+          "fullName": { "type": "string", "description": "Public alias when provided; otherwise the opted-in legacy account name." },
+          "studentProfile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["creatorProfile"],
+            "properties": {
+              "institution": { "type": "string", "description": "Only included with explicit showInstitution consent." },
+              "institutionSource": { "type": "string", "enum": ["self_reported"] },
+              "creatorProfile": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["isDiscoverable", "availability", "platforms", "niches", "contentTypes", "compensationPreference", "sampleWorkLinks", "metricsSource", "verificationStatus"],
+                "properties": {
+                  "isDiscoverable": { "type": "boolean", "enum": [true] },
+                  "displayName": { "type": "string" },
+                  "profileImageUrl": { "type": "string", "format": "uri" },
+                  "availability": { "$ref": "#/components/schemas/Availability" },
+                  "platforms": { "type": "array", "items": { "$ref": "#/components/schemas/Platform" } },
+                  "niches": { "type": "array", "items": { "type": "string" } },
+                  "contentTypes": { "type": "array", "items": { "type": "string" } },
+                  "compensationPreference": { "type": "array", "items": { "$ref": "#/components/schemas/Compensation" } },
+                  "sampleWorkLinks": { "type": "array", "items": { "type": "string", "format": "uri" } },
+                  "metricsSource": { "type": "string", "readOnly": true, "enum": ["self_reported"] },
+                  "verificationStatus": { "type": "string", "readOnly": true, "enum": ["unverified"] }
+                }
+              }
+            }
+          }
+        }
+      },
+      "AcademicProfileInput": {
+        "type": "object",
+        "required": ["institution", "degree", "studyYear", "skills"],
+        "properties": {
+          "institution": { "type": "string", "minLength": 1, "maxLength": 150 },
+          "degree": { "type": "string", "enum": ["ICT", "ET", "BST", "other"] },
+          "studyYear": { "type": "integer", "minimum": 1, "maximum": 6 },
+          "skills": { "type": "array", "minItems": 1, "description": "Existing normalization removes empty/non-string values, truncates labels to 50 characters and keeps up to 25." , "items": { "type": "string" } },
+          "location": { "type": "string", "maxLength": 100 },
+          "careerGoal": { "type": "string", "maxLength": 150 },
+          "availabilityHours": { "type": "integer", "minimum": 0, "maximum": 168 },
+          "preferredWorkType": { "type": "string", "enum": ["remote", "on-site", "hybrid", "flexible"] }
+        }
+      },
+      "OwnerEnvelope": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string" },
+          "data": { "type": "object", "required": ["user"], "properties": { "user": { "type": "object", "description": "Existing own-user representation, with studentProfile.creatorProfile and its server-owned revision; password and tokenVersion are not selected." } } }
+        }
+      },
+      "Error": { "type": "object", "required": ["success", "message"], "properties": { "success": { "type": "boolean", "enum": [false] }, "message": { "type": "string" } } }
+    },
+    "responses": {
+      "OwnerUpdated": { "description": "Saved authenticated owner's data. Cache-Control: no-store.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OwnerEnvelope" } } } },
+      "InvalidInput": { "description": "Invalid fields, platform/portfolio links, filters, ObjectId or pagination; no mutation on validation failure.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unauthorized": { "description": "Missing/invalid/revoked/expired or verification-only bearer session.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Forbidden": { "description": "Wrong persisted role, suspended account or unverified provider.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "MissingOwner": { "description": "Student owner/profile no longer exists.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "MissingPublicCreator": { "description": "Creator profile not found; identical for hidden, suspended, nonstudent or nonexistent targets.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "RevisionConflict": { "description": "Expected profile revision is stale; reload the owner profile before deliberate retry.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "TooLarge": { "description": "Request body exceeds the shared parser limit.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "UnsupportedEncoding": { "description": "Unsupported request encoding.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unavailable": { "description": "Creator services temporarily unavailable; database/internal details are not exposed.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    }
+  }
+}

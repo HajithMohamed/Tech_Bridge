@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import ProviderVerificationPage from './pages/ProviderVerificationPage';
+import CommunityVerificationPage from './pages/CommunityVerificationPage';
 import RegisterPage from './pages/RegisterPage';
 import LandingPage from './pages/LandingPage';
 import FacultyConnectionsPage from './pages/FacultyConnectionsPage';
@@ -29,13 +31,16 @@ import MyPromotionRequestsPage from './pages/MyPromotionRequestsPage';
 import ProviderPromotionRequestsPage from './pages/ProviderPromotionRequestsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import PortalLayout from './components/PortalLayout';
+import MessageUpdates from './components/MessageUpdates';
 
 const App = () => (
-  <Routes>
+  <><MessageUpdates /><Routes>
     <Route path="/" element={<LandingPage />} />
     <Route path="/connections" element={<FacultyConnectionsPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
+    <Route path="/provider-verification" element={<ProviderVerificationPage />} />
+    <Route path="/community-verification" element={<CommunityVerificationPage />} />
     <Route element={<PortalLayout />}>
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/opportunities" element={<OpportunityFeedPage />} />
@@ -63,7 +68,7 @@ const App = () => (
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboardPage /></ProtectedRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
+  </Routes></>
 );
 
 export default App;

@@ -23,4 +23,5 @@ const reportSchema = new Schema<IReport>({
 }, { timestamps: true });
 
 reportSchema.index({ reporterId: 1, targetType: 1, targetId: 1 }, { unique: true });
+reportSchema.index({ createdAt: 1 });
 export default mongoose.model<IReport>('Report', reportSchema);

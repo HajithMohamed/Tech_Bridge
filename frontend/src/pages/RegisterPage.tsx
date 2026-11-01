@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Building, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import type { OrganizationType, RegisterData } from '../types';
@@ -57,7 +57,6 @@ const toSkillArray = (value: string): string[] => {
 };
 
 const RegisterPage = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { register, isLoading, error, fieldErrors, clearError } = useAuth();
 
@@ -88,14 +87,13 @@ const RegisterPage = () => {
       location: '',
       website: '',
       description: '',
-      verificationDocumentName: '',
       opportunityCategories: [] as string[],
       resourceAccessMethods: [] as string[],
     },
   });
 
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
-  const [providerSubmitted, setProviderSubmitted] = useState(false);
+  const [registrationSubmitted, setRegistrationSubmitted] = useState(false);
   const [isCustomCareerGoal, setIsCustomCareerGoal] = useState(false);
   const [isCustomLocation, setIsCustomLocation] = useState(false);
 
@@ -108,7 +106,8 @@ const RegisterPage = () => {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Please enter a valid email';
     
     if (!formData.password) errors.password = 'Password is required';
-    else if (formData.password.length < 6) errors.password = 'At least 6 characters required';
+    else if (formData.password.length < 12) errors.password = 'At least 12 characters required';
+    else if (new TextEncoder().encode(formData.password).length > 72) errors.password = 'Keep your password within 72 UTF-8 bytes';
     
     if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'Passwords do not match';
 
@@ -169,7 +168,6 @@ const RegisterPage = () => {
             location: formData.providerProfile.location,
             website: formData.providerProfile.website,
             description: formData.providerProfile.description,
-            verificationDocumentName: formData.providerProfile.verificationDocumentName || undefined,
             opportunityCategories: formData.providerProfile.opportunityCategories,
             resourceAccessMethods: formData.providerProfile.opportunityCategories.includes('technical_resources') ? formData.providerProfile.resourceAccessMethods : []
           }
@@ -177,11 +175,8 @@ const RegisterPage = () => {
       };
 
       await register(submissionData);
-      if (formData.role === 'provider') {
-        setProviderSubmitted(true);
-        return;
-      }
-      navigate('/dashboard');
+      setFormData((previous) => ({ ...previous, password: '', confirmPassword: '' }));
+      setRegistrationSubmitted(true);
     } catch {
       // Error handled by context
     }
@@ -272,15 +267,16 @@ const RegisterPage = () => {
     return fieldErrors?.find((e) => e.field === field)?.message;
   };
 
-  if (providerSubmitted) {
+  if (registrationSubmitted) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-surface-50">
         <div className="max-w-lg bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 text-center">
           <div className="w-14 h-14 mx-auto rounded-full bg-amber-100 text-amber-700 grid place-items-center text-2xl">⌛</div>
-          <h1 className="mt-5 text-2xl font-bold text-surface-800">Provider verification pending</h1>
-          <p className="mt-3 text-gray-600 leading-7">Thank you for registering. Your organization is under review. You will be able to publish opportunities after verification by the TechBridge team.</p>
-          <p className="mt-3 text-sm text-gray-500">For this MVP, verification is completed manually before your provider account is activated.</p>
-          <Link to="/login" className="inline-flex mt-6 px-5 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 text-white font-semibold hover:opacity-90 transition-opacity">Back to sign in</Link>
+          <h1 className="mt-5 text-2xl font-bold text-surface-800">Check your email</h1>
+          <p role="status" className="mt-3 text-gray-700 leading-7">If this email can be registered, a verification link will arrive shortly. Verify your email before signing in.</p>
+          {formData.role === 'provider' && <p className="mt-3 text-sm text-gray-600">Your organization will also need approval before you can publish opportunities. Email verification and organization review are separate steps.</p>}
+          <Link to="/verify-email" className="inline-flex mt-6 px-5 py-3 rounded-xl bg-primary-700 text-white font-semibold hover:bg-primary-800">Resend verification email</Link>
+          <p className="mt-4"><Link to="/login" className="font-semibold text-primary-800 underline">Back to sign in</Link></p>
         </div>
       </div>
     );
@@ -598,9 +594,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Supporting document <span className="font-normal text-gray-400">(optional)</span></label>
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => handleInputChange('verificationDocumentName', e.target.files?.[0]?.name || '', 'providerProfile')} className="w-full px-4 py-2.5 rounded-xl bg-surface-50 border border-gray-200 text-sm text-gray-600" />
-                      <p className="mt-1 text-xs text-gray-500">For the MVP, TechBridge records the filename for manual review; file storage can be added later.</p>
+                      <p className="text-sm text-gray-600">After registration, use provider verification to securely submit your supporting document and read review decisions.</p>
                     </div>
 
                     <div>
@@ -629,7 +623,7 @@ const RegisterPage = () => {
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
                     <div className="relative">
-                      <input type={showPassword ? 'text' : 'password'} placeholder="At least 6 characters" value={formData.password} onChange={(e) => handleInputChange('password', e.target.value)} className="w-full px-4 pr-11 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
+                      <input type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={12} placeholder="At least 12 characters" value={formData.password} onChange={(e) => handleInputChange('password', e.target.value)} className="w-full px-4 pr-11 py-2.5 rounded-xl bg-surface-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all" />
                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>

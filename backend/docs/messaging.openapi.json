@@ -1,0 +1,2142 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TechBridge messaging backend API",
+    "version": "2.0.0-review",
+    "description": "Documents the PR #22 messaging implementation and Phase 1 security policy. Common error envelopes are {success:false,message}; database outages are reported without internal details. Full HS256 bearer sessions with an expiry and current account/provider verification are required. Protected endpoints, including report creation/resolution, return Cache-Control: no-store. See security-hardening.md for shared parser errors and deployment settings. No production server or credential is embedded."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Normal local API"
+    }
+  ],
+  "paths": {
+    "/api/messages/conversations": {
+      "post": {
+        "summary": "Start or reuse a permitted conversation",
+        "description": "Rechecks active accounts, current provider verification, both blocks, receiving preference and permitted student/provider relationship. Community contact requires current approved visible identity/consent and student initiation. Admins may initiate their own support conversation. Pair creation and the initiator quota serialize through account locks; no transcript access is granted to other admins. Maximum 10 newly initiated conversations/hour; existing reuse does not consume that allowance.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "User",
+          "Conversation",
+          "MessagingSettings",
+          "Application",
+          "ResourceRequest",
+          "PromotionRequest",
+          "CommunityClaim"
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "conversation": {
+                          "$ref": "#/components/schemas/Conversation"
+                        }
+                      },
+                      "required": [
+                        "conversation"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Account quota or per-worker stream capacity exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retry; currently 60 for message endpoints, but hourly/daily quotas can require longer.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipientId": {
+                    "$ref": "#/components/schemas/ObjectId"
+                  }
+                },
+                "required": [
+                  "recipientId"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List and search own conversations",
+        "description": "Only the authenticated participant?s conversations are returned. Search matches peer name/organization as a literal case-insensitive string, not a regular expression. The peer allowlist excludes email/contact details. Sorted by lastMessageAt, createdAt and ID descending; returns at most 20 rows per page. A deleted peer can be absent.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Conversation",
+          "Message",
+          "User",
+          "MessagingSettings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "conversations": {
+                          "type": "array",
+                          "maxItems": 20,
+                          "items": {
+                            "$ref": "#/components/schemas/ConversationRow"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "conversations",
+                        "page",
+                        "total",
+                        "pages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Optional literal peer search.",
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999,
+              "default": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/messages/conversations/{id}/messages": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Conversation ID. Nonparticipants, including administrators, receive 404.",
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Send a private message",
+        "description": "Participant-only, including administrators. Rechecks current permissions and community consent. Text is trimmed, 1?2000 characters; disallowed control characters are rejected. The message and conversation timestamp commit atomically. Shared account limits: 20/minute and 100/hour. Signals are best-effort after commit and contain no message body.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Conversation",
+          "Message",
+          "User",
+          "MessagingSettings",
+          "CommunityClaim",
+          "Application",
+          "ResourceRequest",
+          "PromotionRequest",
+          "MessagingSignal"
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "$ref": "#/components/schemas/Message"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Account quota or per-worker stream capacity exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retry; currently 60 for message endpoints, but hourly/daily quotas can require longer.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "content"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Read participant history",
+        "description": "Participant-only even for administrators. History remains readable after a block or receiving opt-out while account authentication remains valid. Returns the latest/older 40 messages in chronological order. Use nextBefore for stable older pagination ordered by createdAt and ID. The legacy numeric page parameter is retained. Supplying both before and page, or a cursor belonging to another conversation, is invalid.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Conversation",
+          "Message"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "messages": {
+                          "type": "array",
+                          "maxItems": 40,
+                          "items": {
+                            "$ref": "#/components/schemas/Message"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        },
+                        "nextBefore": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "messages",
+                        "page",
+                        "hasMore",
+                        "nextBefore"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "description": "Older-message cursor; mutually exclusive with page.",
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Legacy offset page; omit when using before.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            }
+          }
+        ]
+      }
+    },
+    "/api/messages/conversations/{id}/read": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Conversation ID. Nonparticipants, including administrators, receive 404.",
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          }
+        }
+      ],
+      "patch": {
+        "summary": "Mark incoming messages read",
+        "description": "Participant-only. Optional throughId must belong to the same conversation and bounds the receipt through that message?s createdAt/ID. Without throughId, the current latest message is used. Only unread messages sent by the other participant are changed. Repeated no-op receipts do not publish another refresh.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Conversation",
+          "Message",
+          "MessagingSignal"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Account quota or per-worker stream capacity exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retry; currently 60 for message endpoints, but hourly/daily quotas can require longer.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "throughId": {
+                    "$ref": "#/components/schemas/ObjectId"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/conversations/{id}/typing": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Conversation ID. Nonparticipants, including administrators, receive 404.",
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Publish ephemeral typing",
+        "description": "Rechecks participant/current contact authorization in a transaction. Limit: one typing action per account every two seconds. The four-second signal is sent only to the peer; current blocks, receiving preference and community identity/consent are checked again during delivery. It is never stored as a private message.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Conversation",
+          "User",
+          "MessagingSettings",
+          "CommunityClaim",
+          "MessagingSignal"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Account quota or per-worker stream capacity exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retry; currently 60 for message endpoints, but hourly/daily quotas can require longer.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/settings": {
+      "get": {
+        "summary": "Read own communication settings",
+        "description": "Owner-only; defaults are acceptsMessages=true and notifications=true. blockedUsers contains only ID/name for existing blocked accounts. Receiving opt-out does not prevent sending to a willing peer.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "MessagingSettings",
+          "User"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Settings"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update own communication settings",
+        "description": "Both boolean fields are required; unknown fields (including ownerId and blockedIds) are rejected. The update shares the account lock with sends. Community profile visibility/student-message consent remains an additional independent gate.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "MessagingSettings",
+          "User",
+          "MessagingSignal"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "acceptsMessages": {
+                    "type": "boolean"
+                  },
+                  "notifications": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "acceptsMessages",
+                  "notifications"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/blocks/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Other account ID; self-targeting is invalid.",
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          }
+        }
+      ],
+      "put": {
+        "summary": "Block a member",
+        "description": "Idempotent own-account block. Blocks sends and typing in both directions while retaining participant history. The target must exist. At most 200 blocked IDs; adding a new one at capacity returns 409.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "User",
+          "MessagingSettings",
+          "MessagingSignal"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate complaint, stale/closed decision or configured block capacity conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unblock a member",
+        "description": "Idempotent removal from the owner?s block list. A deleted target can be unblocked by known ID. Other current messaging permissions must still be satisfied.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "User",
+          "MessagingSettings",
+          "MessagingSignal"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate complaint, stale/closed decision or configured block capacity conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/summary": {
+      "get": {
+        "summary": "Read own unread total",
+        "description": "Aggregates unread incoming messages only from the authenticated user?s conversations. notifications controls whether the client should show an in-app notice; the count remains available when notices are disabled. No private message content is returned.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Conversation",
+          "Message",
+          "MessagingSettings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "unread": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "notifications": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "unread",
+                        "notifications"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/events": {
+      "get": {
+        "summary": "Open own live refresh stream",
+        "description": "Authenticated fetch/SSE using Authorization: Bearer, never a token in the URL. There is no arbitrary room/user subscription. Refresh frames contain only type; typing frames contain conversationId and expiry epoch milliseconds. Full session expiry/version/status/provider verification is rechecked before every hint/heartbeat. Heartbeat refresh every 15 seconds, maximum lifetime five minutes; client reconnects and reads durable history. Limits are three streams/account/worker and 1000 total/worker. Slow consumers disconnect. Replica-set MongoDB change streams share temporary signals across workers; TTL expiry removes hints. No confidential message body is in this channel.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "User",
+          "Conversation",
+          "MessagingSettings",
+          "CommunityClaim",
+          "MessagingSignal"
+        ],
+        "responses": {
+          "200": {
+            "description": "Unbuffered SSE frames. Cache-Control: no-store; X-Accel-Buffering: no.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "data: {\"type\":\"refresh\"}\n\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Account quota or per-worker stream capacity exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retry; currently 60 for message endpoints, but hourly/daily quotas can require longer.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports": {
+      "post": {
+        "summary": "Report an incoming private message",
+        "description": "This document describes message complaints only; other existing report target types are unchanged. targetType must be message for this workflow, and targetId must be an incoming message in a conversation owned by the reporter. Self/foreign targets return 404, duplicate owner/target reports 409, maximum 10 message reports/day. This does not grant administrators transcript access.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "student",
+          "provider",
+          "admin"
+        ],
+        "x-database-models": [
+          "Report",
+          "Message",
+          "Conversation",
+          "User"
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "$ref": "#/components/schemas/Report"
+                        }
+                      },
+                      "required": [
+                        "report"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate complaint, stale/closed decision or configured block capacity conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Account quota or per-worker stream capacity exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retry; currently 60 for message endpoints, but hourly/daily quotas can require longer.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected report-persistence failure; generic message without internal details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetType": {
+                    "type": "string",
+                    "enum": [
+                      "message"
+                    ]
+                  },
+                  "targetId": {
+                    "$ref": "#/components/schemas/ObjectId"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "targetType",
+                  "targetId",
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/reports/{id}/message-evidence": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Message complaint ID.",
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Access exactly one reported message",
+        "description": "Current active administrator only; complaint must be an open message report with valid participant provenance. Reporter and reported sender cannot review their own complaint. A 10?500 character access reason is required. MessageReviewAccess and AuditLog commit before evidence is returned; audit failure fails closed. Response excludes conversationId, neighboring messages and participant contact details. Closed complaints return 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "admin"
+        ],
+        "x-database-models": [
+          "User",
+          "Report",
+          "Message",
+          "Conversation",
+          "MessageReviewAccess",
+          "AuditLog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "object",
+                          "properties": {
+                            "_id": {
+                              "$ref": "#/components/schemas/ObjectId"
+                            },
+                            "senderId": {
+                              "$ref": "#/components/schemas/ObjectId"
+                            },
+                            "content": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "_id",
+                            "senderId",
+                            "content",
+                            "createdAt"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/reports/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Message complaint ID.",
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          }
+        }
+      ],
+      "patch": {
+        "summary": "Resolve a message complaint",
+        "description": "Documents the message-specific resolution contract; unrelated report types retain their original contract. Only an active independent administrator may act on an open complaint. A reviewed outcome requires that same actor?s recorded evidence access. A dismissed outcome requires a reason but may omit access. No private-message deletion is supported. Transactional decision/audit persistence; repeat/closed or unreviewed approval attempts return 409.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-authorized-roles": [
+          "admin"
+        ],
+        "x-database-models": [
+          "User",
+          "Report",
+          "Message",
+          "MessageReviewAccess",
+          "AuditLog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "$ref": "#/components/schemas/Report"
+                        }
+                      },
+                      "required": [
+                        "report"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, input, cursor or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or verification-only session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account, relationship, consent, block or role rules deny the action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owned conversation, incoming message or eligible open complaint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate complaint, stale/closed decision or configured block capacity conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable database/service; internal details are not exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "reviewed",
+                      "dismissed"
+                    ]
+                  },
+                  "resolutionNote": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 500
+                  },
+                  "removeTarget": {
+                    "type": "boolean",
+                    "enum": [
+                      false
+                    ],
+                    "default": false
+                  }
+                },
+                "required": [
+                  "status",
+                  "resolutionNote"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Full HS256 session with integer expiry and valid platform claims only; provider-verification-only tokens are rejected. Single case-insensitive Bearer scheme, maximum 4096 header characters. Persisted roles, suspension, provider verification and token-version revocation remain authoritative."
+      }
+    },
+    "schemas": {
+      "ObjectId": {
+        "type": "string",
+        "pattern": "^[a-fA-F0-9]{24}$",
+        "description": "MongoDB ObjectId in canonical hexadecimal form."
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "conversationId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "senderId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "_id",
+          "conversationId",
+          "senderId",
+          "content",
+          "createdAt"
+        ]
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "participantIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "participantKey": {
+            "type": "string"
+          },
+          "initiatedBy": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "_id",
+          "participantIds",
+          "participantKey",
+          "createdAt"
+        ]
+      },
+      "Peer": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "student",
+              "provider",
+              "admin"
+            ]
+          },
+          "providerProfile": {
+            "type": "object",
+            "properties": {
+              "organizationName": {
+                "type": "string"
+              },
+              "organizationType": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "_id",
+          "fullName",
+          "role"
+        ]
+      },
+      "ConversationRow": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Conversation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "otherParticipant": {
+                "$ref": "#/components/schemas/Peer"
+              },
+              "lastMessagePreview": {
+                "type": "string"
+              },
+              "unreadCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "blockedByMe": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "lastMessagePreview",
+              "unreadCount",
+              "blockedByMe"
+            ]
+          }
+        ]
+      },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "acceptsMessages": {
+            "type": "boolean"
+          },
+          "notifications": {
+            "type": "boolean"
+          },
+          "blockedUsers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "$ref": "#/components/schemas/ObjectId"
+                },
+                "fullName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_id",
+                "fullName"
+              ]
+            }
+          }
+        },
+        "required": [
+          "acceptsMessages",
+          "notifications",
+          "blockedUsers"
+        ]
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "reporterId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "reviewed",
+              "dismissed"
+            ]
+          },
+          "resolutionNote": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "_id",
+          "reporterId",
+          "targetType",
+          "targetId",
+          "reason",
+          "status"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "success"
+        ]
+      }
+    }
+  }
+}

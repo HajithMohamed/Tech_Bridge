@@ -1,4 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { eligibilityInput, type OpportunityEligibility } from '../services/opportunityPolicy';
+import { recommendationMetadataInput, type RecommendationMetadata } from '../services/recommendationPolicy';
 
 export type OpportunityType =
   | 'job'
@@ -28,6 +30,11 @@ export interface IOpportunity extends Document {
   eligibilityCriteria?: string[];
   numberOfAwards?: number;
   renewable?: boolean;
+  scholarshipWithdrawnByAdmin?: boolean;
+  opportunityWithdrawnByAdmin?: boolean;
+  eligibility?: OpportunityEligibility;
+  recommendationMetadata?: RecommendationMetadata;
+  revision?: number;
   
   // Conditional fields
   duration?: string; // For internships, training
@@ -104,6 +111,18 @@ const opportunitySchema = new Schema<IOpportunity>(
       type: Boolean,
       required: function (this: IOpportunity) { return this.type === 'scholarship'; },
     },
+    scholarshipWithdrawnByAdmin: { type: Boolean },
+    opportunityWithdrawnByAdmin: { type: Boolean },
+    revision: { type: Number, min: 0 },
+    recommendationMetadata: { type: new Schema<RecommendationMetadata>({
+      departments: [{ type: String, enum: ['ICT', 'ET', 'BST'] }],
+      interests: [{ type: String, trim: true, maxlength: 80 }],
+      activities: [{ type: String, trim: true, maxlength: 80 }],
+      studyYears: [{ type: Number, min: 1, max: 6 }],
+      careerStage: { type: String, enum: ['internship', 'entry', 'graduate', 'experienced'] },
+      employmentArrangement: { type: String, enum: ['full-time', 'part-time', 'contract', 'freelance', 'volunteer'] },
+    }, { _id: false }), validate: { validator: (value: (RecommendationMetadata & { toObject?: () => RecommendationMetadata }) | undefined) => { if (value === undefined) return true; try { recommendationMetadataInput(value.toObject?.() ?? value); return true; } catch { return false; } }, message: 'Invalid recommendation metadata.' } },
+    eligibility: { type: new Schema<OpportunityEligibility>({ degrees: [{ type: String, enum: ['ict', 'et', 'bst', 'other'] }], institutions: [{ type: String, maxlength: 150 }], requiredSkills: [{ type: String, maxlength: 60 }], minStudyYear: { type: Number, min: 1, max: 6 }, maxStudyYear: { type: Number, min: 1, max: 6 } }, { _id: false }), validate: { validator: (value: (OpportunityEligibility & { toObject?: () => OpportunityEligibility }) | undefined) => { if (value === undefined) return true; try { eligibilityInput(value.toObject?.() ?? value); return true; } catch { return false; } }, message: 'Invalid structured eligibility requirements.' } },
     duration: { type: String, trim: true, maxlength: 120 },
     isPaid: { type: Boolean },
     preferredAcademicBackground: { type: String, trim: true, maxlength: 250 },
@@ -123,6 +142,9 @@ const opportunitySchema = new Schema<IOpportunity>(
 );
 
 opportunitySchema.index({ status: 1, type: 1, applicationDeadline: 1 });
+opportunitySchema.index({ status: 1, createdAt: -1, _id: -1 });
+opportunitySchema.index({ providerId: 1, createdAt: -1, _id: -1 });
+opportunitySchema.index({ createdAt: 1 });
 
 const Opportunity = mongoose.model<IOpportunity>('Opportunity', opportunitySchema);
 
