@@ -39,10 +39,14 @@ export async function visibleOpportunity(idValue: unknown, now = new Date()) {
   if (!row) throw new ScholarshipError(404, 'Open opportunity not found.'); return row;
 }
 export async function matchedOpportunities(studentId: Types.ObjectId, query: unknown, now = new Date()) {
-  const student = await User.findById(studentId);
+  const student = await User.findById(studentId).select('+studentProfile.recommendationPreferences');
   if (!student?.studentProfile || student.role !== 'student') throw new ScholarshipError(400, 'Complete your student profile to receive matches.');
   if (student.requiresEmailVerification && !student.emailVerifiedAt) throw new ScholarshipError(403, 'Verify your email before accessing personalized matches.');
   const { filter, page, limit } = opportunitySearch(query, now, true); const keep = page * limit;
+  if (student.studentProfile.recommendationPreferences?.personalizationEnabled === false) {
+    const values = { ...(query as Record<string, unknown>), page: String(page), limit: String(limit), sort: 'newest' };
+    return { ...await discoverOpportunities(values, now), studentSkills: [], careerGoal: '', personalized: false, matchingMethod: 'rules', matchingVersion: 2 };
+  }
   const ranked: Record<string, any>[] = []; let total = 0;
   const compare = (a: Record<string, any>, b: Record<string, any>) => b.matchPercentage - a.matchPercentage || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || String(b._id).localeCompare(String(a._id));
   const cursor = Opportunity.aggregate([{ $match: filter }, ...publicOpportunityProviderStages()]).option({ maxTimeMS: 10000 }).cursor({ batchSize: 100 });

@@ -3,6 +3,7 @@ import User from '../models/User';
 import { generateToken } from '../utils/jwt';
 import { isProviderOfferingAllowed } from '../utils/providerCapabilities';
 import { AuthChallengeError, consumeAuthChallenge, deliverAuthChallenge } from '../services/authChallenges';
+import { privateRecommendationFields } from '../services/recommendationPolicy';
 
 const registrationMessage = 'If this email can be registered, check your inbox for a verification link. Existing accounts can sign in or request a new verification email.';
 const recoveryMessage = 'If an eligible account matches this email, we will send a link. Check your inbox and spam folder.';
@@ -41,9 +42,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Creator discovery is always an explicit, post-registration opt-in.
+    // Creator discovery and private recommendation settings use their guarded,
+    // post-registration APIs instead of bypassing validation through signup.
     const safeStudentProfile = userRole === 'student' && studentProfile && typeof studentProfile === 'object'
-      ? Object.fromEntries(Object.entries(studentProfile as Record<string, unknown>).filter(([key]) => key !== 'creatorProfile'))
+      ? Object.fromEntries(Object.entries(studentProfile as Record<string, unknown>).filter(([key]) => key !== 'creatorProfile' && !(privateRecommendationFields as readonly string[]).includes(key)))
       : studentProfile;
 
     // Create new user
@@ -299,7 +301,7 @@ export const updateStudentProfile = async (req: Request, res: Response): Promise
     const absent = ['location', 'careerGoal', 'availabilityHours', 'preferredWorkType'].filter((key) => !(key in academicProfile));
     const updated = await User.findOneAndUpdate(
       { _id: student._id, role: 'student', accountStatus: 'active' },
-      { $set: fields, ...(absent.length ? { $unset: Object.fromEntries(absent.map((key) => [`studentProfile.${key}`, ''])) } : {}), $inc: { __v: 1 } },
+      { $set: fields, ...(absent.length ? { $unset: Object.fromEntries(absent.map((key) => [`studentProfile.${key}`, ''])) } : {}), $inc: { __v: 1, 'studentProfile.recommendationPreferences.revision': 1 } },
       { new: true, runValidators: true }
     );
     if (!updated) { res.status(403).json({ success: false, message: 'An active student account is required.' }); return; }

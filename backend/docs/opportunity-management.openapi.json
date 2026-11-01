@@ -3,7 +3,7 @@
   "info": {
     "title": "TechBridge Phase 8 Opportunity Management",
     "version": "1.0.0",
-    "description": "Backend-only additive saved/history/eligibility APIs and improvements to existing discovery/application contracts. Public result lists are now bounded; arrays and legacy score fields remain. Actual account/token/provider/email checks apply to protected routes. No production migration or frontend source change."
+    "description": "Backend-only additive saved/history/eligibility APIs and improvements to existing discovery/application contracts. Public result lists are now bounded; arrays and legacy score fields remain. Actual account/token/provider/email checks apply to protected routes. No production migration or frontend source change. Optional provider-owned recommendationMetadata supplies relevance hints; it does not alter eligibility. New private version-3 discovery/preferences are documented separately in personalized-opportunities.openapi.json. Explicit personalization opt-out makes legacy /matched use unranked newest discovery."
   },
   "servers": [
     {
@@ -804,7 +804,14 @@
                         "opportunities": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/MatchedOpportunity"
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/MatchedOpportunity"
+                              },
+                              {
+                                "$ref": "#/components/schemas/UnrankedOpportunity"
+                              }
+                            ]
                           }
                         },
                         "page": {
@@ -835,6 +842,10 @@
                         "matchingVersion": {
                           "type": "integer",
                           "const": 2
+                        },
+                        "personalized": {
+                          "type": "boolean",
+                          "description": "Explicitly false on opt-out; enabled-mode legacy clients retain their existing score fields."
                         }
                       },
                       "required": [
@@ -2022,6 +2033,9 @@
             "type": "string",
             "minLength": 0,
             "maxLength": 500
+          },
+          "recommendationMetadata": {
+            "$ref": "#/components/schemas/RecommendationMetadata"
           }
         },
         "required": [
@@ -2202,6 +2216,9 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000
+          },
+          "recommendationMetadata": {
+            "$ref": "#/components/schemas/RecommendationMetadata"
           }
         },
         "required": [],
@@ -2439,6 +2456,9 @@
             "required": [
               "verification"
             ]
+          },
+          "recommendationMetadata": {
+            "$ref": "#/components/schemas/RecommendationMetadata"
           }
         },
         "required": [
@@ -2790,6 +2810,86 @@
           "reason",
           "createdAt"
         ]
+      },
+      "RecommendationMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ICT",
+                "ET",
+                "BST"
+              ]
+            },
+            "maxItems": 3
+          },
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "maxItems": 20
+          },
+          "studyYears": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "maxItems": 6
+          },
+          "careerStage": {
+            "type": "string",
+            "enum": [
+              "internship",
+              "entry",
+              "graduate",
+              "experienced"
+            ]
+          },
+          "employmentArrangement": {
+            "type": "string",
+            "enum": [
+              "full-time",
+              "part-time",
+              "contract",
+              "freelance",
+              "volunteer"
+            ]
+          }
+        },
+        "required": []
+      },
+      "UnrankedOpportunity": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Opportunity"
+          },
+          {
+            "not": {
+              "required": [
+                "matchPercentage"
+              ]
+            }
+          }
+        ],
+        "description": "Legacy matched-feed opt-out: ordinary open opportunity without personal match fields."
       }
     },
     "responses": {
