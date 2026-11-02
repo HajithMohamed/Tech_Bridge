@@ -1,23 +1,20 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { mobileWorkspaceLinks, workspaceLabel, workspaceLinks } from '../utils/workspaceNavigation';
 import AppHeader from './AppHeader';
+import WorkspaceNavigation from './WorkspaceNavigation';
 import Footer from './landing/Footer';
 
-const PortalLayout = () => {
-  const { pathname } = useLocation();
-  const pageOwnsHeader = pathname === '/my-activity'
-    || pathname === '/provider'
-    || pathname === '/provider/profile'
-    || pathname === '/resources/list';
-
-  return (
-    <div className="min-h-screen bg-surface-50 flex flex-col">
-      {!pageOwnsHeader && <AppHeader />}
-      <div className="flex-grow">
-        <Outlet />
-      </div>
-      <Footer />
+export default function PortalLayout() {
+  const { user } = useAuth();
+  return <div className="tb-portal">
+    <a className="tb-skip-link" href="#workspace-content">Skip to content</a>
+    <AppHeader />
+    <div className="tb-workspace">
+      <aside className="tb-sidebar"><p>{workspaceLabel(user)}</p><WorkspaceNavigation links={workspaceLinks(user)} label="Workspace" /></aside>
+      <div id="workspace-content" className="tb-workspace-content" tabIndex={-1}><Outlet /></div>
     </div>
-  );
-};
-
-export default PortalLayout;
+    <Footer />
+    <WorkspaceNavigation links={mobileWorkspaceLinks(user)} label="Quick navigation" className="tb-bottom-navigation" />
+  </div>;
+}

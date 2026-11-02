@@ -1,7 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
 
 import { createResource, deleteResource, getMyResources, updateResourceStatus } from '../api/resourceApi';
 import { useAuth } from '../hooks/useAuth';
@@ -114,7 +113,7 @@ const ResourceListingPage = () => {
       <div className="grid sm:grid-cols-1 gap-4"><Field label="Item name"><TextInput value={form.itemName} onChange={(itemName) => setForm((current) => ({ ...current, itemName }))} placeholder="e.g. Arduino UNO" /></Field></div>
       <div className="grid sm:grid-cols-2 gap-4"><Field label="Quantity available"><TextInput type="number" min={1} value={form.quantityAvailable} onChange={(quantityAvailable) => setForm((current) => ({ ...current, quantityAvailable: Number(quantityAvailable) }))} /></Field>{!isServiceStock && <Field label="Condition"><select className="feed-input" value={form.condition || ''} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value as ResourceCondition }))}><option value="new">New</option><option value="used_good">Used — good</option><option value="used_fair">Used — fair</option></select></Field>}</div>
 */
-  return <div className="min-h-screen"><AppHeader /><main className="max-w-6xl mx-auto px-4 sm:px-6 py-9">
+  return <div className="min-h-screen"><main className="max-w-6xl mx-auto px-4 sm:px-6 py-9">
     <div className="flex items-center justify-between gap-4 mb-7"><div><p className="text-primary-300 text-sm font-semibold mb-2">TECHNICAL RESOURCE ACCESS HUB</p><h1 className="text-3xl font-bold text-white">List a resource</h1><p className="text-gray-400 mt-2">Add a photo, technical specifications, and exact access terms for students.</p></div><Link to="/resources" className="text-sm text-primary-200 hover:text-white">Browse the hub</Link></div>
     {error && <div className="mb-5 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-100">{error}</div>}
     {notice && <div className="mb-5 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-100">{notice}</div>}
