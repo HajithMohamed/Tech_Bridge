@@ -2,7 +2,7 @@ name: Repository security
 on:
   pull_request:
   push:
-    branches: [audit/security-reconciliation]
+    branches: [main, audit/security-reconciliation]
 permissions:
   contents: read
 jobs:

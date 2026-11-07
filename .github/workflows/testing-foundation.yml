@@ -2,7 +2,7 @@ name: Application checks
 on:
   pull_request:
   push:
-    branches: [integration/techbridge-v2, chore/testing-foundation]
+    branches: [main, integration/techbridge-v2, chore/testing-foundation]
 permissions:
   contents: read
 concurrency:
