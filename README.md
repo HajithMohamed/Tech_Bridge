@@ -3,13 +3,34 @@
 > **Digital Opportunity Bridge for Technology Students**  
 > Empowering students across Information & Communication Technology (ICT), Engineering Technology (ET), Biosystems Technology (BST), and Multidisciplinary Studies (MDS) by connecting them directly with industry opportunities, hardware resources, mentors, and academic networks.
 
+[![Application checks](https://github.com/HajithMohamed/Tech_Bridge/actions/workflows/testing-foundation.yml/badge.svg?branch=main)](https://github.com/HajithMohamed/Tech_Bridge/actions/workflows/testing-foundation.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x%20%7C%207.x-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
 [![Express](https://img.shields.io/badge/Express-5.x-000000?logo=express)](https://expressjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_8-47A248?logo=mongodb)](https://www.mongodb.com/)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=nodedotjs)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22.12+-339933?logo=nodedotjs)](https://nodejs.org/)
+[![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
+
+<!-- Add the live demo link here once it is deployed. -->
+
+![TechBridge landing page: "Bring Opportunities to Students", with links to find opportunities or become a provider](docs/screenshots/landing.png)
+
+## At a glance
+
+| | |
+| --- | --- |
+| **What it is** | A platform where technology students find jobs, internships, scholarships, mentors and hardware to borrow, and where verified organisations publish them |
+| **Roles** | Student, provider (verified by an admin) and admin, each with its own portal and permission checks on the server |
+| **Match engine** | A rule-based 0–100% score (60% skills, 25% career relevance, 15% location) with a list of missing skills. No machine learning |
+| **Stack** | React 19, Vite 8, TypeScript, Tailwind CSS 4 · Express 5, Mongoose 8, MongoDB · JWT, bcrypt, express-validator |
+| **Tests** | 879 backend unit tests and 86 frontend unit and integration tests, plus backend integration tests (mongodb-memory-server) and 10 Playwright end-to-end specs in CI |
+| **Security** | bcrypt (cost 12), JWT pinned to HS256 with a strong secret required in production, a CORS allowlist, escaped search input and an audit log for admin actions |
+
+| Sign in |
+| --- |
+| ![TechBridge sign-in page with the email and password form](docs/screenshots/sign-in.png) |
 
 ---
 
@@ -137,102 +158,17 @@ TechBridge organizes student growth around four key pillars:
 
 ```text
 Tech_Bridge/
-├── backend/                       # Express + TypeScript REST API Server
-│   ├── .env                       # Backend environment variables
-│   ├── package.json               # Backend dependencies & scripts
-│   ├── tsconfig.json              # Backend TypeScript configuration
-│   └── src/
-│       ├── config/
-│       │   └── db.ts              # MongoDB Mongoose connection setup
-│       ├── controllers/           # HTTP controllers for all domain entities
-│       │   ├── applicationController.ts
-│       │   ├── authController.ts
-│       │   ├── dashboardController.ts
-│       │   ├── matchController.ts
-│       │   ├── opportunityController.ts
-│       │   ├── providerController.ts
-│       │   ├── resourceController.ts
-│       │   └── resourceRequestController.ts
-│       ├── middleware/            # Express request interceptors
-│       │   ├── auth.ts            # JWT verification & RBAC authorization
-│       │   └── validate.ts        # express-validator result handler
-│       ├── models/                # Mongoose database schemas
-│       │   ├── Application.ts     # Opportunity application submissions
-│       │   ├── Opportunity.ts     # Jobs, internships, scholarships, courses
-│       │   ├── Resource.ts        # Hardware specifications & access models
-│       │   ├── ResourceRequest.ts # Hardware borrow/rent/claim requests
-│       │   └── User.ts            # Student, Provider, and Admin profiles
-│       ├── routes/                # API route definitions
-│       │   ├── applicationRoutes.ts
-│       │   ├── authRoutes.ts
-│       │   ├── dashboardRoutes.ts
-│       │   ├── opportunityRoutes.ts
-│       │   ├── providerRoutes.ts
-│       │   ├── publicProviderRoutes.ts
-│       │   ├── resourceRequestRoutes.ts
-│       │   └── resourceRoutes.ts
-│       ├── utils/                 # Business logic helpers & calculations
-│       │   ├── jwt.ts             # JWT token sign & verify
-│       │   ├── matchEngine.ts     # Opportunity matching & scoring engine
-│       │   └── providerCapabilities.ts # Capability matrix per organization type
-│       ├── seed.ts                # Explicit local-only synthetic demo seeder
-│       └── server.ts              # Express application bootstrap
-│
-├── frontend/                      # React 19 + Vite Single Page Application
-│   ├── index.html                 # Main HTML entry point
-│   ├── package.json               # Frontend dependencies & scripts
-│   ├── vite.config.ts             # Vite configuration & backend proxy
-│   ├── tsconfig.json              # TypeScript root config
-│   ├── public/                    # Static assets & public illustrations
-│   └── src/
-│       ├── App.tsx                # Client-side route declarations
-│       ├── main.tsx               # React DOM root render
-│       ├── index.css              # Tailwind CSS configuration & tokens
-│       ├── api/                   # Typed Axios API clients
-│       │   ├── axios.ts           # Axios instance with auth interceptors
-│       │   ├── applicationApi.ts
-│       │   ├── authApi.ts
-│       │   ├── dashboardApi.ts
-│       │   ├── opportunityApi.ts
-│       │   ├── providerApi.ts
-│       │   ├── resourceApi.ts
-│       │   └── resourceRequestApi.ts
-│       ├── components/            # Reusable UI components
-│       │   ├── AppHeader.tsx      # Main application navigation header
-│       │   ├── PortalLayout.tsx   # Dashboard container layout
-│       │   ├── ProtectedRoute.tsx # Route guard for authentication & roles
-│       │   └── landing/           # Landing page sections & showcases
-│       ├── context/
-│       │   └── AuthContext.tsx    # Global user session & state
-│       ├── data/
-│       │   └── facultyConnections.ts # University of Ruhuna staff & alumni data
-│       ├── pages/                 # Full-page views (20+ interactive screens)
-│       │   ├── LandingPage.tsx
-│       │   ├── LoginPage.tsx
-│       │   ├── RegisterPage.tsx
-│       │   ├── DashboardPage.tsx
-│       │   ├── OpportunityFeedPage.tsx
-│       │   ├── OpportunityDetailPage.tsx
-│       │   ├── ResourceHubPage.tsx
-│       │   ├── ResourceListingPage.tsx
-│       │   ├── ResourceRequestPage.tsx
-│       │   ├── FacultyConnectionsPage.tsx
-│       │   ├── ImpactDashboardPage.tsx
-│       │   ├── StudentProfilePage.tsx
-│       │   ├── MyApplicationsPage.tsx
-│       │   ├── MyResourceRequestsPage.tsx
-│       │   ├── MyActivityPage.tsx
-│       │   ├── ProviderDashboardPage.tsx
-│       │   ├── ProviderPortalPage.tsx
-│       │   ├── ProviderResourcesPage.tsx
-│       │   ├── ProviderApplicationsPage.tsx
-│       │   ├── ProviderResourceRequestsPage.tsx
-│       │   ├── ProviderProfilePage.tsx
-│       │   └── PublicProviderProfilePage.tsx
-│       └── types/
-│           └── index.ts           # Central TypeScript types & interfaces
-│
-└── README.md                      # Project documentation
+├── backend/            Express 5 + TypeScript REST API
+│   ├── src/            22 controllers, 24 Mongoose models, 19 route files, 42 services
+│   ├── tests/          Vitest unit and integration tests (mongodb-memory-server)
+│   └── docs/           API guides and OpenAPI contracts
+├── frontend/           React 19 + Vite single-page app
+│   ├── src/            33 pages, typed Axios API clients, auth context
+│   ├── src/test/       Vitest, React Testing Library and MSW tests
+│   └── e2e/            10 Playwright end-to-end specs
+├── docs/               Feature reviews, testing guide and local Docker setup
+├── tests/              Repository security checks
+└── compose.local.yml   Local MongoDB replica set
 ```
 
 ---
@@ -432,7 +368,7 @@ Applications and resource requests now require a 30–800 character need justifi
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or higher (v20+ recommended)
+- **Node.js**: 22.12 or newer (24 LTS also works), as required by `engines` in both `package.json` files
 - **npm**: v9.0.0 or higher
 - **MongoDB**: A running local instance or a [MongoDB Atlas](https://www.mongodb.com/atlas) connection URI
 
@@ -457,7 +393,7 @@ backend and frontend `npm run dev` commands.
    ```
 
 3. **Configure environment variables**:
-   Create a `.env` file in the `backend/` root directory:
+   Copy `backend/.env.example` to `backend/.env` and set your own values:
    ```env
    PORT=5000
    MONGODB_URI=mongodb://localhost:27017/techbridge
