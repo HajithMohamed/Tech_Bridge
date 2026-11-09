@@ -1,66 +1,41 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { GraduationCap, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { workspaceLabel, workspaceLinks } from '../utils/workspaceNavigation';
+import WorkspaceNavigation from './WorkspaceNavigation';
+import Button from './ui/Button';
+import Dialog from './ui/Dialog';
 
-const AppHeader = () => {
+export default function AppHeader() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const active = (path: string, exact = false) => (exact ? pathname === path : pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)))
-    ? 'bg-white/10 text-white'
-    : 'text-gray-300 hover:bg-white/5 hover:text-white';
-  const signOut = () => { logout(); navigate('/'); };
+  const [menuOpen, setMenuOpen] = useState(false);
+  const signOut = () => { setMenuOpen(false); logout(); navigate('/'); };
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const desktop = window.matchMedia('(min-width: 1000px)');
+    const closeOnDesktop = () => { if (desktop.matches) setMenuOpen(false); };
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
+  }, []);
 
-  const navClass = (path: string, exact = false) => `rounded-lg px-3 py-2 text-sm ${active(path, exact)}`;
-
-  if (!user) return (
-    <nav className="sticky top-0 z-30 border-b border-white/10 bg-surface-900/95 backdrop-blur">
-      <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
-        <Link to="/" className="font-bold text-white">TECH<span className="text-primary-400">BRIDGE</span></Link>
-        <div className="flex flex-wrap gap-1">
-          <Link to="/opportunities" className={navClass('/opportunities')}>Opportunities</Link>
-          <Link to="/resources" className={navClass('/resources')}>Resources</Link>
-          <Link to="/connections" className={navClass('/connections')}>Academic & Alumni</Link>
-          <Link to="/login" className="rounded-lg px-3 py-2 text-sm text-gray-300 hover:text-white">Sign in</Link>
-          <Link to="/register" className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white">Get started</Link>
+  return <>
+    <header className="tb-header">
+      <div className="tb-header-inner">
+        <Link to="/" className="tb-brand" aria-label="TechBridge home"><GraduationCap size={30} aria-hidden="true" /><span>TECH<span>BRIDGE</span></span></Link>
+        <span className="tb-workspace-label">{workspaceLabel(user)}</span>
+        <div className="tb-header-actions">
+          {user ? <div className="tb-desktop-account"><span className="tb-account-name">{user.fullName}</span><Button variant="quiet" onClick={signOut}><LogOut size={18} aria-hidden="true" />Sign out</Button></div>
+            : <div className="tb-public-actions"><Link className="tb-button tb-button--secondary" to="/login">Sign in</Link><Link className="tb-button tb-button--primary" to="/register">Get started</Link></div>}
+          <Button variant="secondary" className="tb-menu-button" aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={20} aria-hidden="true" /></Button>
         </div>
       </div>
-    </nav>
-  );
-
-  return (
-    <nav className="sticky top-0 z-30 border-b border-white/10 bg-surface-900/95 backdrop-blur">
-      <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
-        <Link to="/" className="font-bold text-white">TECH<span className="text-primary-400">BRIDGE</span></Link>
-        <div className="flex flex-wrap gap-1">
-          <Link to="/" className={navClass('/')}>Home</Link>
-          {user.role === 'student' ? (
-            <>
-              <Link to="/dashboard" className={navClass('/dashboard')}>Dashboard</Link>
-              <Link to="/opportunities" className={navClass('/opportunities')}>Opportunities</Link>
-              <Link to="/resources" className={navClass('/resources')}>Resources</Link>
-              <Link to="/my-activity" className={navClass('/my-activity')}>My activity</Link>
-              <Link to="/creator-profile" className={navClass('/creator-profile')}>Creator profile</Link>
-              <Link to="/my-promotion-requests" className={navClass('/my-promotion-requests')}>Campaign requests</Link>
-            </>
-          ) : user.role === 'provider' ? (
-            <>
-              <Link to="/provider" className={navClass('/provider', true)}>Dashboard</Link>
-              <Link to="/provider/opportunities" className={navClass('/provider/opportunities')}>Listings</Link>
-              <Link to="/provider/applications" className={navClass('/provider/applications')}>Applications</Link>
-              <Link to="/provider/resources" className={navClass('/provider/resources')}>Resources</Link>
-              <Link to="/provider/resource-requests" className={navClass('/provider/resource-requests')}>Requests</Link>
-              <Link to="/creators" className={navClass('/creators')}>Creators</Link>
-              <Link to="/provider/promotion-requests" className={navClass('/provider/promotion-requests')}>Campaigns</Link>
-              <Link to="/provider/profile" className={navClass('/provider/profile')}>Profile</Link>
-            </>
-          ) : <Link to="/admin" className={navClass('/admin')}>Admin</Link>}
-          <Link to="/messages" className={navClass('/messages')}>Messages</Link>
-          <Link to="/connections" className={navClass('/connections')}>Community</Link>
-          <button onClick={signOut} className="rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white">Sign out</button>
-        </div>
-      </div>
-    </nav>
-  );
-};
-
-export default AppHeader;
+    </header>
+    <Dialog open={menuOpen} title="Navigation" onClose={() => setMenuOpen(false)}>
+      <WorkspaceNavigation links={workspaceLinks(user)} label="Mobile workspace" onNavigate={() => setMenuOpen(false)} />
+      {user ? <Button variant="quiet" onClick={signOut}><LogOut size={18} aria-hidden="true" />Sign out</Button>
+        : <div className="tb-auth-actions"><Link to="/login" className="tb-button tb-button--secondary" onClick={() => setMenuOpen(false)}>Sign in</Link><Link to="/register" className="tb-button tb-button--primary" onClick={() => setMenuOpen(false)}>Get started</Link></div>}
+    </Dialog>
+  </>;
+}

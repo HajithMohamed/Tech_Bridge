@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ExternalLink, GraduationCap, Mail, MessageCircle, Search, UsersRound } from 'lucide-react';
-import AppHeader from '../components/AppHeader';
 import { academicStaff, alumniContacts, officialFacultySources, type ConnectionCategory, type FacultyConnection } from '../data/facultyConnections';
 import { getCommunityMembers, type CommunityMember } from '../api/communityApi';
 import { useAuth } from '../hooks/useAuth';
@@ -32,7 +31,7 @@ export default function FacultyConnectionsPage() {
     return (category !== 'academic' || department === 'all' || item.department === department) && (!query.trim() || text.includes(query.trim().toLowerCase()));
   }), [category, department, query]);
   const chooseCategory = (value: ConnectionCategory) => { setCategory(value); setDepartment('all'); setPage(1); };
-  return <div className="min-h-screen bg-surface-50"><AppHeader /><main className="mx-auto max-w-7xl px-4 py-9 sm:px-6">
+  return <div className="min-h-screen bg-surface-50"><main className="mx-auto max-w-7xl px-4 py-9 sm:px-6">
     <section className="rounded-3xl bg-gradient-to-br from-surface-900 via-primary-950 to-primary-800 px-6 py-10 text-white">
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-200">Faculty community</p>
       <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Connect with academic staff and alumni</h1>
