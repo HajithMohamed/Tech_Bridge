@@ -88,7 +88,9 @@ export const resolveReport = async (req: Request, res: Response): Promise<void> 
     } else if (removeTarget && report.targetType === 'resource') {
       await removeResourceWithHistory(String(report.targetId), req.user!._id, true, report.resolutionNote || undefined);
     } else {
-      await audit(req.user!._id, 'report_resolved', 'user', report.reporterId, report.resolutionNote);
+      const auditTargetType = report.targetType === 'opportunity' ? 'opportunity' : report.targetType === 'resource' ? 'resource' : 'user';
+      const auditTargetId = auditTargetType === 'user' ? report.reporterId : report.targetId;
+      await audit(req.user!._id, 'report_resolved', auditTargetType, auditTargetId, report.resolutionNote);
     }
     res.json({ success: true, message: 'Report resolved.', data: { report } });
   } catch (error) { adminFailure(res, error); }

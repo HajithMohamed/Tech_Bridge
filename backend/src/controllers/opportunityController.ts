@@ -217,12 +217,10 @@ export const listMyOpportunities = async (req: Request, res: Response): Promise<
 export const getOpportunity = async (req: Request, res: Response): Promise<void> => {
   try {
     const opportunity = await visibleOpportunity(req.params.id);
+    // Increment view count best-effort; a narrow race where the deadline expires
+    // between visibleOpportunity and here does not invalidate the found listing.
     const updated = await Opportunity.updateOne({ _id: opportunity._id, status: 'open', applicationDeadline: { $gt: new Date() } }, { $inc: { views: 1 } });
-    if (!updated.matchedCount) {
-      res.status(404).json({ success: false, message: 'Open opportunity not found' });
-      return;
-    }
-    opportunity.views += 1;
+    if (updated.matchedCount) opportunity.views += 1;
     res.status(200).json({ success: true, data: { opportunity } });
   } catch (error) {
     res.status(error instanceof ScholarshipAwardError ? error.statusCode : 503).json({ success: false, message: error instanceof ScholarshipAwardError ? error.message : 'Unable to fetch this opportunity.' });

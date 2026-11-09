@@ -289,15 +289,22 @@ export const createResource = async (req: Request, res: Response): Promise<void>
 /** GET /api/resources?item=Laptop&accessType=installment */
 export const listResources = async (req: Request, res: Response): Promise<void> => {
   try {
-    const filter: Record<string, unknown> = { status: 'available' };
+    const filter: Record<string, unknown> = { status: 'available', withdrawnByAdmin: { $ne: true } };
     if (typeof req.query.accessType === 'string' && accessTypes.includes(req.query.accessType as ResourceAccessType)) filter.accessType = req.query.accessType;
     if (typeof req.query.category === 'string' && categories.includes(req.query.category as ResourceCategory)) filter.category = req.query.category;
     if (typeof req.query.item === 'string' && req.query.item.trim()) {
       const escaped = req.query.item.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.itemName = { $regex: escaped, $options: 'i' };
     }
-    const resources = await Resource.find(filter).populate('listedBy', listedBySelect).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: { resources: resources.map(publicResource) } });
+    const rawPage = Number(req.query.page ?? 1);
+    const rawLimit = Number(req.query.limit ?? 20);
+    const page = Number.isInteger(rawPage) && rawPage >= 1 ? rawPage : 1;
+    const limit = Number.isInteger(rawLimit) && rawLimit >= 1 && rawLimit <= 100 ? rawLimit : 20;
+    const [resources, total] = await Promise.all([
+      Resource.find(filter).populate('listedBy', listedBySelect).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      Resource.countDocuments(filter),
+    ]);
+    res.status(200).json({ success: true, data: { resources: resources.map(publicResource), total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) } });
   } catch {
     res.status(500).json({ success: false, message: 'Unable to fetch resource listings.' });
   }

@@ -70,13 +70,14 @@ export function opportunitySearch(queryValue: unknown, now = new Date(), matched
   const query = opportunityObject(queryValue, ['type', 'skill', 'workMode', 'q', 'location', 'providerId', 'deadlineFrom', 'deadlineTo', 'isPaid', 'isFree', 'page', 'limit', 'sort']);
   const page = opportunityPage(query.page, 1, matched ? 100 : 10000); const limit = opportunityPage(query.limit, 20, matched ? 50 : 100);
   const filter: Record<string, unknown> = { status: 'open', scholarshipWithdrawnByAdmin: { $ne: true }, opportunityWithdrawnByAdmin: { $ne: true }, applicationDeadline: { $gt: now } };
-  if (query.type !== undefined) { if (!opportunityTypes.includes(query.type as OpportunityType)) throw new ScholarshipError(400, 'Select a valid opportunity type.'); filter.type = query.type; }
-  if (query.workMode !== undefined) { if (!['remote', 'on-site', 'hybrid'].includes(query.workMode as string)) throw new ScholarshipError(400, 'Select a valid work mode.'); filter.workMode = query.workMode; }
-  if (query.skill !== undefined) filter.requiredSkills = { $regex: literal(query.skill), $options: 'i' };
-  if (query.location !== undefined) filter.location = { $regex: literal(query.location), $options: 'i' };
-  if (query.providerId !== undefined) filter.providerId = opportunityId(query.providerId);
-  if (query.q !== undefined) { const q = literal(query.q); filter.$or = [{ title: { $regex: q, $options: 'i' } }, { description: { $regex: q, $options: 'i' } }]; }
-  for (const key of ['isPaid', 'isFree']) if (query[key] !== undefined) { if (!['true', 'false'].includes(query[key] as string)) throw new ScholarshipError(400, 'Use true or false for paid/free filters.'); filter[key] = query[key] === 'true'; }
+  const str = (key: string) => { if (query[key] !== undefined && typeof query[key] !== 'string') throw new ScholarshipError(400, `${key} must be a single string value.`); return query[key] as string | undefined; };
+  if (query.type !== undefined) { if (!opportunityTypes.includes(str('type') as OpportunityType)) throw new ScholarshipError(400, 'Select a valid opportunity type.'); filter.type = query.type; }
+  if (query.workMode !== undefined) { if (!['remote', 'on-site', 'hybrid'].includes(str('workMode') as string)) throw new ScholarshipError(400, 'Select a valid work mode.'); filter.workMode = query.workMode; }
+  if (query.skill !== undefined) filter.requiredSkills = { $regex: literal(str('skill')), $options: 'i' };
+  if (query.location !== undefined) filter.location = { $regex: literal(str('location')), $options: 'i' };
+  if (query.providerId !== undefined) filter.providerId = opportunityId(str('providerId'));
+  if (query.q !== undefined) { const q = literal(str('q')); filter.$or = [{ title: { $regex: q, $options: 'i' } }, { description: { $regex: q, $options: 'i' } }]; }
+  for (const key of ['isPaid', 'isFree']) if (query[key] !== undefined) { if (!['true', 'false'].includes(str(key) as string)) throw new ScholarshipError(400, 'Use true or false for paid/free filters.'); filter[key] = query[key] === 'true'; }
   const from = query.deadlineFrom === undefined ? undefined : opportunityDate(query.deadlineFrom); const to = query.deadlineTo === undefined ? undefined : opportunityDate(query.deadlineTo);
   if (from && to && from > to) throw new ScholarshipError(400, 'Deadline bounds are reversed.');
   if (from || to) filter.applicationDeadline = { $gt: now, ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) };

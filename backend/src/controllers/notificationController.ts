@@ -31,11 +31,13 @@ export const setNotificationRead = async (req: Request, res: Response) => {
     const filter = { _id: id, ...visible(req) };
     let row;
     if (body.read) {
-      row = await Notification.findOneAndUpdate({ ...filter, readAt: { $exists: false } }, { $set: { readAt: new Date() } }, { new: true });
-      if (!row) row = await Notification.findOne(filter);
-    } else row = await Notification.findOneAndUpdate(filter, { $unset: { readAt: '' } }, { new: true });
+      row = await Notification.findOneAndUpdate({ ...filter, readAt: { $exists: false } }, { $set: { readAt: new Date() } }, { new: true }).select(privateProjection);
+      if (!row) row = await Notification.findOne(filter).select(privateProjection);
+    } else {
+      row = await Notification.findOneAndUpdate(filter, { $unset: { readAt: '' } }, { new: true }).select(privateProjection);
+    }
     if (!row) throw new NotificationError(404, 'Notification not found.');
-    res.json({ success: true, data: { notification: await Notification.findOne(filter).select(privateProjection) } });
+    res.json({ success: true, data: { notification: row } });
   } catch (error) { failure(res, error); }
 };
 export const getNotificationPreferences = async (req: Request, res: Response) => {
