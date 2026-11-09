@@ -1,17 +1,25 @@
 :root {
-  --tb-forest: #10251a;
-  --tb-brand: #4f9d69;
-  --tb-action: #15803d;
-  --tb-action-hover: #166534;
-  --tb-mint: #eaf7ef;
-  --tb-canvas: #f7faf8;
+  /* ── TechBridge V2 Design Tokens ─────────────────────────── */
+  --tb-forest: #052e16;
+  --tb-brand: #16a34a;
+  --tb-action: #16a34a;
+  --tb-action-hover: #15803d;
+  --tb-mint: #dcfce7;
+  --tb-mint-soft: #f0fdf4;
+  --tb-canvas: #f8fafc;
   --tb-surface: #fff;
-  --tb-ink: #10251a;
-  --tb-muted: #475569;
-  --tb-line: #dde7e1;
-  --tb-control-line: #708178;
-  --tb-danger: #b91c1c;
-  --tb-radius: 18px;
+  --tb-ink: #0f172a;
+  --tb-subtext: #334155;
+  --tb-muted: #64748b;
+  --tb-line: #e2e8f0;
+  --tb-control-line: #94a3b8;
+  /* Semantic */
+  --tb-success: #10b981;
+  --tb-warning: #f59e0b;
+  --tb-danger: #ef4444;
+  --tb-info: #3b82f6;
+  /* Layout */
+  --tb-radius: 16px;
   --tb-control-radius: 10px;
   --tb-header-height: 72px;
   --tb-bottom-space: calc(80px + env(safe-area-inset-bottom, 0px));

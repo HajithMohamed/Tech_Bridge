@@ -28,6 +28,7 @@ import MessagesPage from './pages/MessagesPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import CreatorProfilePage from './pages/CreatorProfilePage';
 import CreatorDirectoryPage from './pages/CreatorDirectoryPage';
+import StudentProfileSetupPage from './pages/StudentProfileSetupPage';
 import MyPromotionRequestsPage from './pages/MyPromotionRequestsPage';
 import ProviderPromotionRequestsPage from './pages/ProviderPromotionRequestsPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -41,6 +42,7 @@ const App = () => (
     <Route path="/" element={<LandingPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
+    <Route path="/setup-profile" element={<ProtectedRoute allowedRoles={['student']}><StudentProfileSetupPage /></ProtectedRoute>} />
     <Route path="/provider-verification" element={<ProviderVerificationPage />} />
     <Route path="/community-verification" element={<CommunityVerificationPage />} />
     <Route element={<PortalLayout />}>

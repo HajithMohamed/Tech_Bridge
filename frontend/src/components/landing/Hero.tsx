@@ -1,67 +1,140 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Briefcase, GraduationCap, Users, Laptop } from 'lucide-react';
 
-const Hero = () => {
-  return (
-    <section className="relative pt-28 pb-16 md:pt-32 md:pb-24 overflow-hidden">
-      {/* Background styling elements */}
-      <div className="absolute inset-0 bg-surface-50 -z-10" />
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary-100/40 rounded-full blur-3xl opacity-50 -z-10 translate-x-1/3 -translate-y-1/3" />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
-          
-          {/* LEFT COLUMN: Copy */}
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-100 shadow-sm mb-6">
-              <Sparkles className="w-4 h-4 text-primary-500" />
-              <span className="text-xs font-semibold text-gray-700 tracking-wide uppercase">Digital Opportunity Bridge</span>
+const HIGHLIGHTS = [
+  { icon: Briefcase,     label: 'Jobs & Internships' },
+  { icon: GraduationCap, label: 'Scholarships' },
+  { icon: Users,         label: 'Mentorship' },
+  { icon: Laptop,        label: 'Resources' },
+];
+
+const FEATURES = [
+  {
+    title: 'Multidisciplinary Opportunities',
+    desc: 'Jobs, internships and training across ICT, ET and BST.',
+  },
+  {
+    title: 'Personalized for You',
+    desc: 'Discover opportunities based on your department and interests.',
+  },
+  {
+    title: 'Grow Beyond the Classroom',
+    desc: 'Mentorship, projects, events and a vibrant student community.',
+  },
+];
+
+const Hero = () => (
+  <section className="relative pt-28 pb-0 overflow-hidden bg-white">
+    {/* Soft green background blob */}
+    <div className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full bg-primary-50 -z-10 translate-x-1/3 -translate-y-1/4" />
+
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="grid lg:grid-cols-2 gap-10 lg:gap-6 items-end">
+
+        {/* ── Left column ── */}
+        <div className="pb-16">
+          {/* Badge */}
+          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-xs font-semibold mb-6">
+            For ICT, Engineering Technology &amp; Biosystems Technology Students
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-4xl sm:text-5xl lg:text-[52px] font-bold leading-[1.1] tracking-tight text-gray-900 mb-5">
+            Bridge Your Skills<br />
+            to{' '}
+            <span className="text-primary-600">Real Opportunities</span>
+          </h1>
+
+          {/* Sub-copy */}
+          <p className="text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
+            A unified platform for opportunities, learning, collaboration and career growth — built for TechBridge students.
+          </p>
+
+          {/* CTAs */}
+          <div className="flex flex-wrap gap-3 mb-10">
+            <Link
+              to="/register"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 transition-colors shadow-lg shadow-primary-600/25 group"
+            >
+              Get Started
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
+            </Link>
+            <Link
+              to="/opportunities"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white border border-gray-200 text-gray-700 font-semibold text-sm hover:border-gray-300 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              Explore Opportunities
+            </Link>
+          </div>
+
+          {/* Category chips */}
+          <div className="flex flex-wrap gap-3">
+            {HIGHLIGHTS.map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-white border border-gray-100 shadow-sm text-sm font-medium text-gray-700"
+              >
+                <Icon className="w-4 h-4 text-primary-600" aria-hidden="true" />
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Right column: hero image ── */}
+        <div className="relative flex items-end justify-center">
+          <div className="relative w-full max-w-md lg:max-w-full">
+            {/* Decorative circle behind students */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[420px] h-[420px] rounded-full bg-primary-100/60 -z-10" />
+            <img
+              src="/hero-students.png"
+              alt="Three TechBridge students from ICT, ET and BST departments"
+              className="relative z-10 w-full h-auto max-h-[500px] object-contain object-bottom drop-shadow-xl"
+              onError={(e) => {
+                /* Fallback gradient if image missing */
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            {/* Stats badge floating top-left */}
+            <div className="absolute top-8 left-0 bg-white rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 border border-gray-100 z-20">
+              <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center">
+                <GraduationCap className="w-5 h-5 text-primary-600" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Active Opportunities</p>
+                <p className="text-lg font-bold text-gray-900">120+</p>
+              </div>
             </div>
-            
-            <h1 className="text-4xl lg:text-5xl font-bold text-surface-900 leading-[1.1] tracking-tight mb-6">
-              Bring <span className="text-primary-600 relative">
-                Opportunities
-                <span className="absolute bottom-1 left-0 w-full h-3 bg-primary-200/50 -z-10 rounded-full"></span>
-              </span><br />
-              to Students.
-            </h1>
-            
-            <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-xl">
-              One platform connecting students with jobs, internships, scholarships, mentors, and technical resources.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <Link to="/register?role=student" className="inline-flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 transition-all shadow-md shadow-primary-500/20 group">
-                Find Opportunities
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link to="/register?role=provider" className="inline-flex justify-center items-center gap-2 px-6 py-3.5 rounded-xl bg-white text-surface-900 border border-gray-200 font-semibold hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm">
-                Become a Provider
-              </Link>
-            </div>
-            
-            <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
-              <CheckCircle2 className="w-4 h-4 text-primary-500" />
-              Built for Faculty of Technology students
+            {/* Match badge floating bottom-right */}
+            <div className="absolute bottom-16 right-0 bg-white rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 border border-gray-100 z-20">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <span className="text-emerald-600 text-sm font-black">96%</span>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Avg. Match Score</p>
+                <p className="text-sm font-bold text-gray-900">Your Profile</p>
+              </div>
             </div>
           </div>
-          
-          {/* RIGHT COLUMN: Hero Image */}
-          <div className="relative w-full flex items-center justify-center">
-            <div className="relative w-full max-w-lg">
-              <div className="absolute -inset-4 bg-gradient-to-tr from-primary-200/30 via-emerald-100/20 to-amber-100/20 rounded-[2.5rem] blur-2xl -z-10" />
-              <img 
-                src="/hero-illustration.png" 
-                alt="Students from various technology departments collaborating on projects" 
-                className="w-full h-auto rounded-3xl shadow-2xl shadow-primary-900/10 border border-white/50"
-              />
-            </div>
-          </div>
-          
         </div>
       </div>
-    </section>
-  );
-};
+    </div>
+
+    {/* ── Feature strip ── */}
+    <div className="bg-white border-t border-gray-100 mt-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+        {FEATURES.map(({ title, desc }) => (
+          <div key={title} className="flex items-center gap-4 py-6 px-6 group cursor-default">
+            <div className="flex-1">
+              <p className="text-sm font-bold text-gray-900 mb-1">{title}</p>
+              <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0 group-hover:text-primary-500 transition-colors" aria-hidden="true" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
 
 export default Hero;

@@ -38,12 +38,22 @@ const matchColor = (pct: number) => {
 const isMatched = (opp: Opportunity | MatchedOpportunity): opp is MatchedOpportunity =>
   'matchPercentage' in opp;
 
+const DEPARTMENTS = [
+  { key: 'all',  label: 'All Departments' },
+  { key: 'ict',  label: 'ICT' },
+  { key: 'et',   label: 'Engineering Technology' },
+  { key: 'bst',  label: 'Biosystems Technology' },
+  { key: 'other', label: 'Interdisciplinary' },
+] as const;
+type DeptKey = typeof DEPARTMENTS[number]['key'];
+
 const OpportunityFeedPage = () => {
   const { user } = useAuth();
   const isStudent = user?.role === 'student';
 
   const [opportunities, setOpportunities] = useState<(Opportunity | MatchedOpportunity)[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'earn' | 'learn' | 'experience' | 'financial' | 'matched'>('all');
+  const [dept, setDept] = useState<DeptKey>('all');
   const [type, setType] = useState<OpportunityType | ''>('');
   const [skill, setSkill] = useState('');
   const [workMode, setWorkMode] = useState<WorkMode | ''>('');
@@ -58,38 +68,38 @@ const OpportunityFeedPage = () => {
         if (activeTab === 'matched' && isStudent) {
           const result = await getMatchedOpportunities();
           let matched = result.opportunities;
-          if (type) matched = matched.filter((opportunity) => opportunity.type === type);
-          if (skill.trim()) matched = matched.filter((opportunity) => opportunity.requiredSkills.some((requiredSkill) => requiredSkill.toLowerCase().includes(skill.trim().toLowerCase())));
-          if (workMode) matched = matched.filter((opportunity) => opportunity.workMode === workMode);
+          if (type) matched = matched.filter((o) => o.type === type);
+          if (skill.trim()) matched = matched.filter((o) => o.requiredSkills.some((s) => s.toLowerCase().includes(skill.trim().toLowerCase())));
+          if (workMode) matched = matched.filter((o) => o.workMode === workMode);
           setOpportunities(matched);
         } else if (activeTab === 'financial' && !skill.trim() && !workMode) {
           setOpportunities(await getScholarships());
         } else {
-          let typeQuery = type ? type : undefined;
-          
-          if (!type) {
-            if (activeTab === 'financial') typeQuery = 'scholarship';
-            // We can't query multiple types simultaneously with the current `type` filter. 
-            // The backend /api/opportunities?type=job etc. supports only one.
-            // But wait, if activeTab is earn/learn/experience we can fetch all and filter in frontend,
-            // OR update backend to support multiple types? 
-            // For now, let's fetch all and filter in frontend if no specific `type` is chosen!
-          }
+          let typeQuery = type || undefined;
+          if (!type && activeTab === 'financial') typeQuery = 'scholarship';
 
           const filters = {
             ...(typeQuery ? { type: typeQuery } : {}),
             ...(skill.trim() ? { skill: skill.trim() } : {}),
             ...(workMode ? { workMode } : {}),
           };
-          
+
           let results = await getOpportunities(filters);
-          
+
           if (!typeQuery) {
-            if (activeTab === 'earn') results = results.filter(o => ['job', 'freelance', 'promotion'].includes(o.type));
-            if (activeTab === 'learn') results = results.filter(o => ['course', 'workshop', 'mentorship'].includes(o.type));
-            if (activeTab === 'experience') results = results.filter(o => o.type === 'internship');
+            if (activeTab === 'earn') results = results.filter((o) => ['job', 'freelance', 'promotion'].includes(o.type));
+            if (activeTab === 'learn') results = results.filter((o) => ['course', 'workshop', 'mentorship'].includes(o.type));
+            if (activeTab === 'experience') results = results.filter((o) => o.type === 'internship');
           }
-          
+
+          // Frontend department filter — matches against eligibility degrees field if populated
+          if (dept !== 'all') {
+            results = results.filter((o) => {
+              const degrees: string[] = (o as Opportunity & { eligibility?: { degrees?: string[] } }).eligibility?.degrees ?? [];
+              return degrees.length === 0 || degrees.includes(dept);
+            });
+          }
+
           setOpportunities(results);
         }
       } catch {
@@ -99,25 +109,44 @@ const OpportunityFeedPage = () => {
       }
     };
     void load();
-  }, [activeTab, type, skill, workMode, isStudent]);
+  }, [activeTab, dept, type, skill, workMode, isStudent]);
 
   const switchTab = (tab: 'all' | 'earn' | 'learn' | 'experience' | 'financial' | 'matched') => {
     setActiveTab(tab);
     setType('');
   };
 
+  const switchDept = (d: DeptKey) => setDept(d);
+
   return (
     <div className="min-h-screen bg-surface-50">
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-9">
         {/* Hero Section */}
-        <section className="mb-8">
+        <section className="mb-7">
           <p className="text-primary-600 text-sm font-semibold mb-2 uppercase tracking-wider">Opportunity Hub</p>
           <h1 className="text-3xl font-bold text-gray-900">Find your next practical pathway</h1>
           <p className="text-gray-500 mt-2">
             Jobs, internships, learning and dedicated scholarship support in one place.
           </p>
         </section>
+
+        {/* Department filter chips */}
+        <div className="flex flex-wrap gap-2 mb-5">
+          {DEPARTMENTS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => switchDept(key)}
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors cursor-pointer border ${
+                dept === key
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
