@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import ProviderVerificationPage from './pages/ProviderVerificationPage';
@@ -33,15 +34,18 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PortalLayout from './components/PortalLayout';
 import MessageUpdates from './components/MessageUpdates';
 
+const DesignSystemPage = import.meta.env.DEV ? lazy(() => import('./pages/DesignSystemPage')) : null;
+
 const App = () => (
   <><MessageUpdates /><Routes>
     <Route path="/" element={<LandingPage />} />
-    <Route path="/connections" element={<FacultyConnectionsPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/provider-verification" element={<ProviderVerificationPage />} />
     <Route path="/community-verification" element={<CommunityVerificationPage />} />
     <Route element={<PortalLayout />}>
+      <Route path="/connections" element={<FacultyConnectionsPage />} />
+      {DesignSystemPage ? <Route path="/design-system" element={<Suspense fallback={<p role="status">Loading design examples…</p>}><DesignSystemPage /></Suspense>} /> : null}
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/opportunities" element={<OpportunityFeedPage />} />
       <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
